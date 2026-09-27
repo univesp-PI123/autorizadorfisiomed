@@ -13,8 +13,9 @@ mesmo servidor na **AWS (EC2)**. Não usamos Neon nem Vercel.
 
 ## Funcionalidades
 
-- **Dashboard** — indicadores (autorizações ativas, pendentes, vencendo,
-  glosas, atendimentos sem autorização) e gráficos.
+- **Visão geral** — indicadores (autorizações ativas, pendentes, vencendo,
+  atendimentos do mês), autorizações vencendo, ações rápidas, cobrança e
+  gráfico de atendimentos por mês.
 - **Pacientes** — cadastro, edição, desativação e carteirinhas de convênio.
 - **Convênios** — cadastro de operadoras, prazos e antecedência dos alertas.
 - **Autorizações** — ciclo completo com histórico:
@@ -28,16 +29,39 @@ mesmo servidor na **AWS (EC2)**. Não usamos Neon nem Vercel.
   exportação CSV/JSON.
 - **Configurações** — troca da própria senha; gestão de usuários (admin).
 
+## Visual (design system Sóbrio)
+
+A interface segue o design system **Sóbrio**: bordas finas em vez de sombras,
+um único rosa de destaque, status em badges discretos, números em fonte mono
+(IBM Plex Mono) e texto em IBM Plex Sans. Tem **tema claro e escuro** (botão
+na barra superior; a escolha fica salva no navegador).
+
+- `src/styles/sobrio/` — `tokens.css` e `sobrio.css` do pacote do design
+  system, **sem alterações**. Para atualizar o design system, substitua esses
+  dois arquivos.
+- `src/styles/app.css` — complementos do sistema (estrutura das telas, modal,
+  formulários, gráficos), usando só os tokens do Sóbrio.
+- `public/fundo-login.webp` — imagem de fundo do login.
+- **Logo:** enquanto não houver o arquivo de logo da clínica, o login e o menu
+  mostram a marca em texto ("F" + "Fisiomed ABA"), definida em
+  `src/components/Marca.tsx`. Para usar o logo, coloque o arquivo em
+  `public/` e troque o conteúdo desse componente por um `<img>`.
+
+As fontes são baixadas do Google Fonts **durante o `npm run build`** e
+servidas pelo próprio site (o navegador dos usuários não acessa o Google).
+Por isso o servidor precisa de acesso à internet na hora do build.
+
 ## Perfis de acesso
 
 | Tela / ação                         | Admin | Recepção | Terapeuta | Financeiro |
 |-------------------------------------|:-----:|:--------:|:---------:|:----------:|
-| Dashboard, Configurações (própria senha) | ✅ | ✅ | ✅ | ✅ |
+| Visão geral, Configurações (própria senha) | ✅ | ✅ | ✅ | ✅ |
 | Pacientes                           | ✅ | ✅ | ✅ |    |
 | Convênios (ver)                     | ✅ | ✅ |    | ✅ |
 | Convênios (criar/editar)            | ✅ |    |    | ✅ |
 | Autorizações                        | ✅ | ✅ |    | ✅ |
 | Atendimentos (registrar)            | ✅ | ✅ | ✅ |    |
+| Atendimentos (ver)                  | ✅ | ✅ | ✅ | ✅ |
 | Atendimentos (cobrança/glosa)       | ✅ | ✅ |    | ✅ |
 | Relatórios                          | ✅ |    |    | ✅ |
 | Gestão de usuários                  | ✅ |    |    |    |
@@ -342,6 +366,9 @@ Isso gera uma nova pasta em `prisma/migrations/`. Faça commit dela junto com
 o schema — no servidor, o `migrate deploy` vai aplicá-la.
 
 ## Próximos passos sugeridos
+
+- Recuperação de senha por e-mail (o link "Esqueci minha senha" do login já
+  existe, mas por enquanto só orienta a procurar o administrador).
 
 - Busca de paciente por nome nos formulários (hoje as listas trazem até 200
   pacientes ativos).

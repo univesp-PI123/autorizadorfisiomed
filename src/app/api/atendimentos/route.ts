@@ -47,7 +47,7 @@ export const GET = rota(async (req) => {
 });
 
 export const POST = rota(async (req) => {
-  const usuario = await exigirSessao(req);
+  const usuario = await exigirSessao(req, ["admin", "recepcionista", "terapeuta"]);
   const { autorizacaoId, terapeutaId, ...dados } = await lerCorpo(req, esquemaAtendimento);
 
   const paciente = await prisma.paciente.findUnique({ where: { id: dados.pacienteId } });

@@ -50,7 +50,7 @@ export const GET = rota(async (req) => {
 });
 
 export const POST = rota(async (req) => {
-  const usuario = await exigirSessao(req);
+  const usuario = await exigirSessao(req, ["admin", "recepcionista", "financeiro"]);
   const dados = await lerCorpo(req, esquemaAutorizacao);
 
   const [paciente, convenio] = await Promise.all([

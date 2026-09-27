@@ -2,14 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState, type ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
+import Icone from "@/components/Icone";
 import { useSessao } from "@/contextos/SessaoContexto";
 import { itemDaRota } from "@/lib/navegacao";
-import Header from "./Header";
-import Sidebar from "./Sidebar";
+import Rail from "./Rail";
+import Topbar from "./Topbar";
 
 export default function MainLayout({ children }: { children: ReactNode }) {
-  const [sidebarAberta, setSidebarAberta] = useState(true);
   const { usuario } = useSessao();
   const pathname = usePathname();
 
@@ -19,21 +19,22 @@ export default function MainLayout({ children }: { children: ReactNode }) {
   const permitido = !item || item.perfis.includes(usuario.perfil);
 
   return (
-    <div className={`main-layout ${sidebarAberta ? "sidebar-open" : "sidebar-closed"}`}>
-      <Sidebar aberta={sidebarAberta} onFechar={() => setSidebarAberta(false)} />
-      <div className="layout-content">
-        <Header onAbrirSidebar={() => setSidebarAberta(true)} sidebarAberta={sidebarAberta} />
-        <main id="main-content" className="layout-main" tabIndex={-1}>
+    <div className="app">
+      <Suspense>
+        <Rail />
+      </Suspense>
+      <div className="main">
+        <Topbar />
+        <main id="conteudo" className="content" tabIndex={-1}>
           {permitido ? (
             children
           ) : (
-            <div className="card vazio" role="alert">
-              <p style={{ fontSize: "2rem" }} aria-hidden="true">
-                🔒
-              </p>
-              <p>Seu perfil não tem acesso a esta tela.</p>
-              <Link href="/dashboard" className="btn btn-primary" style={{ marginTop: "16px" }}>
-                Voltar ao Dashboard
+            <div className="sb-card estado-central" role="alert">
+              <Icone nome="cadeado" tamanho={24} />
+              <h2 className="card-title">Acesso restrito</h2>
+              <p className="texto-apoio">Seu perfil não tem acesso a esta tela.</p>
+              <Link href="/dashboard" className="sb-btn">
+                Voltar à visão geral
               </Link>
             </div>
           )}

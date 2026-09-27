@@ -5,10 +5,11 @@ import { useParams } from "next/navigation";
 import { useCallback, useState, type ChangeEvent, type FormEvent } from "react";
 import toast from "react-hot-toast";
 import FormPaciente, { formDoPaciente, type DadosFormPaciente } from "@/components/FormPaciente";
+import Icone from "@/components/Icone";
 import Carregando from "@/components/ui/Carregando";
 import MensagemErro from "@/components/ui/MensagemErro";
 import Modal from "@/components/ui/Modal";
-import StatusBadge from "@/components/ui/StatusBadge";
+import StatusBadge, { Badge } from "@/components/ui/StatusBadge";
 import { formatarData } from "@/lib/analiseDados";
 import { mensagemDeErro } from "@/lib/cliente/api";
 import { useFetch } from "@/lib/cliente/hooks";
@@ -27,7 +28,7 @@ export default function PacienteDetalhe() {
   const buscarConvenios = useCallback(() => convenioService.listar({ ativo: true }), []);
   const { data: convenios } = useFetch(buscarConvenios);
 
-  if (carregando) return <Carregando mensagem="Carregando dados do paciente..." />;
+  if (carregando) return <Carregando mensagem="Carregando paciente…" />;
   if (erro || !paciente) return <MensagemErro mensagem={erro ?? "Paciente não encontrado."} onRetry={recarregar} />;
 
   const salvar = async (acao: () => Promise<unknown>, sucesso: string, aoConcluir: () => void) => {
@@ -38,7 +39,7 @@ export default function PacienteDetalhe() {
       aoConcluir();
       recarregar();
     } catch (err) {
-      toast.error(mensagemDeErro(err, "Erro ao salvar."));
+      toast.error(mensagemDeErro(err, "Não foi possível salvar."));
     } finally {
       setSalvando(false);
     }
@@ -46,12 +47,12 @@ export default function PacienteDetalhe() {
 
   const aoEditar = (e: FormEvent) => {
     e.preventDefault();
-    if (edicao) salvar(() => pacienteService.atualizar(id, edicao), "Paciente atualizado!", () => setEdicao(null));
+    if (edicao) salvar(() => pacienteService.atualizar(id, edicao), "Paciente atualizado.", () => setEdicao(null));
   };
 
   const aoVincular = (e: FormEvent) => {
     e.preventDefault();
-    if (vinculo) salvar(() => pacienteService.vincularConvenio(id, vinculo), "Convênio vinculado!", () => setVinculo(null));
+    if (vinculo) salvar(() => pacienteService.vincularConvenio(id, vinculo), "Convênio vinculado.", () => setVinculo(null));
   };
 
   const desativar = () => {
@@ -64,139 +65,161 @@ export default function PacienteDetalhe() {
     (c) => !(paciente.vinculos ?? []).some((v) => v.convenioId === c.id),
   );
 
+  const dados: [string, string, boolean?][] = [
+    ["Data de nascimento", formatarData(paciente.dataNascimento), true],
+    ["CPF", paciente.cpf || "—", true],
+    ["Responsável", paciente.responsavel || "—"],
+    ["Telefone", paciente.telefone || "—", true],
+    ["E-mail", paciente.email || "—"],
+    ["CID-10", paciente.cid || "—", true],
+  ];
+
   return (
-    <div className="pilha">
-      <div className="cabecalho-pagina">
-        <Link href="/pacientes" className="btn btn-secondary btn-sm">
-          ← Voltar
+    <>
+      <div className="ferramentas">
+        <Link href="/pacientes" className="sb-btn sb-btn--ghost">
+          <Icone nome="voltar" />
+          Pacientes
         </Link>
-        <h2>{paciente.nome}</h2>
-        {!paciente.ativo && <span className="badge badge-danger">Inativo</span>}
-        <div style={{ marginLeft: "auto", display: "flex", gap: "8px" }}>
-          <button className="btn btn-secondary btn-sm" onClick={() => setEdicao(formDoPaciente(paciente))}>
-            Editar
-          </button>
+        <h2 className="card-title" style={{ fontSize: 17 }}>
+          {paciente.nome}
+        </h2>
+        {!paciente.ativo && <Badge>Inativo</Badge>}
+        <div className="empurra ferramentas">
           {paciente.ativo && (
-            <button className="btn btn-ghost btn-sm" onClick={desativar} disabled={salvando}>
+            <button type="button" className="sb-btn" onClick={desativar} disabled={salvando}>
               Desativar
             </button>
           )}
+          <button type="button" className="sb-btn" onClick={() => setEdicao(formDoPaciente(paciente))}>
+            Editar
+          </button>
         </div>
       </div>
 
-      <div className="grade-2">
-        <section className="card" aria-labelledby="dados-pessoais">
-          <h3 id="dados-pessoais" className="titulo-secao">
-            Dados pessoais
-          </h3>
-          <dl className="dl-grade">
-            {(
-              [
-                ["Data de nascimento", formatarData(paciente.dataNascimento)],
-                ["CPF", paciente.cpf || "—"],
-                ["Responsável", paciente.responsavel || "—"],
-                ["Telefone", paciente.telefone || "—"],
-                ["E-mail", paciente.email || "—"],
-                ["CID-10", paciente.cid || "—"],
-              ] as const
-            ).map(([rotulo, valor]) => (
-              <div key={rotulo}>
-                <dt>{rotulo}</dt>
-                <dd>{valor}</dd>
-              </div>
-            ))}
-            {paciente.diagnostico && (
-              <div style={{ gridColumn: "1 / -1" }}>
-                <dt>Diagnóstico</dt>
-                <dd>{paciente.diagnostico}</dd>
-              </div>
-            )}
-          </dl>
+      <div className="grid-meio">
+        <section className="sb-card" aria-labelledby="dados-pessoais">
+          <div className="sb-card__header">
+            <h3 id="dados-pessoais" className="sb-card__title">
+              Dados pessoais
+            </h3>
+          </div>
+          <div className="sb-card__body">
+            <dl className="dl-grade">
+              {dados.map(([rotulo, valor, mono]) => (
+                <div key={rotulo}>
+                  <dt>{rotulo}</dt>
+                  <dd className={mono ? "mono" : undefined}>{valor}</dd>
+                </div>
+              ))}
+              {paciente.diagnostico && (
+                <div className="inteira">
+                  <dt>Diagnóstico</dt>
+                  <dd>{paciente.diagnostico}</dd>
+                </div>
+              )}
+              {paciente.observacoes && (
+                <div className="inteira">
+                  <dt>Observações</dt>
+                  <dd>{paciente.observacoes}</dd>
+                </div>
+              )}
+            </dl>
+          </div>
         </section>
 
-        <section className="card" aria-labelledby="convenios-titulo">
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "16px", gap: "8px", flexWrap: "wrap" }}>
-            <h3 id="convenios-titulo" style={{ fontWeight: 700 }}>
+        <section className="sb-card" aria-labelledby="convenios-titulo">
+          <div className="sb-card__header">
+            <h3 id="convenios-titulo" className="sb-card__title">
               Convênios
             </h3>
-            <div style={{ display: "flex", gap: "8px" }}>
-              <Link href={`/autorizacoes?pacienteId=${paciente.id}`} className="btn btn-ghost btn-sm">
-                Ver autorizações
-              </Link>
-              {paciente.ativo && (
-                <button className="btn btn-primary btn-sm" onClick={() => setVinculo(VINCULO_VAZIO)}>
-                  + Vincular
-                </button>
-              )}
-            </div>
+            {paciente.ativo && (
+              <button type="button" className="sb-btn sb-btn--sm" onClick={() => setVinculo(VINCULO_VAZIO)}>
+                <Icone nome="mais" />
+                Vincular
+              </button>
+            )}
           </div>
-          {(paciente.vinculos ?? []).length === 0 ? (
-            <p className="texto-suave">Nenhum convênio vinculado.</p>
-          ) : (
-            <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: "12px" }}>
-              {paciente.vinculos!.map((v) => (
-                <li key={v.id} className="caixa-cinza">
-                  <p style={{ fontWeight: 700, fontSize: "var(--font-size-sm)" }}>{v.convenio?.nome}</p>
-                  <p style={{ fontSize: "var(--font-size-xs)", color: "var(--color-gray-500)" }}>
-                    Carteirinha: {v.numeroCarteirinha} | Plano: {v.plano || "—"}
-                    {v.dataValidade && ` | Validade: ${formatarData(v.dataValidade)}`}
-                  </p>
-                  {!v.ativo && (
-                    <span className="badge badge-danger" style={{ marginTop: "4px" }}>
-                      Inativo
-                    </span>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
+          <div className="sb-card__body">
+            {(paciente.vinculos ?? []).length === 0 ? (
+              <p className="texto-suave">Nenhum convênio vinculado.</p>
+            ) : (
+              <ul className="lista-simples">
+                {paciente.vinculos!.map((v) => (
+                  <li key={v.id}>
+                    <p style={{ fontWeight: 500 }}>
+                      {v.convenio?.nome} {!v.ativo && <Badge>Inativo</Badge>}
+                    </p>
+                    <p className="texto-suave">
+                      Carteirinha <span className="mono">{v.numeroCarteirinha}</span> · Plano {v.plano || "—"}
+                      {v.dataValidade && (
+                        <>
+                          {" "}
+                          · Validade <span className="mono">{formatarData(v.dataValidade)}</span>
+                        </>
+                      )}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </section>
       </div>
 
-      <section className="card" aria-labelledby="autorizacoes-titulo">
-        <h3 id="autorizacoes-titulo" className="titulo-secao">
-          Últimas autorizações
-        </h3>
-        {paciente.autorizacoes.length === 0 ? (
-          <p className="texto-suave">Nenhuma autorização registrada.</p>
-        ) : (
-          <div className="table-container">
-            <table aria-label="Autorizações do paciente">
-              <thead>
+      <section className="sb-card" aria-labelledby="autorizacoes-titulo">
+        <div className="sb-card__header">
+          <h3 id="autorizacoes-titulo" className="sb-card__title">
+            Últimas autorizações
+          </h3>
+          <Link href={`/autorizacoes?pacienteId=${paciente.id}`}>Ver todas</Link>
+        </div>
+        <div className="tabela-rolagem">
+          <table className="sb-table">
+            <thead>
+              <tr>
+                <th scope="col">Procedimento</th>
+                <th scope="col">Convênio</th>
+                <th scope="col">Status</th>
+                <th scope="col" className="sb-end">
+                  Sessões
+                </th>
+                <th scope="col" className="sb-end">
+                  Solicitação
+                </th>
+                <th scope="col" className="sb-end">
+                  Fim da vigência
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {paciente.autorizacoes.length === 0 ? (
                 <tr>
-                  <th scope="col">Procedimento</th>
-                  <th scope="col">Convênio</th>
-                  <th scope="col">Solicitação</th>
-                  <th scope="col">Fim da vigência</th>
-                  <th scope="col">Sessões</th>
-                  <th scope="col">Status</th>
-                  <th scope="col">Ações</th>
+                  <td colSpan={6} className="vazio">
+                    Nenhuma autorização registrada.
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {paciente.autorizacoes.map((a) => (
+              ) : (
+                paciente.autorizacoes.map((a) => (
                   <tr key={a.id}>
-                    <td>{a.procedimento}</td>
-                    <td>{a.convenio?.nome}</td>
-                    <td>{formatarData(a.dataSolicitacao)}</td>
-                    <td>{formatarData(a.dataFimVigencia)}</td>
-                    <td>
-                      {a.quantidadeUtilizada}/{a.quantidadeAutorizada ?? a.quantidadeSolicitada}
+                    <td className="sb-strong">
+                      <Link href={`/autorizacoes/${a.id}`}>{a.procedimento}</Link>
                     </td>
+                    <td>{a.convenio?.nome}</td>
                     <td>
                       <StatusBadge status={a.status} />
                     </td>
-                    <td>
-                      <Link href={`/autorizacoes/${a.id}`} className="btn btn-secondary btn-sm">
-                        Ver
-                      </Link>
+                    <td className="sb-mono sb-end">
+                      {a.quantidadeUtilizada}/{a.quantidadeAutorizada ?? a.quantidadeSolicitada}
                     </td>
+                    <td className="sb-mono sb-end">{formatarData(a.dataSolicitacao)}</td>
+                    <td className="sb-mono sb-end">{formatarData(a.dataFimVigencia)}</td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </section>
 
       <Modal
@@ -206,11 +229,11 @@ export default function PacienteDetalhe() {
         tamanho="lg"
         rodape={
           <>
-            <button className="btn btn-secondary" onClick={() => setEdicao(null)}>
+            <button type="button" className="sb-btn" onClick={() => setEdicao(null)}>
               Cancelar
             </button>
-            <button className="btn btn-primary" form="form-editar-paciente" type="submit" disabled={salvando}>
-              {salvando ? "Salvando..." : "Salvar"}
+            <button type="submit" className="sb-btn sb-btn--primary" form="form-editar-paciente" disabled={salvando}>
+              {salvando ? "Salvando…" : "Salvar"}
             </button>
           </>
         }
@@ -233,30 +256,30 @@ export default function PacienteDetalhe() {
         titulo="Vincular convênio"
         rodape={
           <>
-            <button className="btn btn-secondary" onClick={() => setVinculo(null)}>
+            <button type="button" className="sb-btn" onClick={() => setVinculo(null)}>
               Cancelar
             </button>
-            <button className="btn btn-primary" form="form-vinculo" type="submit" disabled={salvando}>
-              {salvando ? "Salvando..." : "Vincular"}
+            <button type="submit" className="sb-btn sb-btn--primary" form="form-vinculo" disabled={salvando}>
+              {salvando ? "Salvando…" : "Vincular"}
             </button>
           </>
         }
       >
         {vinculo && (
           <form id="form-vinculo" onSubmit={aoVincular} noValidate>
-            <div className="grade-form">
-              <div className="form-group inteira">
-                <label className="form-label" htmlFor="v-convenio">
-                  Convênio <span className="required">*</span>
+            <div className="form-grade">
+              <div className="sb-field inteira">
+                <label className="sb-label" htmlFor="v-convenio">
+                  Convênio<span className="obrigatorio" aria-hidden="true">*</span>
                 </label>
                 <select
                   id="v-convenio"
-                  className="form-control"
+                  className="sb-input"
                   value={vinculo.convenioId}
                   onChange={(e) => setVinculo({ ...vinculo, convenioId: e.target.value })}
                   required
                 >
-                  <option value="">Selecione...</option>
+                  <option value="">Selecione…</option>
                   {conveniosDisponiveis.map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.nome}
@@ -264,48 +287,38 @@ export default function PacienteDetalhe() {
                   ))}
                 </select>
               </div>
-              <div className="form-group">
-                <label className="form-label" htmlFor="v-carteirinha">
-                  Nº da carteirinha <span className="required">*</span>
+              <div className="sb-field">
+                <label className="sb-label" htmlFor="v-carteirinha">
+                  Número da carteirinha<span className="obrigatorio" aria-hidden="true">*</span>
                 </label>
                 <input
                   id="v-carteirinha"
-                  className="form-control"
+                  className="sb-input"
                   value={vinculo.numeroCarteirinha}
                   onChange={(e) => setVinculo({ ...vinculo, numeroCarteirinha: e.target.value })}
                   required
                 />
               </div>
-              <div className="form-group">
-                <label className="form-label" htmlFor="v-plano">
+              <div className="sb-field">
+                <label className="sb-label" htmlFor="v-plano">
                   Plano
                 </label>
-                <input
-                  id="v-plano"
-                  className="form-control"
-                  value={vinculo.plano}
-                  onChange={(e) => setVinculo({ ...vinculo, plano: e.target.value })}
-                />
+                <input id="v-plano" className="sb-input" value={vinculo.plano} onChange={(e) => setVinculo({ ...vinculo, plano: e.target.value })} />
               </div>
-              <div className="form-group">
-                <label className="form-label" htmlFor="v-titular">
+              <div className="sb-field">
+                <label className="sb-label" htmlFor="v-titular">
                   Titular (se não for o paciente)
                 </label>
-                <input
-                  id="v-titular"
-                  className="form-control"
-                  value={vinculo.titular}
-                  onChange={(e) => setVinculo({ ...vinculo, titular: e.target.value })}
-                />
+                <input id="v-titular" className="sb-input" value={vinculo.titular} onChange={(e) => setVinculo({ ...vinculo, titular: e.target.value })} />
               </div>
-              <div className="form-group">
-                <label className="form-label" htmlFor="v-validade">
+              <div className="sb-field">
+                <label className="sb-label" htmlFor="v-validade">
                   Validade da carteirinha
                 </label>
                 <input
                   id="v-validade"
                   type="date"
-                  className="form-control"
+                  className="sb-input"
                   value={vinculo.dataValidade}
                   onChange={(e) => setVinculo({ ...vinculo, dataValidade: e.target.value })}
                 />
@@ -314,6 +327,6 @@ export default function PacienteDetalhe() {
           </form>
         )}
       </Modal>
-    </div>
+    </>
   );
 }

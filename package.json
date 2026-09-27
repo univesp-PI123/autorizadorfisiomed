@@ -1,6 +1,6 @@
 {
   "name": "sga-fisiomed-aba",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "engines": {
     "node": ">=20.9.0"
@@ -22,11 +22,9 @@
   "dependencies": {
     "@prisma/client": "^5.20.0",
     "bcryptjs": "^2.4.3",
-    "chart.js": "^4.5.1",
     "jose": "^5.9.3",
     "next": "^16.3.6",
     "react": "^19.3.0",
-    "react-chartjs-2": "^5.3.1",
     "react-dom": "^19.3.0",
     "react-hot-toast": "^2.6.1",
     "zod": "^3.23.8"

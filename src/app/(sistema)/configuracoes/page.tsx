@@ -2,9 +2,11 @@
 
 import { useCallback, useState, type FormEvent } from "react";
 import toast from "react-hot-toast";
+import Icone from "@/components/Icone";
 import Carregando from "@/components/ui/Carregando";
 import MensagemErro from "@/components/ui/MensagemErro";
 import Modal from "@/components/ui/Modal";
+import { Badge } from "@/components/ui/StatusBadge";
 import { useSessao } from "@/contextos/SessaoContexto";
 import { formatarDataHora } from "@/lib/analiseDados";
 import { mensagemDeErro } from "@/lib/cliente/api";
@@ -39,7 +41,7 @@ export default function ConfiguracoesPage() {
       toast.success(sucesso);
       aoConcluir();
     } catch (err) {
-      toast.error(mensagemDeErro(err, "Erro ao salvar."));
+      toast.error(mensagemDeErro(err, "Não foi possível salvar."));
     } finally {
       setSalvando(false);
     }
@@ -47,7 +49,7 @@ export default function ConfiguracoesPage() {
 
   const aoCriarUsuario = (e: FormEvent) => {
     e.preventDefault();
-    executar(() => usuarioService.criar(formUsuario), "Usuário criado com sucesso!", () => {
+    executar(() => usuarioService.criar(formUsuario), "Usuário criado.", () => {
       setModalUsuario(false);
       setFormUsuario(FORM_USUARIO);
       usuarios.recarregar();
@@ -55,113 +57,134 @@ export default function ConfiguracoesPage() {
   };
 
   const alternarAtivo = (u: Usuario) => {
-    const acao = u.ativo ? "desativar" : "reativar";
-    if (!window.confirm(`Deseja ${acao} ${u.nome}?`)) return;
-    executar(() => usuarioService.atualizar(u.id, { ativo: !u.ativo }), `Usuário ${u.ativo ? "desativado" : "reativado"}.`, usuarios.recarregar);
+    if (!window.confirm(`${u.ativo ? "Desativar" : "Reativar"} ${u.nome}?`)) return;
+    executar(
+      () => usuarioService.atualizar(u.id, { ativo: !u.ativo }),
+      u.ativo ? "Usuário desativado." : "Usuário reativado.",
+      usuarios.recarregar,
+    );
   };
 
   const aoAlterarSenha = (e: FormEvent) => {
     e.preventDefault();
     if (senhaForm.novaSenha !== senhaForm.confirmar) {
-      toast.error("As senhas não coincidem.");
+      toast.error("A confirmação não confere com a nova senha.");
       return;
     }
     executar(
       () => usuarioService.alterarSenha({ senhaAtual: senhaForm.senhaAtual, novaSenha: senhaForm.novaSenha }),
-      "Senha alterada com sucesso!",
+      "Senha alterada.",
       () => setSenhaForm(SENHA_VAZIA),
     );
   };
 
+  const campoSenha = (campo: keyof typeof SENHA_VAZIA, rotulo: string, autoComplete: string) => (
+    <div className="sb-field">
+      <label className="sb-label" htmlFor={`senha-${campo}`}>
+        {rotulo}
+      </label>
+      <input
+        id={`senha-${campo}`}
+        type="password"
+        autoComplete={autoComplete}
+        className="sb-input"
+        value={senhaForm[campo]}
+        onChange={(e) => setSenhaForm((s) => ({ ...s, [campo]: e.target.value }))}
+        required
+      />
+    </div>
+  );
+
   return (
-    <div className="pilha" style={{ maxWidth: "900px" }}>
-      <section className="card" aria-labelledby="minha-conta">
-        <h2 id="minha-conta" className="titulo-secao">
-          Minha conta
-        </h2>
-        <div style={{ marginBottom: "16px" }}>
-          <p>
-            <strong>Nome:</strong> {usuario.nome}
-          </p>
-          <p>
-            <strong>E-mail:</strong> {usuario.email}
-          </p>
-          <p>
-            <strong>Perfil:</strong> {ROTULO_PERFIL[usuario.perfil]}
-          </p>
+    <>
+      <section className="grid-meio">
+        <div className="sb-card" id="minha-conta">
+          <div className="sb-card__header">
+            <h2 className="sb-card__title">Minha conta</h2>
+          </div>
+          <div className="sb-card__body">
+            <dl className="dl-grade">
+              <div className="inteira">
+                <dt>Nome</dt>
+                <dd>{usuario.nome}</dd>
+              </div>
+              <div>
+                <dt>E-mail</dt>
+                <dd>{usuario.email}</dd>
+              </div>
+              <div>
+                <dt>Perfil</dt>
+                <dd>{ROTULO_PERFIL[usuario.perfil]}</dd>
+              </div>
+            </dl>
+          </div>
         </div>
-        <form onSubmit={aoAlterarSenha} noValidate aria-labelledby="titulo-senha">
-          <h3 id="titulo-senha" style={{ marginBottom: "12px", fontSize: "var(--font-size-base)", fontWeight: 600 }}>
-            Alterar senha
-          </h3>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "12px", marginBottom: "12px" }}>
-            <div className="form-group">
-              <label className="form-label" htmlFor="senhaAtual">
-                Senha atual
-              </label>
-              <input id="senhaAtual" type="password" autoComplete="current-password" className="form-control" value={senhaForm.senhaAtual} onChange={(e) => setSenhaForm((s) => ({ ...s, senhaAtual: e.target.value }))} required />
-            </div>
-            <div className="form-group">
-              <label className="form-label" htmlFor="novaSenha">
-                Nova senha (mín. 8)
-              </label>
-              <input id="novaSenha" type="password" autoComplete="new-password" className="form-control" value={senhaForm.novaSenha} onChange={(e) => setSenhaForm((s) => ({ ...s, novaSenha: e.target.value }))} required minLength={8} />
-            </div>
-            <div className="form-group">
-              <label className="form-label" htmlFor="confirmarSenha">
-                Confirmar nova senha
-              </label>
-              <input id="confirmarSenha" type="password" autoComplete="new-password" className="form-control" value={senhaForm.confirmar} onChange={(e) => setSenhaForm((s) => ({ ...s, confirmar: e.target.value }))} required />
+
+        <form className="sb-card" onSubmit={aoAlterarSenha} noValidate aria-labelledby="titulo-senha">
+          <div className="sb-card__header">
+            <h2 className="sb-card__title" id="titulo-senha">
+              Alterar senha
+            </h2>
+          </div>
+          <div className="sb-card__body pilha">
+            {campoSenha("senhaAtual", "Senha atual", "current-password")}
+            {campoSenha("novaSenha", "Nova senha", "new-password")}
+            {campoSenha("confirmar", "Confirmar nova senha", "new-password")}
+            <span className="sb-help">Mínimo de 8 caracteres.</span>
+            <div>
+              <button type="submit" className="sb-btn" disabled={salvando}>
+                {salvando ? "Salvando…" : "Alterar senha"}
+              </button>
             </div>
           </div>
-          <button type="submit" className="btn btn-primary btn-sm" disabled={salvando}>
-            {salvando ? "Salvando..." : "Alterar senha"}
-          </button>
         </form>
       </section>
 
       {ehAdmin && (
-        <section className="card" aria-labelledby="usuarios-sistema">
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "16px" }}>
-            <h2 id="usuarios-sistema" style={{ fontWeight: 700 }}>
+        <section className="sb-card" id="usuarios-sistema" aria-labelledby="titulo-usuarios">
+          <div className="sb-card__header">
+            <h2 className="sb-card__title" id="titulo-usuarios">
               Usuários do sistema
             </h2>
-            <button className="btn btn-primary btn-sm" onClick={() => setModalUsuario(true)}>
-              + Novo usuário
+            <button type="button" className="sb-btn sb-btn--primary" onClick={() => setModalUsuario(true)}>
+              <Icone nome="mais" />
+              Novo usuário
             </button>
           </div>
           {usuarios.carregando ? (
             <Carregando />
           ) : usuarios.erro ? (
-            <MensagemErro mensagem={usuarios.erro} onRetry={usuarios.recarregar} />
+            <div className="sb-card__body">
+              <MensagemErro mensagem={usuarios.erro} onRetry={usuarios.recarregar} />
+            </div>
           ) : (
-            <div className="table-container">
-              <table aria-label="Lista de usuários">
+            <div className="tabela-rolagem">
+              <table className="sb-table">
                 <thead>
                   <tr>
                     <th scope="col">Nome</th>
                     <th scope="col">E-mail</th>
                     <th scope="col">Perfil</th>
                     <th scope="col">Situação</th>
-                    <th scope="col">Último acesso</th>
-                    <th scope="col">Ações</th>
+                    <th scope="col" className="sb-end">
+                      Último acesso
+                    </th>
+                    <th scope="col" className="sb-end">
+                      <span className="sr-only">Ações</span>
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {(usuarios.data ?? []).map((u) => (
                     <tr key={u.id}>
-                      <td>
-                        <strong>{u.nome}</strong>
-                      </td>
+                      <td className="sb-strong">{u.nome}</td>
                       <td>{u.email}</td>
                       <td>{ROTULO_PERFIL[u.perfil]}</td>
-                      <td>
-                        <span className={`badge ${u.ativo ? "badge-success" : "badge-danger"}`}>{u.ativo ? "Ativo" : "Inativo"}</span>
-                      </td>
-                      <td>{formatarDataHora(u.ultimoAcesso)}</td>
-                      <td>
+                      <td>{u.ativo ? <Badge tom="success">Ativo</Badge> : <Badge>Inativo</Badge>}</td>
+                      <td className="sb-mono sb-end">{formatarDataHora(u.ultimoAcesso)}</td>
+                      <td className="sb-end">
                         {u.id !== usuario.id && (
-                          <button className="btn btn-secondary btn-sm" onClick={() => alternarAtivo(u)} disabled={salvando}>
+                          <button type="button" className="sb-btn sb-btn--sm" onClick={() => alternarAtivo(u)} disabled={salvando}>
                             {u.ativo ? "Desativar" : "Reativar"}
                           </button>
                         )}
@@ -184,50 +207,60 @@ export default function ConfiguracoesPage() {
         titulo="Novo usuário"
         rodape={
           <>
-            <button className="btn btn-secondary" onClick={() => setModalUsuario(false)}>
+            <button type="button" className="sb-btn" onClick={() => setModalUsuario(false)}>
               Cancelar
             </button>
-            <button className="btn btn-primary" form="form-usuario" type="submit" disabled={salvando}>
-              {salvando ? "Salvando..." : "Criar"}
+            <button type="submit" className="sb-btn sb-btn--primary" form="form-usuario" disabled={salvando}>
+              {salvando ? "Salvando…" : "Criar usuário"}
             </button>
           </>
         }
       >
-        <form id="form-usuario" onSubmit={aoCriarUsuario} noValidate>
-          <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-            <div className="form-group">
-              <label className="form-label" htmlFor="u-nome">
-                Nome <span className="required">*</span>
-              </label>
-              <input id="u-nome" type="text" className="form-control" value={formUsuario.nome} onChange={(e) => setFormUsuario((f) => ({ ...f, nome: e.target.value }))} required />
-            </div>
-            <div className="form-group">
-              <label className="form-label" htmlFor="u-email">
-                E-mail <span className="required">*</span>
-              </label>
-              <input id="u-email" type="email" autoComplete="off" className="form-control" value={formUsuario.email} onChange={(e) => setFormUsuario((f) => ({ ...f, email: e.target.value }))} required />
-            </div>
-            <div className="form-group">
-              <label className="form-label" htmlFor="u-senha">
-                Senha inicial (mín. 8) <span className="required">*</span>
-              </label>
-              <input id="u-senha" type="password" autoComplete="new-password" className="form-control" value={formUsuario.senha} onChange={(e) => setFormUsuario((f) => ({ ...f, senha: e.target.value }))} required minLength={8} />
-            </div>
-            <div className="form-group">
-              <label className="form-label" htmlFor="u-perfil">
-                Perfil <span className="required">*</span>
-              </label>
-              <select id="u-perfil" className="form-control" value={formUsuario.perfil} onChange={(e) => setFormUsuario((f) => ({ ...f, perfil: e.target.value as Perfil }))}>
-                {PERFIS.map((p) => (
-                  <option key={p} value={p}>
-                    {ROTULO_PERFIL[p]}
-                  </option>
-                ))}
-              </select>
-            </div>
+        <form id="form-usuario" onSubmit={aoCriarUsuario} noValidate className="pilha">
+          <div className="sb-field">
+            <label className="sb-label" htmlFor="u-nome">
+              Nome<span className="obrigatorio" aria-hidden="true">*</span>
+            </label>
+            <input id="u-nome" className="sb-input" value={formUsuario.nome} onChange={(e) => setFormUsuario((f) => ({ ...f, nome: e.target.value }))} required />
+          </div>
+          <div className="sb-field">
+            <label className="sb-label" htmlFor="u-email">
+              E-mail<span className="obrigatorio" aria-hidden="true">*</span>
+            </label>
+            <input id="u-email" type="email" autoComplete="off" className="sb-input" value={formUsuario.email} onChange={(e) => setFormUsuario((f) => ({ ...f, email: e.target.value }))} required />
+          </div>
+          <div className="sb-field">
+            <label className="sb-label" htmlFor="u-senha">
+              Senha inicial<span className="obrigatorio" aria-hidden="true">*</span>
+            </label>
+            <input
+              id="u-senha"
+              type="password"
+              autoComplete="new-password"
+              className="sb-input"
+              value={formUsuario.senha}
+              onChange={(e) => setFormUsuario((f) => ({ ...f, senha: e.target.value }))}
+              required
+              aria-describedby="u-senha-ajuda"
+            />
+            <span id="u-senha-ajuda" className="sb-help">
+              Mínimo de 8 caracteres. A pessoa pode trocá-la depois em Configurações.
+            </span>
+          </div>
+          <div className="sb-field">
+            <label className="sb-label" htmlFor="u-perfil">
+              Perfil
+            </label>
+            <select id="u-perfil" className="sb-input" value={formUsuario.perfil} onChange={(e) => setFormUsuario((f) => ({ ...f, perfil: e.target.value as Perfil }))}>
+              {PERFIS.map((p) => (
+                <option key={p} value={p}>
+                  {ROTULO_PERFIL[p]}
+                </option>
+              ))}
+            </select>
           </div>
         </form>
       </Modal>
-    </div>
+    </>
   );
 }

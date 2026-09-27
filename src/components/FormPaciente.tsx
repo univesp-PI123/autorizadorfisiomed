@@ -32,6 +32,29 @@ export function formDoPaciente(p: Paciente): DadosFormPaciente {
   };
 }
 
+type Campo = {
+  nome: keyof DadosFormPaciente;
+  rotulo: string;
+  tipo?: string;
+  obrigatorio?: boolean;
+  exemplo?: string;
+  inteira?: boolean;
+  area?: boolean;
+  inputMode?: "numeric" | "tel" | "email";
+};
+
+const CAMPOS: Campo[] = [
+  { nome: "nome", rotulo: "Nome completo", obrigatorio: true, inteira: true },
+  { nome: "dataNascimento", rotulo: "Data de nascimento", tipo: "date", obrigatorio: true },
+  { nome: "cpf", rotulo: "CPF", exemplo: "000.000.000-00", inputMode: "numeric" },
+  { nome: "responsavel", rotulo: "Responsável" },
+  { nome: "telefone", rotulo: "Telefone", tipo: "tel", exemplo: "(11) 99999-0000" },
+  { nome: "email", rotulo: "E-mail", tipo: "email", exemplo: "nome@email.com" },
+  { nome: "cid", rotulo: "CID-10", exemplo: "F84.0" },
+  { nome: "diagnostico", rotulo: "Diagnóstico", inteira: true, area: true },
+  { nome: "observacoes", rotulo: "Observações", inteira: true, area: true },
+];
+
 export default function FormPaciente({
   id,
   form,
@@ -45,61 +68,34 @@ export default function FormPaciente({
 }) {
   return (
     <form id={id} onSubmit={aoEnviar} noValidate>
-      <div className="grade-form">
-        <div className="form-group inteira">
-          <label className="form-label" htmlFor={`${id}-nome`}>
-            Nome completo <span className="required">*</span>
-          </label>
-          <input id={`${id}-nome`} name="nome" type="text" className="form-control" value={form.nome} onChange={aoMudar} required />
-        </div>
-        <div className="form-group">
-          <label className="form-label" htmlFor={`${id}-nasc`}>
-            Data de nascimento <span className="required">*</span>
-          </label>
-          <input id={`${id}-nasc`} name="dataNascimento" type="date" className="form-control" value={form.dataNascimento} onChange={aoMudar} required />
-        </div>
-        <div className="form-group">
-          <label className="form-label" htmlFor={`${id}-cpf`}>
-            CPF
-          </label>
-          <input id={`${id}-cpf`} name="cpf" type="text" inputMode="numeric" className="form-control" value={form.cpf} onChange={aoMudar} placeholder="000.000.000-00" />
-        </div>
-        <div className="form-group">
-          <label className="form-label" htmlFor={`${id}-resp`}>
-            Responsável
-          </label>
-          <input id={`${id}-resp`} name="responsavel" type="text" className="form-control" value={form.responsavel} onChange={aoMudar} />
-        </div>
-        <div className="form-group">
-          <label className="form-label" htmlFor={`${id}-tel`}>
-            Telefone
-          </label>
-          <input id={`${id}-tel`} name="telefone" type="tel" className="form-control" value={form.telefone} onChange={aoMudar} placeholder="(11) 99999-0000" />
-        </div>
-        <div className="form-group">
-          <label className="form-label" htmlFor={`${id}-cid`}>
-            CID-10
-          </label>
-          <input id={`${id}-cid`} name="cid" type="text" className="form-control" value={form.cid} onChange={aoMudar} placeholder="Ex.: F84.0" />
-        </div>
-        <div className="form-group">
-          <label className="form-label" htmlFor={`${id}-email`}>
-            E-mail
-          </label>
-          <input id={`${id}-email`} name="email" type="email" className="form-control" value={form.email} onChange={aoMudar} />
-        </div>
-        <div className="form-group inteira">
-          <label className="form-label" htmlFor={`${id}-diag`}>
-            Diagnóstico
-          </label>
-          <textarea id={`${id}-diag`} name="diagnostico" className="form-control" value={form.diagnostico} onChange={aoMudar} rows={2} />
-        </div>
-        <div className="form-group inteira">
-          <label className="form-label" htmlFor={`${id}-obs`}>
-            Observações
-          </label>
-          <textarea id={`${id}-obs`} name="observacoes" className="form-control" value={form.observacoes} onChange={aoMudar} rows={2} />
-        </div>
+      <div className="form-grade">
+        {CAMPOS.map((c) => (
+          <div className={`sb-field ${c.inteira ? "inteira" : ""}`} key={c.nome}>
+            <label className="sb-label" htmlFor={`${id}-${c.nome}`}>
+              {c.rotulo}
+              {c.obrigatorio && (
+                <span className="obrigatorio" aria-hidden="true">
+                  *
+                </span>
+              )}
+            </label>
+            {c.area ? (
+              <textarea id={`${id}-${c.nome}`} name={c.nome} className="sb-input" rows={2} value={form[c.nome]} onChange={aoMudar} />
+            ) : (
+              <input
+                id={`${id}-${c.nome}`}
+                name={c.nome}
+                type={c.tipo ?? "text"}
+                inputMode={c.inputMode}
+                className="sb-input"
+                placeholder={c.exemplo}
+                value={form[c.nome]}
+                onChange={aoMudar}
+                required={c.obrigatorio}
+              />
+            )}
+          </div>
+        ))}
       </div>
     </form>
   );
