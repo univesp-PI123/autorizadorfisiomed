@@ -1,0 +1,144 @@
+// Schema do banco de dados do SGA — Sistema de Gestão de Autorizações
+// Modelo baseado nas 7 entidades da proposta técnica (Paciente, Convenio,
+// Autorizacao, HistoricoStatus, Agendamento, Alerta, Usuario).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// --- Enums -----------------------------------------------------------
+
+enum PerfilUsuario {
+  RECEPCAO
+  AUTORIZADOR
+  GESTOR
+}
+
+// Máquina de estados da autorização (seção 3 do documento).
+// As transições válidas são controladas em código, não aqui —
+// veja src/lib/autorizacao/maquina-estados.ts na próxima fase.
+enum StatusAutorizacao {
+  RASCUNHO
+  SOLICITADA
+  EM_ANALISE
+  AUTORIZADA
+  NEGADA
+  PARCIAL
+  VENCIDA
+  ESGOTADA
+}
+
+enum TipoAlerta {
+  VENCIMENTO
+  SALDO_BAIXO
+  SEM_AUTORIZACAO
+}
+
+enum SituacaoAlerta {
+  PENDENTE
+  VISUALIZADO
+  RESOLVIDO
+}
+
+// --- Entidades ---------------------------------------------------------
+
+model Usuario {
+  id        String        @id @default(cuid())
+  nome      String
+  email     String        @unique
+  senhaHash String
+  perfil    PerfilUsuario
+  criadoEm  DateTime      @default(now())
+
+  alertas Alerta[]
+}
+
+model Paciente {
+  id             String   @id @default(cuid())
+  nome           String
+  dataNascimento DateTime
+  carteirinha    String // número da carteirinha no convênio
+  convenioId     String
+  criadoEm       DateTime @default(now())
+
+  convenio      Convenio       @relation(fields: [convenioId], references: [id])
+  autorizacoes  Autorizacao[]
+  agendamentos  Agendamento[]
+}
+
+model Convenio {
+  id              String @id @default(cuid())
+  nome            String
+  // qual adapter usar para integrar (ex: "AmilMockAdapter", "AmilTissAdapter")
+  adapterConfig   String
+
+  pacientes    Paciente[]
+  autorizacoes Autorizacao[]
+}
+
+model Autorizacao {
+  id                  String            @id @default(cuid())
+  pacienteId          String
+  convenioId          String
+  numeroGuia          String?
+  codigoProcedimento  String // código TUSS
+  valorProcedimento   Decimal           @db.Decimal(10, 2)
+  sessoesAutorizadas  Int               @default(0)
+  sessoesUtilizadas   Int               @default(0)
+  validade            DateTime?
+  status              StatusAutorizacao @default(RASCUNHO)
+  criadoEm            DateTime          @default(now())
+  atualizadoEm        DateTime          @updatedAt
+
+  paciente  Paciente        @relation(fields: [pacienteId], references: [id])
+  convenio  Convenio        @relation(fields: [convenioId], references: [id])
+  historico HistoricoStatus[]
+  agendamentos Agendamento[]
+  alertas   Alerta[]
+
+  @@index([status])
+  @@index([validade])
+}
+
+// Trilha de auditoria — uma linha por transição de status (seção 3).
+model HistoricoStatus {
+  id            String            @id @default(cuid())
+  autorizacaoId String
+  statusAnterior StatusAutorizacao?
+  statusNovo    StatusAutorizacao
+  observacao    String?
+  criadoEm      DateTime          @default(now())
+
+  autorizacao Autorizacao @relation(fields: [autorizacaoId], references: [id])
+}
+
+model Agendamento {
+  id             String   @id @default(cuid())
+  pacienteId     String
+  autorizacaoId  String? // pode ser nulo -> agendamento sem autorização vigente (gera alerta/receita em risco)
+  dataHora       DateTime
+  realizado      Boolean  @default(false)
+  criadoEm       DateTime @default(now())
+
+  paciente    Paciente     @relation(fields: [pacienteId], references: [id])
+  autorizacao Autorizacao? @relation(fields: [autorizacaoId], references: [id])
+}
+
+// Alertas de vencimento, saldo baixo e sessão sem autorização (regra de negócio 1 e 2).
+model Alerta {
+  id            String         @id @default(cuid())
+  tipo          TipoAlerta
+  situacao      SituacaoAlerta @default(PENDENTE)
+  destinatarioId String
+  autorizacaoId String?
+  mensagem      String
+  criadoEm      DateTime       @default(now())
+
+  destinatario Usuario      @relation(fields: [destinatarioId], references: [id])
+  autorizacao  Autorizacao? @relation(fields: [autorizacaoId], references: [id])
+}
