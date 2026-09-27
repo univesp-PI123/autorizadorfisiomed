@@ -41,8 +41,8 @@ Isso vem nas próximas fases, em cima desta base.
 
 ## Instalação no servidor AWS (EC2)
 
-Os comandos abaixo assumem **Ubuntu 22.04 ou 24.04**. Se a sua instância for
-Amazon Linux, troque `apt` por `dnf` (os nomes dos pacotes mudam um pouco).
+Os comandos abaixo foram escritos para **Debian 13 (trixie)** — a imagem
+oficial do Debian na AWS. Também funcionam no Debian 12 e no Ubuntu.
 
 ### 1. Liberar as portas no Security Group
 
@@ -61,14 +61,25 @@ de pacientes (LGPD).
 
 ### 2. Instalar Node.js, PostgreSQL, Nginx e Git
 
-Conecte via SSH e rode:
+Conecte via SSH. Na imagem oficial do Debian na AWS o usuário é **`admin`**
+(não `ubuntu` nem `ec2-user`):
+
+```bash
+ssh -i sua-chave.pem admin@IP_PUBLICO_DA_INSTANCIA
+```
+
+E rode:
 
 ```bash
 sudo apt update && sudo apt upgrade -y
 
+# Ferramentas básicas (a imagem do Debian é mínima e pode não trazê-las)
+sudo apt install -y curl ca-certificates gnupg openssl cron
+
 # Node.js 22 (LTS)
 curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
 sudo apt install -y nodejs git nginx postgresql
+# (o Debian 13 instala o PostgreSQL 17)
 
 # Gerenciador que mantém a aplicação rodando e reinicia no boot
 sudo npm install -g pm2
@@ -96,7 +107,7 @@ CREATE DATABASE sga OWNER sga;
 SQL
 ```
 
-Por padrão, o PostgreSQL do Ubuntu só aceita conexões da própria máquina
+Por padrão, o PostgreSQL do Debian só aceita conexões da própria máquina
 (`localhost`) — é exatamente o que queremos.
 
 ### 4. Baixar o projeto e configurar o `.env`
