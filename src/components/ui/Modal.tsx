@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useId, useRef, type ReactNode } from "react";
+import Icone from "@/components/Icone";
 
-const TAMANHOS = { sm: "400px", md: "560px", lg: "720px", xl: "900px" };
+const TAMANHOS = { sm: "400px", md: "520px", lg: "680px", xl: "880px" };
 
 /**
  * Modal acessível (WCAG 2.1): role="dialog", aria-modal, título associado,
@@ -68,8 +69,8 @@ export default function Modal({
 
   return (
     <div
-      className="modal-overlay"
-      onClick={(e) => {
+      className="modal-fundo"
+      onMouseDown={(e) => {
         if (e.target === e.currentTarget) onFechar();
       }}
       role="presentation"
@@ -83,16 +84,16 @@ export default function Modal({
         tabIndex={-1}
         style={{ maxWidth: TAMANHOS[tamanho] }}
       >
-        <div className="modal-header">
-          <h2 id={idTitulo} className="modal-title">
+        <div className="modal__header">
+          <h2 id={idTitulo} className="card-title">
             {titulo}
           </h2>
-          <button className="btn btn-secondary btn-sm" onClick={onFechar} aria-label="Fechar">
-            ✕
+          <button type="button" className="sb-btn sb-btn--icon sb-btn--ghost" onClick={onFechar} aria-label="Fechar">
+            <Icone nome="fechar" />
           </button>
         </div>
-        <div className="modal-body">{children}</div>
-        {rodape && <div className="modal-footer">{rodape}</div>}
+        <div className="modal__body">{children}</div>
+        {rodape && <div className="modal__footer">{rodape}</div>}
       </div>
     </div>
   );

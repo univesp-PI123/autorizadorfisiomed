@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { Bar } from "react-chartjs-2";
-import { CORES, translucida } from "@/components/graficos";
+import { GraficoBarras, GraficoEmpilhado, type Serie } from "@/components/Graficos";
+import Icone from "@/components/Icone";
 import Carregando from "@/components/ui/Carregando";
 import MensagemErro from "@/components/ui/MensagemErro";
 import { calcularTaxaGlosa, formatarData, formatarMes, formatarMoeda } from "@/lib/analiseDados";
@@ -10,11 +10,12 @@ import { useFetch } from "@/lib/cliente/hooks";
 import { atendimentoService, relatorioService } from "@/lib/cliente/servicos";
 import { exportarParaCSV, exportarParaJSON } from "@/lib/exportacao";
 
-const OPCOES_GRAFICO = {
-  responsive: true,
-  plugins: { legend: { position: "top" as const } },
-  scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
-};
+const SERIES: Serie[] = [
+  { nome: "Autorizadas", cor: "var(--serie-1)" },
+  { nome: "Pendentes", cor: "var(--serie-2)" },
+  { nome: "Negadas", cor: "var(--serie-3)" },
+];
+const STATUS_SERIES = ["autorizada", "pendente", "negada"] as const;
 
 export default function RelatoriosPage() {
   const [meses, setMeses] = useState(6);
@@ -28,105 +29,142 @@ export default function RelatoriosPage() {
   const totalAtendimentos = linhasEvolucao.reduce((s, e) => s + e.total, 0);
   const totalGlosados = linhasEvolucao.reduce((s, e) => s + e.glosados, 0);
 
-  const conveniosMap: Record<string, { autorizada: number; pendente: number; negada: number }> = {};
+  const porNome = new Map<string, number[]>();
   for (const r of porConvenio.data ?? []) {
-    const nome = r.convenio.nome;
-    conveniosMap[nome] ??= { autorizada: 0, pendente: 0, negada: 0 };
-    if (r.status === "autorizada" || r.status === "pendente" || r.status === "negada") {
-      conveniosMap[nome][r.status] = r.total;
-    }
+    const i = STATUS_SERIES.indexOf(r.status as (typeof STATUS_SERIES)[number]);
+    if (i < 0) continue;
+    const valores = porNome.get(r.convenio.nome) ?? [0, 0, 0];
+    valores[i] = r.total;
+    porNome.set(r.convenio.nome, valores);
   }
-  const convenioLabels = Object.keys(conveniosMap);
-
-  const barConvenio = {
-    labels: convenioLabels,
-    datasets: [
-      { label: "Autorizadas", data: convenioLabels.map((c) => conveniosMap[c].autorizada), backgroundColor: translucida(CORES.verde) },
-      { label: "Pendentes", data: convenioLabels.map((c) => conveniosMap[c].pendente), backgroundColor: translucida(CORES.laranja) },
-      { label: "Negadas", data: convenioLabels.map((c) => conveniosMap[c].negada), backgroundColor: translucida(CORES.vermelho) },
-    ],
-  };
-
-  const barEvolucao = {
-    labels: linhasEvolucao.map((e) => formatarMes(e.mes)),
-    datasets: [
-      { label: "Atendimentos", data: linhasEvolucao.map((e) => e.total), backgroundColor: translucida(CORES.azul) },
-      { label: "Glosados", data: linhasEvolucao.map((e) => e.glosados), backgroundColor: translucida(CORES.vermelho) },
-      { label: "Sem autorização", data: linhasEvolucao.map((e) => e.semAutorizacao), backgroundColor: translucida(CORES.laranja) },
-    ],
-  };
+  const linhasConvenio = [...porNome.entries()]
+    .map(([rotulo, valores]) => ({ rotulo, valores }))
+    .sort((a, b) => b.valores.reduce((x, y) => x + y, 0) - a.valores.reduce((x, y) => x + y, 0));
 
   return (
-    <div className="pilha">
-      <div className="barra-acoes" style={{ marginBottom: 0 }}>
-        <label className="form-label" htmlFor="meses-sel" style={{ margin: 0 }}>
-          Período:
-        </label>
-        <select id="meses-sel" className="form-control" value={meses} onChange={(e) => setMeses(Number(e.target.value))} style={{ maxWidth: "180px" }}>
-          <option value={3}>Últimos 3 meses</option>
-          <option value={6}>Últimos 6 meses</option>
-          <option value={12}>Último ano</option>
-        </select>
-        <button className="btn btn-secondary btn-sm" onClick={() => exportarParaCSV(linhasEvolucao, "evolucao_atendimentos")}>
-          ⬇ Exportar CSV
-        </button>
-        <button className="btn btn-secondary btn-sm" onClick={() => exportarParaJSON(linhasEvolucao, "evolucao_atendimentos")}>
-          ⬇ Exportar JSON
-        </button>
-      </div>
-
-      <section className="card" aria-labelledby="rel-evolucao">
-        <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: "8px", marginBottom: "16px" }}>
-          <h2 id="rel-evolucao" style={{ fontWeight: 700 }}>
-            Evolução de atendimentos
+    <>
+      <section className="sb-card" id="rel-evolucao" aria-labelledby="titulo-evolucao">
+        <div className="sb-card__header">
+          <h2 className="sb-card__title" id="titulo-evolucao">
+            Atendimentos por mês
           </h2>
-          {!evolucao.carregando && (
-            <span className="texto-suave">
-              {totalAtendimentos} atendimento(s) · taxa de glosa {calcularTaxaGlosa(totalAtendimentos, totalGlosados)}
-            </span>
-          )}
+          <div className="ferramentas">
+            <select className="sb-input sb-input--sm" value={meses} onChange={(e) => setMeses(Number(e.target.value))} aria-label="Período">
+              <option value={3}>Últimos 3 meses</option>
+              <option value={6}>Últimos 6 meses</option>
+              <option value={12}>Últimos 12 meses</option>
+            </select>
+            <button type="button" className="sb-btn" onClick={() => exportarParaCSV(linhasEvolucao, "atendimentos_por_mes")}>
+              <Icone nome="baixar" />
+              Exportar CSV
+            </button>
+            <button type="button" className="sb-btn" onClick={() => exportarParaJSON(linhasEvolucao, "atendimentos_por_mes")}>
+              <Icone nome="baixar" />
+              Exportar JSON
+            </button>
+          </div>
         </div>
         {evolucao.carregando ? (
           <Carregando />
         ) : evolucao.erro ? (
-          <MensagemErro mensagem={evolucao.erro} onRetry={evolucao.recarregar} />
+          <div className="sb-card__body">
+            <MensagemErro mensagem={evolucao.erro} onRetry={evolucao.recarregar} />
+          </div>
         ) : (
-          <Bar data={barEvolucao} options={OPCOES_GRAFICO} aria-label="Gráfico de atendimentos por mês" role="img" />
+          <>
+            <div className="sb-card__body pilha">
+              <p className="texto-suave">
+                <span className="mono">{totalAtendimentos}</span> atendimento(s) no período · taxa de glosa{" "}
+                <span className="mono">{calcularTaxaGlosa(totalAtendimentos, totalGlosados)}</span>
+              </p>
+              <GraficoBarras
+                pontos={linhasEvolucao.map((m) => ({ rotulo: formatarMes(m.mes), valor: m.total }))}
+                titulo="Atendimentos por mês"
+                unidade="atendimentos"
+              />
+            </div>
+            <div className="tabela-rolagem">
+              <table className="sb-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Mês</th>
+                    <th scope="col" className="sb-end">
+                      Atendimentos
+                    </th>
+                    <th scope="col" className="sb-end">
+                      Sem autorização
+                    </th>
+                    <th scope="col" className="sb-end">
+                      Glosados
+                    </th>
+                    <th scope="col" className="sb-end">
+                      Taxa de glosa
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {linhasEvolucao.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="vazio">
+                        Sem atendimentos no período.
+                      </td>
+                    </tr>
+                  ) : (
+                    linhasEvolucao.map((m) => (
+                      <tr key={m.mes}>
+                        <td className="sb-mono">{formatarMes(m.mes)}</td>
+                        <td className="sb-mono sb-end">{m.total}</td>
+                        <td className="sb-mono sb-end">{m.semAutorizacao}</td>
+                        <td className="sb-mono sb-end">{m.glosados}</td>
+                        <td className="sb-mono sb-end">{calcularTaxaGlosa(m.total, m.glosados)}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </section>
 
-      <section className="card" aria-labelledby="rel-convenio">
-        <h2 id="rel-convenio" className="titulo-secao">
-          Autorizações por convênio
-        </h2>
-        {porConvenio.carregando ? (
-          <Carregando />
-        ) : porConvenio.erro ? (
-          <MensagemErro mensagem={porConvenio.erro} onRetry={porConvenio.recarregar} />
-        ) : (
-          <Bar data={barConvenio} options={OPCOES_GRAFICO} aria-label="Gráfico de autorizações por convênio" role="img" />
-        )}
+      <section className="sb-card" id="rel-convenio" aria-labelledby="titulo-convenio">
+        <div className="sb-card__header">
+          <h2 className="sb-card__title" id="titulo-convenio">
+            Autorizações por convênio
+          </h2>
+        </div>
+        <div className="sb-card__body">
+          {porConvenio.carregando ? (
+            <Carregando />
+          ) : porConvenio.erro ? (
+            <MensagemErro mensagem={porConvenio.erro} onRetry={porConvenio.recarregar} />
+          ) : (
+            <GraficoEmpilhado series={SERIES} linhas={linhasConvenio} titulo="Autorizações por convênio e status" />
+          )}
+        </div>
       </section>
 
-      <section className="card" aria-labelledby="rel-glosas">
-        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "16px", flexWrap: "wrap", gap: "8px" }}>
-          <h2 id="rel-glosas" style={{ fontWeight: 700 }}>
+      <section className="sb-card" id="rel-glosas" aria-labelledby="titulo-glosas">
+        <div className="sb-card__header">
+          <h2 className="sb-card__title" id="titulo-glosas">
             Glosas em aberto
           </h2>
           {glosas.data && (
-            <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}>
-              <span style={{ color: "var(--color-danger)", fontWeight: 700 }}>{glosas.data.total} atendimento(s) glosado(s)</span>
-              <span style={{ color: "var(--color-danger)", fontWeight: 700 }}>Total: {formatarMoeda(glosas.data.totalGlosado)}</span>
-            </div>
+            <span className="texto-suave">
+              <span className="mono">{glosas.data.total}</span> atendimento(s) ·{" "}
+              <span className="mono">{formatarMoeda(glosas.data.totalGlosado)}</span>
+            </span>
           )}
         </div>
         {glosas.carregando ? (
           <Carregando />
         ) : glosas.erro ? (
-          <MensagemErro mensagem={glosas.erro} onRetry={glosas.recarregar} />
+          <div className="sb-card__body">
+            <MensagemErro mensagem={glosas.erro} onRetry={glosas.recarregar} />
+          </div>
         ) : (
-          <div className="table-container">
-            <table aria-label="Tabela de glosas">
+          <div className="tabela-rolagem">
+            <table className="sb-table">
               <thead>
                 <tr>
                   <th scope="col">Data</th>
@@ -134,25 +172,27 @@ export default function RelatoriosPage() {
                   <th scope="col">Convênio</th>
                   <th scope="col">Procedimento</th>
                   <th scope="col">Motivo</th>
-                  <th scope="col">Valor cobrado</th>
+                  <th scope="col" className="sb-end">
+                    Valor cobrado
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {(glosas.data?.glosas ?? []).length === 0 ? (
                   <tr>
                     <td colSpan={6} className="vazio">
-                      Nenhuma glosa encontrada.
+                      Nenhuma glosa em aberto.
                     </td>
                   </tr>
                 ) : (
                   glosas.data!.glosas.map((g) => (
                     <tr key={g.id}>
-                      <td>{formatarData(g.dataAtendimento)}</td>
-                      <td>{g.paciente?.nome}</td>
+                      <td className="sb-mono">{formatarData(g.dataAtendimento)}</td>
+                      <td className="sb-strong">{g.paciente?.nome}</td>
                       <td>{g.autorizacao?.convenio?.nome || "—"}</td>
                       <td>{g.procedimento}</td>
                       <td>{g.motivoGlosa || "—"}</td>
-                      <td style={{ color: "var(--color-danger)", fontWeight: 600 }}>{formatarMoeda(g.valorCobrado)}</td>
+                      <td className="sb-mono sb-end">{formatarMoeda(g.valorCobrado)}</td>
                     </tr>
                   ))
                 )}
@@ -161,6 +201,6 @@ export default function RelatoriosPage() {
           </div>
         )}
       </section>
-    </div>
+    </>
   );
 }

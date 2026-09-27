@@ -3,27 +3,35 @@
 import Link from "next/link";
 import { useCallback, useState, type ChangeEvent, type FormEvent } from "react";
 import toast from "react-hot-toast";
-import FormPaciente, { FORM_PACIENTE_VAZIO as FORM_INICIAL } from "@/components/FormPaciente";
+import { comUrl, tirarNovoDaUrl } from "@/components/ComUrl";
+import FormPaciente, { FORM_PACIENTE_VAZIO } from "@/components/FormPaciente";
+import Icone from "@/components/Icone";
 import Carregando from "@/components/ui/Carregando";
 import MensagemErro from "@/components/ui/MensagemErro";
 import Modal from "@/components/ui/Modal";
 import Paginacao from "@/components/ui/Paginacao";
+import { Badge } from "@/components/ui/StatusBadge";
 import { formatarData } from "@/lib/analiseDados";
 import { mensagemDeErro } from "@/lib/cliente/api";
 import { useFetch, usePaginacao } from "@/lib/cliente/hooks";
 import { pacienteService } from "@/lib/cliente/servicos";
 
-
-export default function PacientesPage() {
-  const [busca, setBusca] = useState("");
-  const [filtroAtivo, setFiltroAtivo] = useState("true");
-  const [modalAberto, setModalAberto] = useState(false);
-  const [form, setForm] = useState(FORM_INICIAL);
+function PacientesPage({ url }: { url: URLSearchParams }) {
+  const [busca, setBusca] = useState(url.get("busca") ?? "");
+  const [filtroAtivo, setFiltroAtivo] = useState(url.get("ativo") ?? "true");
+  const [modalAberto, setModalAberto] = useState(url.get("novo") === "1");
+  const [form, setForm] = useState(FORM_PACIENTE_VAZIO);
   const [salvando, setSalvando] = useState(false);
   const { pagina, limite, setPagina, resetar } = usePaginacao(20);
 
   const buscar = useCallback(
-    () => pacienteService.listar({ page: pagina, limit: limite, busca: busca || undefined, ativo: filtroAtivo || undefined }),
+    () =>
+      pacienteService.listar({
+        page: pagina,
+        limit: limite,
+        busca: busca.trim() || undefined,
+        ativo: filtroAtivo || undefined,
+      }),
     [pagina, limite, busca, filtroAtivo],
   );
   const { data, carregando, erro, recarregar } = useFetch(buscar);
@@ -34,7 +42,8 @@ export default function PacientesPage() {
 
   const fechar = () => {
     setModalAberto(false);
-    setForm(FORM_INICIAL);
+    tirarNovoDaUrl();
+    setForm(FORM_PACIENTE_VAZIO);
   };
 
   const aoEnviar = async (e: FormEvent) => {
@@ -42,108 +51,121 @@ export default function PacientesPage() {
     setSalvando(true);
     try {
       await pacienteService.criar(form);
-      toast.success("Paciente cadastrado com sucesso!");
+      toast.success("Paciente cadastrado.");
       fechar();
       recarregar();
     } catch (err) {
-      toast.error(mensagemDeErro(err, "Erro ao salvar paciente."));
+      toast.error(mensagemDeErro(err, "Não foi possível salvar o paciente."));
     } finally {
       setSalvando(false);
     }
   };
 
   return (
-    <div>
-      <div className="barra-acoes">
-        <input
-          type="search"
-          className="form-control"
-          placeholder="Buscar por nome ou CPF..."
-          value={busca}
-          onChange={(e) => {
-            setBusca(e.target.value);
-            resetar();
-          }}
-          aria-label="Buscar pacientes"
-          style={{ maxWidth: "300px" }}
-        />
-        <select
-          className="form-control"
-          value={filtroAtivo}
-          onChange={(e) => {
-            setFiltroAtivo(e.target.value);
-            resetar();
-          }}
-          aria-label="Filtrar por situação"
-          style={{ maxWidth: "160px" }}
-        >
-          <option value="true">Ativos</option>
-          <option value="false">Inativos</option>
-          <option value="">Todos</option>
-        </select>
-        <button className="btn btn-primary empurra" onClick={() => setModalAberto(true)}>
-          + Novo paciente
-        </button>
-      </div>
+    <>
+      <section className="sb-card">
+        <div className="sb-card__header">
+          <h2 className="sb-card__title">
+            Pacientes{" "}
+            {data && (
+              <span className="texto-suave mono" style={{ fontWeight: 400 }}>
+                {data.pagination.total}
+              </span>
+            )}
+          </h2>
+          <div className="ferramentas">
+            <input
+              type="search"
+              className="sb-input sb-input--sm"
+              placeholder="Nome ou CPF…"
+              value={busca}
+              onChange={(e) => {
+                setBusca(e.target.value);
+                resetar();
+              }}
+              aria-label="Buscar pacientes por nome ou CPF"
+            />
+            <select
+              className="sb-input sb-input--sm"
+              value={filtroAtivo}
+              onChange={(e) => {
+                setFiltroAtivo(e.target.value);
+                resetar();
+              }}
+              aria-label="Situação"
+            >
+              <option value="true">Ativos</option>
+              <option value="false">Inativos</option>
+              <option value="">Todos</option>
+            </select>
+            <button type="button" className="sb-btn sb-btn--primary" onClick={() => setModalAberto(true)}>
+              <Icone nome="mais" />
+              Novo paciente
+            </button>
+          </div>
+        </div>
 
-      {carregando && <Carregando mensagem="Carregando pacientes..." />}
-      {erro && <MensagemErro mensagem={erro} onRetry={recarregar} />}
-
-      {!carregando && !erro && (
-        <>
-          <div className="table-container">
-            <table aria-label="Lista de pacientes">
-              <thead>
-                <tr>
-                  <th scope="col">Nome</th>
-                  <th scope="col">Data nasc.</th>
-                  <th scope="col">CPF</th>
-                  <th scope="col">Responsável</th>
-                  <th scope="col">Telefone</th>
-                  <th scope="col">CID</th>
-                  <th scope="col">Convênios</th>
-                  <th scope="col">Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pacientes.length === 0 ? (
+        {carregando ? (
+          <Carregando mensagem="Carregando pacientes…" />
+        ) : erro ? (
+          <div className="sb-card__body">
+            <MensagemErro mensagem={erro} onRetry={recarregar} />
+          </div>
+        ) : (
+          <>
+            <div className="tabela-rolagem">
+              <table className="sb-table">
+                <thead>
                   <tr>
-                    <td colSpan={8} className="vazio">
-                      Nenhum paciente encontrado.
-                    </td>
+                    <th scope="col">Nome</th>
+                    <th scope="col">Nascimento</th>
+                    <th scope="col">CPF</th>
+                    <th scope="col">Responsável</th>
+                    <th scope="col">Telefone</th>
+                    <th scope="col">CID</th>
+                    <th scope="col">Convênios</th>
                   </tr>
-                ) : (
-                  pacientes.map((p) => (
-                    <tr key={p.id}>
-                      <td>
-                        <strong>{p.nome}</strong>
-                      </td>
-                      <td>{formatarData(p.dataNascimento)}</td>
-                      <td>{p.cpf || "—"}</td>
-                      <td>{p.responsavel || "—"}</td>
-                      <td>{p.telefone || "—"}</td>
-                      <td>{p.cid || "—"}</td>
-                      <td>
-                        {(p.vinculos ?? []).map((v) => (
-                          <span key={v.id} className="badge badge-info" style={{ marginRight: "4px" }}>
-                            {v.convenio?.nome}
-                          </span>
-                        ))}
-                      </td>
-                      <td>
-                        <Link href={`/pacientes/${p.id}`} className="btn btn-secondary btn-sm" aria-label={`Ver ${p.nome}`}>
-                          Ver
-                        </Link>
+                </thead>
+                <tbody>
+                  {pacientes.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="vazio">
+                        Nenhum paciente encontrado.
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-          <Paginacao pagina={pagina} totalPaginas={data?.pagination.totalPages ?? 0} onPagina={setPagina} />
-        </>
-      )}
+                  ) : (
+                    pacientes.map((p) => (
+                      <tr key={p.id}>
+                        <td className="sb-strong">
+                          <Link href={`/pacientes/${p.id}`}>{p.nome}</Link>
+                          {!p.ativo && (
+                            <>
+                              {" "}
+                              <Badge>Inativo</Badge>
+                            </>
+                          )}
+                        </td>
+                        <td className="sb-mono">{formatarData(p.dataNascimento)}</td>
+                        <td className="sb-mono">{p.cpf || "—"}</td>
+                        <td>{p.responsavel || "—"}</td>
+                        <td className="sb-mono">{p.telefone || "—"}</td>
+                        <td className="sb-mono">{p.cid || "—"}</td>
+                        <td>{(p.vinculos ?? []).map((v) => v.convenio?.nome).join(", ") || "—"}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <Paginacao
+              pagina={pagina}
+              totalPaginas={data?.pagination.totalPages ?? 0}
+              total={data?.pagination.total}
+              onPagina={setPagina}
+            />
+          </>
+        )}
+      </section>
 
       <Modal
         aberto={modalAberto}
@@ -152,17 +174,19 @@ export default function PacientesPage() {
         tamanho="lg"
         rodape={
           <>
-            <button className="btn btn-secondary" onClick={fechar}>
+            <button type="button" className="sb-btn" onClick={fechar}>
               Cancelar
             </button>
-            <button className="btn btn-primary" form="form-paciente" type="submit" disabled={salvando}>
-              {salvando ? "Salvando..." : "Salvar"}
+            <button type="submit" className="sb-btn sb-btn--primary" form="form-paciente" disabled={salvando}>
+              {salvando ? "Salvando…" : "Salvar"}
             </button>
           </>
         }
       >
         <FormPaciente id="form-paciente" form={form} aoMudar={aoMudar} aoEnviar={aoEnviar} />
       </Modal>
-    </div>
+    </>
   );
 }
+
+export default comUrl(PacientesPage);

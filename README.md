@@ -13,8 +13,9 @@ mesmo servidor na **AWS (EC2)**. Não usamos Neon nem Vercel.
 
 ## Funcionalidades
 
-- **Dashboard** — indicadores (autorizações ativas, pendentes, vencendo,
-  glosas, atendimentos sem autorização) e gráficos.
+- **Visão geral** — indicadores (autorizações ativas, pendentes, vencendo,
+  atendimentos do mês), autorizações vencendo, ações rápidas, cobrança e
+  gráfico de atendimentos por mês.
 - **Pacientes** — cadastro, edição, desativação e carteirinhas de convênio.
 - **Convênios** — cadastro de operadoras, prazos e antecedência dos alertas.
 - **Autorizações** — ciclo completo com histórico:
@@ -28,16 +29,76 @@ mesmo servidor na **AWS (EC2)**. Não usamos Neon nem Vercel.
   exportação CSV/JSON.
 - **Configurações** — troca da própria senha; gestão de usuários (admin).
 
+## Visual (design system Sóbrio)
+
+A interface segue o design system **Sóbrio**: bordas finas em vez de sombras,
+um único rosa de destaque, status em badges discretos, números em fonte mono
+(IBM Plex Mono) e texto em IBM Plex Sans. Tem **tema claro e escuro** (botão
+na barra superior; a escolha fica salva no navegador).
+
+- `src/styles/sobrio/` — `tokens.css` e `sobrio.css` do pacote do design
+  system, **sem alterações**. Para atualizar o design system, substitua esses
+  dois arquivos.
+- `src/styles/app.css` — complementos do sistema (estrutura das telas, modal,
+  formulários, gráficos), usando só os tokens do Sóbrio.
+- `public/fundo-login.webp` — imagem de fundo do login.
+- **Logos** (`public/marca/`): `logo-fisiomed.png` (colorido, horizontal),
+  `logo-fisiomed-branco.webp` (branco, empilhado) e `logo-simbolo.png` (só o
+  "O" de quebra-cabeça, recortado do colorido). Uso:
+  - menu recolhido → símbolo; menu expandido → logo horizontal (em branco no
+    tema escuro);
+  - login → horizontal colorido no tema claro, branco empilhado no escuro;
+  - o símbolo também é o ícone da aba do navegador (`src/app/icon.png`).
+  Para trocar um logo, substitua o arquivo mantendo o nome.
+
+As fontes são baixadas do Google Fonts **durante o `npm run build`** e
+servidas pelo próprio site (o navegador dos usuários não acessa o Google).
+Por isso o servidor precisa de acesso à internet na hora do build.
+
+## Ambientes (tenants)
+
+No lugar do antigo "Sistema conectado", a barra superior mostra o ambiente em
+uso (`autofisiomed.cftconsult.com.br`) e um ponto de status: **verde**
+conectado, **âmbar** sem resposta do servidor. Ao clicar, abre a lista de
+ambientes.
+
+O modelo é **um subdomínio por cliente**, cada um com a própria instalação e
+o próprio banco — trocar de ambiente é abrir o endereço do outro cliente, que
+tem o seu próprio login. A lista fica em `src/lib/ambientes.ts`; para um novo
+cliente, instale a aplicação no subdomínio dele e acrescente-o ali. (Ainda
+não existe um login único entre ambientes; cada um autentica separadamente.)
+
+## Acessibilidade
+
+- **Painel de acessibilidade** (ícone de pessoa na barra superior e no canto
+  do login), com as escolhas salvas no navegador:
+  - tamanho do texto: 100%, 112%, 125% e 150% (em telas de celular o painel
+    orienta a usar o zoom do próprio aparelho);
+  - alto contraste (textos, bordas e foco mais fortes, nos dois temas);
+  - sublinhar links;
+  - reduzir animações (a preferência do sistema operacional também vale);
+  - **VLibras**, o tradutor de Libras do governo federal — só é carregado
+    quando a pessoa ativa, para o site não chamar o gov.br sem necessidade.
+- Tema claro e escuro.
+- Navegação completa por teclado: link "Ir para o conteúdo" no primeiro Tab,
+  submenus que abrem no foco, modais que prendem o foco e fecham com Esc.
+- Rótulos e papéis para leitores de tela (menus, diálogos, tabelas, status),
+  gráficos com tabela equivalente oculta, cores de gráfico validadas para
+  daltonismo e texto com contraste mínimo WCAG AA.
+- Verificado com o **axe-core** (regras WCAG 2.1 A/AA): nenhuma violação em
+  todas as telas, nos temas claro e escuro e no alto contraste.
+
 ## Perfis de acesso
 
 | Tela / ação                         | Admin | Recepção | Terapeuta | Financeiro |
 |-------------------------------------|:-----:|:--------:|:---------:|:----------:|
-| Dashboard, Configurações (própria senha) | ✅ | ✅ | ✅ | ✅ |
+| Visão geral, Configurações (própria senha) | ✅ | ✅ | ✅ | ✅ |
 | Pacientes                           | ✅ | ✅ | ✅ |    |
 | Convênios (ver)                     | ✅ | ✅ |    | ✅ |
 | Convênios (criar/editar)            | ✅ |    |    | ✅ |
 | Autorizações                        | ✅ | ✅ |    | ✅ |
 | Atendimentos (registrar)            | ✅ | ✅ | ✅ |    |
+| Atendimentos (ver)                  | ✅ | ✅ | ✅ | ✅ |
 | Atendimentos (cobrança/glosa)       | ✅ | ✅ |    | ✅ |
 | Relatórios                          | ✅ |    |    | ✅ |
 | Gestão de usuários                  | ✅ |    |    |    |
@@ -342,6 +403,9 @@ Isso gera uma nova pasta em `prisma/migrations/`. Faça commit dela junto com
 o schema — no servidor, o `migrate deploy` vai aplicá-la.
 
 ## Próximos passos sugeridos
+
+- Recuperação de senha por e-mail (o link "Esqueci minha senha" do login já
+  existe, mas por enquanto só orienta a procurar o administrador).
 
 - Busca de paciente por nome nos formulários (hoje as listas trazem até 200
   pacientes ativos).

@@ -4,7 +4,13 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 import { autorizacaoService } from "@/lib/cliente/servicos";
 import type { Autorizacao } from "@/lib/cliente/tipos";
 
-type Alertas = { alertas: Autorizacao[]; totalAlertas: number; buscarAlertas: () => Promise<void> };
+type Alertas = {
+  alertas: Autorizacao[];
+  totalAlertas: number;
+  // Se a última consulta ao servidor funcionou (indicador na barra superior).
+  conectado: boolean;
+  buscarAlertas: () => Promise<void>;
+};
 
 const AlertaContexto = createContext<Alertas | null>(null);
 
@@ -13,13 +19,16 @@ const INTERVALO_MS = 5 * 60 * 1000;
 // Autorizações vencendo em 7 dias, atualizadas a cada 5 minutos.
 export function AlertaProvider({ children }: { children: ReactNode }) {
   const [alertas, setAlertas] = useState<Autorizacao[]>([]);
+  const [conectado, setConectado] = useState(true);
 
   const buscarAlertas = useCallback(async () => {
     try {
       const res = await autorizacaoService.alertasVencimento(7);
       setAlertas(res.autorizacoes);
+      setConectado(true);
     } catch {
-      // Silencioso: alerta indisponível não deve travar a tela.
+      // Alerta indisponível não trava a tela; só muda o indicador.
+      setConectado(false);
     }
   }, []);
 
@@ -33,7 +42,7 @@ export function AlertaProvider({ children }: { children: ReactNode }) {
   }, [buscarAlertas]);
 
   return (
-    <AlertaContexto.Provider value={{ alertas, totalAlertas: alertas.length, buscarAlertas }}>
+    <AlertaContexto.Provider value={{ alertas, totalAlertas: alertas.length, conectado, buscarAlertas }}>
       {children}
     </AlertaContexto.Provider>
   );

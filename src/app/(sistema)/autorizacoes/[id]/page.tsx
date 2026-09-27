@@ -4,11 +4,13 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useState, type FormEvent } from "react";
 import toast from "react-hot-toast";
+import Icone from "@/components/Icone";
 import Carregando from "@/components/ui/Carregando";
 import MensagemErro from "@/components/ui/MensagemErro";
 import Modal from "@/components/ui/Modal";
 import StatusBadge, { rotuloStatus } from "@/components/ui/StatusBadge";
 import { useAlertas } from "@/contextos/AlertaContexto";
+import { useSessao } from "@/contextos/SessaoContexto";
 import { formatarData, formatarDataHora, percentualSessoes } from "@/lib/analiseDados";
 import { mensagemDeErro } from "@/lib/cliente/api";
 import { useFetch } from "@/lib/cliente/hooks";
@@ -20,6 +22,7 @@ const DADOS_VAZIOS = { motivoNegativa: "", numeroAutorizacao: "", dataResposta: 
 
 export default function AutorizacaoDetalhe() {
   const { id } = useParams<{ id: string }>();
+  const { usuario } = useSessao();
   const { buscarAlertas } = useAlertas();
   const [modalStatus, setModalStatus] = useState(false);
   const [novoStatus, setNovoStatus] = useState<StatusAutorizacao | "">("");
@@ -29,10 +32,10 @@ export default function AutorizacaoDetalhe() {
   const buscar = useCallback(() => autorizacaoService.buscarPorId(id), [id]);
   const { data: aut, carregando, erro, recarregar } = useFetch(buscar);
 
-  if (carregando) return <Carregando mensagem="Carregando autorização..." />;
+  if (carregando) return <Carregando mensagem="Carregando autorização…" />;
   if (erro || !aut) return <MensagemErro mensagem={erro ?? "Autorização não encontrada."} onRetry={recarregar} />;
 
-  const transicoes = TRANSICOES_MANUAIS[aut.status];
+  const transicoes = usuario.perfil === "terapeuta" ? [] : TRANSICOES_MANUAIS[aut.status];
 
   const fecharModal = () => {
     setModalStatus(false);
@@ -47,14 +50,14 @@ export default function AutorizacaoDetalhe() {
       const atualizada = await autorizacaoService.atualizarStatus(id, { status: novoStatus, ...dadosStatus });
       toast.success(
         atualizada.status === novoStatus
-          ? "Status atualizado!"
-          : `Status atualizado — e em seguida marcado como "${rotuloStatus(atualizada.status)}" pelo sistema.`,
+          ? `Status alterado para ${rotuloStatus(novoStatus).toLowerCase()}.`
+          : `Status alterado e, em seguida, marcado como ${rotuloStatus(atualizada.status).toLowerCase()} pelo sistema.`,
       );
       fecharModal();
       recarregar();
       buscarAlertas();
     } catch (err) {
-      toast.error(mensagemDeErro(err, "Erro ao atualizar status."));
+      toast.error(mensagemDeErro(err, "Não foi possível alterar o status."));
     } finally {
       setSalvando(false);
     }
@@ -63,175 +66,187 @@ export default function AutorizacaoDetalhe() {
   const total = aut.quantidadeAutorizada ?? aut.quantidadeSolicitada;
   const pct = percentualSessoes(aut.quantidadeUtilizada, aut.quantidadeAutorizada);
 
+  const dados: [string, string | number, boolean?][] = [
+    ["Nº da autorização", aut.numeroAutorizacao || "—", true],
+    ["Protocolo", aut.protocolo || "—", true],
+    ["Procedimento", aut.procedimento],
+    ["Código TUSS", aut.codigoProcedimento || "—", true],
+    ["Sessões solicitadas", aut.quantidadeSolicitada, true],
+    ["Sessões autorizadas", aut.quantidadeAutorizada ?? "—", true],
+    ["Solicitação", formatarData(aut.dataSolicitacao), true],
+    ["Resposta", formatarData(aut.dataResposta), true],
+    ["Início da vigência", formatarData(aut.dataInicioVigencia), true],
+    ["Fim da vigência", formatarData(aut.dataFimVigencia), true],
+  ];
+
   return (
-    <div className="pilha">
-      <div className="cabecalho-pagina">
-        <Link href="/autorizacoes" className="btn btn-secondary btn-sm">
-          ← Voltar
+    <>
+      <div className="ferramentas">
+        <Link href="/autorizacoes" className="sb-btn sb-btn--ghost">
+          <Icone nome="voltar" />
+          Autorizações
         </Link>
-        <h2 style={{ flex: 1 }}>Autorização — {aut.procedimento}</h2>
+        <h2 className="card-title" style={{ fontSize: 17 }}>
+          {aut.procedimento}
+        </h2>
         <StatusBadge status={aut.status} />
         {transicoes.length > 0 && (
-          <button className="btn btn-primary btn-sm" onClick={() => setModalStatus(true)}>
-            Atualizar status
+          <button type="button" className="sb-btn sb-btn--primary empurra" onClick={() => setModalStatus(true)}>
+            Alterar status
           </button>
         )}
       </div>
 
-      <div className="grade-2">
-        <section className="card" aria-labelledby="dados-aut">
-          <h3 id="dados-aut" className="titulo-secao">
-            Dados da autorização
-          </h3>
-          <dl className="dl-grade">
-            {(
-              [
-                ["Nº autorização", aut.numeroAutorizacao || "—"],
-                ["Protocolo", aut.protocolo || "—"],
-                ["Procedimento", aut.procedimento],
-                ["Código", aut.codigoProcedimento || "—"],
-                ["Qtd. solicitada", aut.quantidadeSolicitada],
-                ["Qtd. autorizada", aut.quantidadeAutorizada ?? "—"],
-                ["Data da solicitação", formatarData(aut.dataSolicitacao)],
-                ["Data da resposta", formatarData(aut.dataResposta)],
-                ["Início da vigência", formatarData(aut.dataInicioVigencia)],
-                ["Fim da vigência", formatarData(aut.dataFimVigencia)],
-              ] as const
-            ).map(([rotulo, valor]) => (
-              <div key={rotulo}>
-                <dt>{rotulo}</dt>
-                <dd>{valor}</dd>
+      <div className="grid2">
+        <section className="sb-card" aria-labelledby="dados-aut">
+          <div className="sb-card__header">
+            <h3 id="dados-aut" className="sb-card__title">
+              Dados da autorização
+            </h3>
+          </div>
+          <div className="sb-card__body pilha">
+            <dl className="dl-grade">
+              {dados.map(([rotulo, valor, mono]) => (
+                <div key={rotulo}>
+                  <dt>{rotulo}</dt>
+                  <dd className={mono ? "mono" : undefined}>{valor}</dd>
+                </div>
+              ))}
+            </dl>
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                <span className="texto-suave">Sessões utilizadas</span>
+                <span className="mono">
+                  {aut.quantidadeUtilizada} de {total}
+                </span>
               </div>
-            ))}
-          </dl>
-
-          <div style={{ marginTop: "16px" }}>
-            <p className="texto-suave" style={{ marginBottom: "4px" }}>
-              Sessões utilizadas: <strong>{aut.quantidadeUtilizada}</strong> de {total}
-            </p>
-            {aut.quantidadeAutorizada !== null && (
-              <div
-                role="progressbar"
-                aria-valuenow={pct}
-                aria-valuemin={0}
-                aria-valuemax={100}
-                aria-label="Percentual de sessões utilizadas"
-                style={{ height: "8px", background: "var(--color-gray-200)", borderRadius: "999px", overflow: "hidden" }}
-              >
+              {aut.quantidadeAutorizada !== null && (
                 <div
-                  style={{
-                    width: `${pct}%`,
-                    height: "100%",
-                    background: pct >= 90 ? "var(--color-danger)" : pct >= 80 ? "var(--color-warning)" : "var(--color-success)",
-                  }}
-                />
+                  className="progresso"
+                  role="progressbar"
+                  aria-valuenow={pct}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-label="Sessões utilizadas"
+                >
+                  <span style={{ width: `${pct}%` }} />
+                </div>
+              )}
+            </div>
+            {aut.motivoNegativa && (
+              <div className="aviso">
+                <strong style={{ fontWeight: 500 }}>Motivo da negativa:</strong> {aut.motivoNegativa}
               </div>
+            )}
+            {aut.observacoes && (
+              <p className="texto-apoio">
+                <span className="texto-suave">Observações: </span>
+                {aut.observacoes}
+              </p>
             )}
           </div>
-
-          {aut.motivoNegativa && (
-            <div style={{ marginTop: "12px", background: "#fee2e2", padding: "12px", borderRadius: "var(--radius)" }}>
-              <strong style={{ color: "var(--color-danger)" }}>Motivo da negativa:</strong>
-              <p style={{ marginTop: "4px", fontSize: "var(--font-size-sm)" }}>{aut.motivoNegativa}</p>
-            </div>
-          )}
-          {aut.observacoes && (
-            <p className="texto-suave" style={{ marginTop: "12px" }}>
-              <strong>Observações:</strong> {aut.observacoes}
-            </p>
-          )}
         </section>
 
-        <section className="card" aria-labelledby="vinculo-titulo">
-          <h3 id="vinculo-titulo" className="titulo-secao">
-            Paciente e convênio
-          </h3>
-          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-            <div className="caixa-cinza">
-              <p style={{ fontWeight: 700, fontSize: "var(--font-size-sm)" }}>{aut.paciente?.nome}</p>
-              <p style={{ fontSize: "var(--font-size-xs)", color: "var(--color-gray-500)" }}>
-                CPF: {aut.paciente?.cpf || "—"}
-              </p>
-              <Link href={`/pacientes/${aut.pacienteId}`} className="btn btn-ghost btn-sm" style={{ marginTop: "8px" }}>
-                Ver paciente
-              </Link>
-            </div>
-            <div className="caixa-cinza">
-              <p style={{ fontWeight: 700, fontSize: "var(--font-size-sm)" }}>{aut.convenio?.nome}</p>
-              <p style={{ fontSize: "var(--font-size-xs)", color: "var(--color-gray-500)" }}>
-                {aut.vinculo
-                  ? `Carteirinha: ${aut.vinculo.numeroCarteirinha} | Plano: ${aut.vinculo.plano || "—"}`
-                  : "Paciente sem carteirinha cadastrada para este convênio."}
-              </p>
-            </div>
-            {aut.usuarioCriou && (
-              <p style={{ fontSize: "var(--font-size-xs)", color: "var(--color-gray-500)" }}>
-                Criada por: {aut.usuarioCriou.nome}
-              </p>
-            )}
+        <section className="sb-card" aria-labelledby="vinculo-titulo">
+          <div className="sb-card__header">
+            <h3 id="vinculo-titulo" className="sb-card__title">
+              Paciente e convênio
+            </h3>
+          </div>
+          <div className="sb-card__body">
+            <ul className="lista-simples">
+              <li>
+                <p style={{ fontWeight: 500 }}>
+                  <Link href={`/pacientes/${aut.pacienteId}`}>{aut.paciente?.nome}</Link>
+                </p>
+                <p className="texto-suave">
+                  CPF <span className="mono">{aut.paciente?.cpf || "—"}</span>
+                </p>
+              </li>
+              <li>
+                <p style={{ fontWeight: 500 }}>{aut.convenio?.nome}</p>
+                <p className="texto-suave">
+                  {aut.vinculo ? (
+                    <>
+                      Carteirinha <span className="mono">{aut.vinculo.numeroCarteirinha}</span> · Plano{" "}
+                      {aut.vinculo.plano || "—"}
+                    </>
+                  ) : (
+                    "Paciente sem carteirinha cadastrada para este convênio."
+                  )}
+                </p>
+              </li>
+              {aut.usuarioCriou && (
+                <li>
+                  <p className="texto-suave">Criada por {aut.usuarioCriou.nome}</p>
+                </li>
+              )}
+            </ul>
           </div>
         </section>
       </div>
 
-      <section className="card" aria-labelledby="historico-titulo">
-        <h3 id="historico-titulo" className="titulo-secao">
-          Histórico de status
-        </h3>
-        {(aut.historico ?? []).length === 0 ? (
-          <p className="texto-suave">Sem registros.</p>
-        ) : (
-          <ol style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: "10px" }}>
-            {aut.historico!.map((h) => (
-              <li key={h.id} style={{ display: "flex", gap: "12px", alignItems: "baseline", flexWrap: "wrap" }}>
-                <span className="texto-suave" style={{ minWidth: "150px" }}>
-                  {formatarDataHora(h.createdAt)}
-                </span>
-                <span>
-                  {h.statusAnterior && (
-                    <>
-                      <StatusBadge status={h.statusAnterior} /> →{" "}
-                    </>
-                  )}
-                  <StatusBadge status={h.statusNovo} />
-                </span>
-                <span className="texto-suave">
-                  {h.usuario ? h.usuario.nome : "Sistema"}
-                  {h.observacao && ` — ${h.observacao}`}
-                </span>
-              </li>
-            ))}
-          </ol>
-        )}
+      <section className="sb-card" aria-labelledby="historico-titulo">
+        <div className="sb-card__header">
+          <h3 id="historico-titulo" className="sb-card__title">
+            Histórico de status
+          </h3>
+        </div>
+        <div className="sb-card__body">
+          {(aut.historico ?? []).length === 0 ? (
+            <p className="texto-suave">Sem registros.</p>
+          ) : (
+            <ol className="linha-tempo">
+              {aut.historico!.map((h) => (
+                <li key={h.id}>
+                  <span className="quando">{formatarDataHora(h.createdAt)}</span>
+                  <span>
+                    {h.statusAnterior && (
+                      <>
+                        <StatusBadge status={h.statusAnterior} /> <span aria-label="para">→</span>{" "}
+                      </>
+                    )}
+                    <StatusBadge status={h.statusNovo} />{" "}
+                    <span className="texto-apoio">
+                      {h.usuario ? h.usuario.nome : "Sistema"}
+                      {h.observacao && ` — ${h.observacao}`}
+                    </span>
+                  </span>
+                </li>
+              ))}
+            </ol>
+          )}
+        </div>
       </section>
 
       <Modal
         aberto={modalStatus}
         onFechar={fecharModal}
-        titulo="Atualizar status da autorização"
+        titulo="Alterar status"
         rodape={
           <>
-            <button className="btn btn-secondary" onClick={fecharModal}>
+            <button type="button" className="sb-btn" onClick={fecharModal}>
               Cancelar
             </button>
-            <button className="btn btn-primary" form="form-status" type="submit" disabled={salvando || !novoStatus}>
-              {salvando ? "Salvando..." : "Confirmar"}
+            <button type="submit" className="sb-btn sb-btn--primary" form="form-status" disabled={salvando || !novoStatus}>
+              {salvando ? "Salvando…" : "Confirmar"}
             </button>
           </>
         }
       >
-        <form id="form-status" onSubmit={aoAtualizarStatus}>
-          <div className="form-group" style={{ marginBottom: "16px" }}>
-            <label className="form-label" htmlFor="novoStatus">
-              Novo status <span className="required">*</span>
+        <form id="form-status" onSubmit={aoAtualizarStatus} className="pilha">
+          <div className="sb-field">
+            <label className="sb-label" htmlFor="novoStatus">
+              Novo status<span className="obrigatorio" aria-hidden="true">*</span>
             </label>
             <select
               id="novoStatus"
-              className="form-control"
+              className="sb-input"
               value={novoStatus}
               onChange={(e) => setNovoStatus(e.target.value as StatusAutorizacao)}
               required
             >
-              <option value="">Selecione...</option>
+              <option value="">Selecione…</option>
               {transicoes.map((s) => (
                 <option key={s} value={s}>
                   {rotuloStatus(s)}
@@ -241,42 +256,45 @@ export default function AutorizacaoDetalhe() {
           </div>
           {novoStatus === "autorizada" && (
             <>
-              <div className="form-group" style={{ marginBottom: "16px" }}>
-                <label className="form-label" htmlFor="numeroAutorizacao">
+              <div className="sb-field">
+                <label className="sb-label" htmlFor="numeroAutorizacao">
                   Número da autorização
                 </label>
                 <input
                   id="numeroAutorizacao"
-                  type="text"
-                  className="form-control"
+                  className="sb-input"
                   value={dadosStatus.numeroAutorizacao}
                   onChange={(e) => setDadosStatus((d) => ({ ...d, numeroAutorizacao: e.target.value }))}
                 />
               </div>
-              <div className="form-group" style={{ marginBottom: "16px" }}>
-                <label className="form-label" htmlFor="qtdAut">
-                  Quantidade autorizada
+              <div className="sb-field">
+                <label className="sb-label" htmlFor="qtdAut">
+                  Sessões autorizadas
                 </label>
                 <input
                   id="qtdAut"
                   type="number"
                   min="1"
-                  className="form-control"
-                  placeholder={`Em branco = ${aut.quantidadeSolicitada} (solicitada)`}
+                  className="sb-input"
+                  placeholder={`${aut.quantidadeSolicitada} (solicitadas)`}
                   value={dadosStatus.quantidadeAutorizada}
                   onChange={(e) => setDadosStatus((d) => ({ ...d, quantidadeAutorizada: e.target.value }))}
+                  aria-describedby="qtdAut-ajuda"
                 />
+                <span id="qtdAut-ajuda" className="sb-help">
+                  Em branco, vale a quantidade solicitada.
+                </span>
               </div>
             </>
           )}
           {novoStatus === "negada" && (
-            <div className="form-group">
-              <label className="form-label" htmlFor="motivoNegativa">
+            <div className="sb-field">
+              <label className="sb-label" htmlFor="motivoNegativa">
                 Motivo da negativa
               </label>
               <textarea
                 id="motivoNegativa"
-                className="form-control"
+                className="sb-input"
                 rows={3}
                 value={dadosStatus.motivoNegativa}
                 onChange={(e) => setDadosStatus((d) => ({ ...d, motivoNegativa: e.target.value }))}
@@ -284,21 +302,25 @@ export default function AutorizacaoDetalhe() {
             </div>
           )}
           {(novoStatus === "autorizada" || novoStatus === "negada") && (
-            <div className="form-group" style={{ marginTop: "16px" }}>
-              <label className="form-label" htmlFor="dataResposta">
+            <div className="sb-field">
+              <label className="sb-label" htmlFor="dataResposta">
                 Data da resposta
               </label>
               <input
                 id="dataResposta"
                 type="date"
-                className="form-control"
+                className="sb-input"
                 value={dadosStatus.dataResposta}
                 onChange={(e) => setDadosStatus((d) => ({ ...d, dataResposta: e.target.value }))}
+                aria-describedby="dataResposta-ajuda"
               />
+              <span id="dataResposta-ajuda" className="sb-help">
+                Em branco, vale a data de hoje.
+              </span>
             </div>
           )}
         </form>
       </Modal>
-    </div>
+    </>
   );
 }

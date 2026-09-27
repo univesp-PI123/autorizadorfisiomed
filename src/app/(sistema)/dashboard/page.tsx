@@ -2,139 +2,200 @@
 
 import Link from "next/link";
 import { useCallback } from "react";
-import { Bar, Doughnut } from "react-chartjs-2";
-import { CORES, translucida } from "@/components/graficos";
+import { GraficoBarras } from "@/components/Graficos";
 import Carregando from "@/components/ui/Carregando";
 import MensagemErro from "@/components/ui/MensagemErro";
-import { formatarMes, formatarMoeda } from "@/lib/analiseDados";
+import { useAlertas } from "@/contextos/AlertaContexto";
+import { useSessao } from "@/contextos/SessaoContexto";
+import { diasParaVencimento, formatarData, formatarMes, formatarMoeda } from "@/lib/analiseDados";
 import { useFetch } from "@/lib/cliente/hooks";
 import { relatorioService } from "@/lib/cliente/servicos";
 
-type Metrica = {
-  titulo: string;
+function Indicador({
+  rotulo,
+  valor,
+  sub,
+  href,
+}: {
+  rotulo: string;
   valor: string | number;
-  icone: string;
-  cor: string;
-  link?: string;
-  descricao?: string;
-};
-
-function CardMetrica({ titulo, valor, icone, cor, link, descricao }: Metrica) {
-  const conteudo = (
-    <article className="metrica-card" style={{ borderLeftColor: cor }}>
-      <div className="metrica-icon" style={{ background: cor + "20" }} aria-hidden="true">
-        {icone}
+  sub: string;
+  href: string;
+}) {
+  return (
+    <Link href={href} className="card-link">
+      <div className="sb-card sb-stat">
+        <span className="sb-stat__label">{rotulo}</span>
+        <span className="sb-stat__value">{valor}</span>
+        <span className="sb-stat__sub">{sub}</span>
       </div>
-      <div className="metrica-info">
-        <p className="metrica-titulo">{titulo}</p>
-        <p className="metrica-valor" style={{ color: cor }}>
-          {valor}
-        </p>
-        {descricao && <p className="metrica-desc">{descricao}</p>}
-      </div>
-    </article>
-  );
-  return link ? (
-    <Link href={link} style={{ textDecoration: "none" }}>
-      {conteudo}
     </Link>
-  ) : (
-    conteudo
   );
 }
 
 export default function Dashboard() {
+  const { usuario } = useSessao();
+  const { alertas } = useAlertas();
   const { data, carregando, erro, recarregar } = useFetch(relatorioService.dashboard);
   const buscarEvolucao = useCallback(() => relatorioService.evolucaoAtendimentos(6), []);
-  const { data: evolucao } = useFetch(buscarEvolucao);
+  const evolucao = useFetch(buscarEvolucao);
 
-  if (carregando) return <Carregando mensagem="Carregando dashboard..." />;
+  if (carregando) return <Carregando mensagem="Carregando indicadores…" />;
   if (erro || !data) return <MensagemErro mensagem={erro ?? "Sem dados."} onRetry={recarregar} />;
 
-  const metricas: Metrica[] = [
-    { titulo: "Pacientes ativos", valor: data.totalPacientes, icone: "👤", cor: CORES.azul, link: "/pacientes" },
-    { titulo: "Autorizações ativas", valor: data.autorizacoesAtivas, icone: "✅", cor: CORES.verde, link: "/autorizacoes?status=autorizada" },
-    { titulo: "Pendentes de aprovação", valor: data.autorizacoesPendentes, icone: "⏳", cor: CORES.laranja, link: "/autorizacoes?status=pendente" },
-    {
-      titulo: "Vencendo em 7 dias",
-      valor: data.autorizacoesVencendo,
-      icone: "⚠️",
-      cor: CORES.vermelho,
-      link: "/autorizacoes?vencendoEm=7",
-      descricao: data.autorizacoesVencendo > 0 ? "Requer atenção!" : undefined,
-    },
-    { titulo: "Atendimentos no mês", valor: data.atendimentosMes, icone: "📅", cor: "#0891b2", link: "/atendimentos" },
-    { titulo: "Glosas em aberto", valor: data.glosasAberto, icone: "❌", cor: CORES.vermelho, link: "/atendimentos?statusCobranca=glosado" },
-    { titulo: "Sem autorização (mês)", valor: data.semAutorizacaoMes, icone: "🚫", cor: "#9333ea", link: "/atendimentos?semAutorizacao=true" },
-    { titulo: "Total glosado", valor: formatarMoeda(data.totalGlosado), icone: "💸", cor: CORES.vermelho },
-  ];
+  const meses = evolucao.data ?? [];
+  const pontos = meses.map((m) => ({
+    rotulo: formatarMes(m.mes),
+    valor: m.total,
+    detalhe: `${m.glosados} glosado(s) · ${m.semAutorizacao} sem autorização`,
+  }));
+  const pico = meses.reduce<(typeof meses)[number] | null>((p, m) => (!p || m.total > p.total ? m : p), null);
 
-  const meses = evolucao ?? [];
-  const barData = {
-    labels: meses.map((e) => formatarMes(e.mes)),
-    datasets: [
-      { label: "Total", data: meses.map((e) => e.total), backgroundColor: translucida(CORES.azul) },
-      { label: "Glosados", data: meses.map((e) => e.glosados), backgroundColor: translucida(CORES.vermelho) },
-      { label: "Sem autorização", data: meses.map((e) => e.semAutorizacao), backgroundColor: translucida(CORES.laranja) },
-    ],
-  };
-
-  const doughnutData = {
-    labels: ["Ativas (fora do prazo crítico)", "Pendentes", "Vencendo em 7 dias"],
-    datasets: [
-      {
-        // "Vencendo" também é "ativa": separa para as fatias não se sobreporem.
-        data: [
-          data.autorizacoesAtivas - data.autorizacoesVencendo,
-          data.autorizacoesPendentes,
-          data.autorizacoesVencendo,
-        ],
-        backgroundColor: [CORES.verde, CORES.laranja, CORES.vermelho],
-        borderWidth: 2,
-      },
-    ],
-  };
+  const perfil = usuario.perfil;
+  const acoes = [
+    { rotulo: "Nova autorização", href: "/autorizacoes?novo=1", mostrar: perfil !== "terapeuta" },
+    { rotulo: "Registrar atendimento", href: "/atendimentos?novo=1", mostrar: perfil !== "financeiro" },
+    { rotulo: "Novo paciente", href: "/pacientes?novo=1", mostrar: perfil !== "financeiro" },
+    { rotulo: "Ver pendentes", href: "/autorizacoes?status=pendente", mostrar: perfil !== "terapeuta" },
+    { rotulo: "Ver glosas", href: "/atendimentos?statusCobranca=glosado", mostrar: true },
+    { rotulo: "Relatórios", href: "/relatorios", mostrar: perfil === "admin" || perfil === "financeiro" },
+  ].filter((a) => a.mostrar);
 
   return (
-    <div className="dashboard">
-      <section aria-labelledby="metricas-titulo">
-        <h2 id="metricas-titulo" className="sr-only">
-          Métricas principais
-        </h2>
-        <div className="metricas-grid">
-          {metricas.map((m) => (
-            <CardMetrica key={m.titulo} {...m} />
-          ))}
+    <>
+      <section className="stats" aria-label="Indicadores">
+        <Indicador
+          rotulo="Autorizações ativas"
+          valor={data.autorizacoesAtivas}
+          sub={`${data.totalPacientes} pacientes ativos`}
+          href="/autorizacoes?status=autorizada"
+        />
+        <Indicador
+          rotulo="Pendentes"
+          valor={data.autorizacoesPendentes}
+          sub="Aguardando resposta do convênio"
+          href="/autorizacoes?status=pendente"
+        />
+        <Indicador
+          rotulo="Vencendo em 7 dias"
+          valor={data.autorizacoesVencendo}
+          sub={data.autorizacoesVencendo > 0 ? "Requer atenção" : "Nenhuma no período"}
+          href="/autorizacoes?vencendoEm=7"
+        />
+        <Indicador
+          rotulo="Atendimentos no mês"
+          valor={data.atendimentosMes}
+          sub={`${data.semAutorizacaoMes} sem autorização`}
+          href="/atendimentos"
+        />
+      </section>
+
+      <section className="grid2">
+        <div className="sb-card">
+          <div className="sb-card__header">
+            <h2 className="sb-card__title">Autorizações vencendo</h2>
+            <Link href="/autorizacoes?vencendoEm=7">Ver todas</Link>
+          </div>
+          <div className="tabela-rolagem">
+            <table className="sb-table">
+              <thead>
+                <tr>
+                  <th scope="col">Paciente</th>
+                  <th scope="col">Convênio</th>
+                  <th scope="col">Procedimento</th>
+                  <th scope="col" className="sb-end">
+                    Sessões
+                  </th>
+                  <th scope="col" className="sb-end">
+                    Vence em
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {alertas.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="vazio">
+                      Nenhuma autorização vence nos próximos 7 dias.
+                    </td>
+                  </tr>
+                ) : (
+                  alertas.slice(0, 6).map((a) => {
+                    const dias = diasParaVencimento(a.dataFimVigencia);
+                    return (
+                      <tr key={a.id}>
+                        <td className="sb-strong">
+                          <Link href={`/autorizacoes/${a.id}`}>{a.paciente?.nome}</Link>
+                        </td>
+                        <td>{a.convenio?.nome}</td>
+                        <td>{a.procedimento}</td>
+                        <td className="sb-mono sb-end">
+                          {a.quantidadeUtilizada}/{a.quantidadeAutorizada ?? "—"}
+                        </td>
+                        <td className="sb-mono sb-end" title={formatarData(a.dataFimVigencia)}>
+                          {dias === 0 ? "hoje" : `${dias} d`}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="pilha">
+          <div className="sb-card">
+            <div className="sb-card__header">
+              <h2 className="sb-card__title">Ações rápidas</h2>
+            </div>
+            <div className="sb-card__body acoes-rapidas">
+              {acoes.map((a) => (
+                <Link key={a.href} href={a.href} className="sb-btn">
+                  {a.rotulo}
+                </Link>
+              ))}
+            </div>
+          </div>
+          <div className="sb-card">
+            <div className="sb-card__header">
+              <h2 className="sb-card__title">Cobrança</h2>
+              <Link href="/atendimentos?statusCobranca=glosado">Ver glosas</Link>
+            </div>
+            <div className="sb-card__body">
+              <dl className="dl-grade">
+                <div>
+                  <dt>Glosas em aberto</dt>
+                  <dd className="mono">{data.glosasAberto}</dd>
+                </div>
+                <div>
+                  <dt>Total glosado</dt>
+                  <dd className="mono">{formatarMoeda(data.totalGlosado)}</dd>
+                </div>
+              </dl>
+            </div>
+          </div>
         </div>
       </section>
 
-      <div className="dashboard-graficos">
-        <section className="card" aria-labelledby="grafico-evolucao-titulo">
-          <h2 id="grafico-evolucao-titulo" className="titulo-secao">
-            Evolução de atendimentos (últimos 6 meses)
+      <section className="sb-card" aria-labelledby="titulo-volume">
+        <div className="sb-card__header">
+          <h2 className="sb-card__title" id="titulo-volume">
+            Atendimentos por mês
           </h2>
-          <Bar
-            data={barData}
-            options={{ responsive: true, plugins: { legend: { position: "top" } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }}
-            aria-label="Gráfico de barras com a evolução mensal de atendimentos"
-            role="img"
-          />
-        </section>
-
-        <section className="card" aria-labelledby="grafico-status-titulo">
-          <h2 id="grafico-status-titulo" className="titulo-secao">
-            Status das autorizações
-          </h2>
-          <div style={{ maxWidth: "260px", margin: "0 auto" }}>
-            <Doughnut
-              data={doughnutData}
-              options={{ responsive: true, plugins: { legend: { position: "bottom" } } }}
-              aria-label="Gráfico de rosca com a distribuição de status das autorizações"
-              role="img"
-            />
-          </div>
-        </section>
-      </div>
-    </div>
+          <span className="caption" style={{ color: "var(--ink-muted)" }}>
+            Últimos 6 meses{pico && pico.total > 0 ? ` · pico em ${formatarMes(pico.mes)}` : ""}
+          </span>
+        </div>
+        <div className="sb-card__body">
+          {evolucao.carregando ? (
+            <Carregando />
+          ) : evolucao.erro ? (
+            <MensagemErro mensagem={evolucao.erro} onRetry={evolucao.recarregar} />
+          ) : (
+            <GraficoBarras pontos={pontos} titulo="Atendimentos por mês" unidade="atendimentos" />
+          )}
+        </div>
+      </section>
+    </>
   );
 }
