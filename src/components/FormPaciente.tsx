@@ -21,7 +21,7 @@ export type DadosFormPaciente = typeof FORM_PACIENTE_VAZIO;
 export function formDoPaciente(p: Paciente): DadosFormPaciente {
   return {
     nome: p.nome,
-    dataNascimento: p.dataNascimento,
+    dataNascimento: p.dataNascimento ?? "",
     cpf: p.cpf ?? "",
     responsavel: p.responsavel ?? "",
     telefone: p.telefone ?? "",

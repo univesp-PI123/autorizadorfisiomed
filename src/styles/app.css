@@ -143,7 +143,9 @@ textarea.sb-input { height: auto; min-height: 72px; padding: 10px 14px; resize: 
 }
 
 /* ---------- Tabelas dentro de card ---------- */
-.tabela-rolagem { overflow-x: auto; }
+/* position: relative prende os elementos absolutos (ex.: o "Ações" só para
+   leitor de tela) dentro da rolagem; sem isso eles alargam a página no celular. */
+.tabela-rolagem { overflow-x: auto; position: relative; }
 .sb-table td.vazio { text-align: center; color: var(--ink-muted); padding: var(--space-8) var(--space-5); }
 .sb-table .sb-mono.sb-end, .sb-table td.sb-end { white-space: nowrap; }
 .sb-table tbody tr:hover td { background: var(--surface-subtle); }
@@ -305,12 +307,37 @@ textarea.sb-input { height: auto; min-height: 72px; padding: 10px 14px; resize: 
   *, *::before, *::after { transition: none !important; scroll-behavior: auto !important; }
 }
 
+/* ---------- Importação, agenda e cadastros da integração ---------- */
+.dl-grade--4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.stats--5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.subtitulo { font: 500 13px/20px var(--font-sans); color: var(--ink); margin-bottom: var(--space-2); }
+.aviso--atencao { background: var(--warning-bg); color: var(--warning-ink); }
+.aviso a { color: inherit; text-decoration: underline; }
+.sb-root a.link-texto { text-decoration: underline; text-underline-offset: 2px; }
+.arquivo { display: block; width: 100%; font: inherit; color: var(--ink-secondary); padding: var(--space-2) 0; }
+.arquivo::file-selector-button {
+  font: 500 13px/1 var(--font-sans); height: var(--size-control); padding: 0 var(--space-3); margin-right: var(--space-3);
+  border: 1px solid var(--border-input); border-radius: var(--radius-md); background: var(--surface); color: var(--ink); cursor: pointer;
+}
+.pendencias { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 4px; }
+.pendencias li { font-size: 12px; line-height: 16px; padding: 2px 6px; border-radius: var(--radius-sm); background: var(--warning-bg); color: var(--warning-ink); }
+.sb-table td .texto-suave { display: block; }
+.lista-arquivos { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); }
+.lista-simples .lista-arquivos li { border: 0; padding: 0; }
+.lista-arquivos a { display: inline-flex; align-items: center; gap: 6px; }
+.lista-arquivos svg { width: 16px; height: 16px; }
+.card-botao { width: 100%; text-align: left; font: inherit; cursor: pointer; }
+.card-botao:hover { border-color: var(--border-input); }
+.card-botao[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+fieldset.sb-field { border: 0; padding: 0; margin: 0; min-width: 0; }
+.checks { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); }
+
 /* ---------- Responsivo ---------- */
 @media (max-width: 1100px) {
   .topbar__usuario { display: none; }
 }
 @media (max-width: 900px) {
-  .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .stats, .dl-grade--4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .grid2, .grid-meio { grid-template-columns: 1fr; }
   .topbar { padding: 0 var(--space-4); gap: var(--space-2); }
   .topbar .busca { display: none; }
@@ -318,6 +345,7 @@ textarea.sb-input { height: auto; min-height: 72px; padding: 10px 14px; resize: 
 }
 @media (max-width: 640px) {
   .stats, .form-grade, .dl-grade, .acoes-rapidas { grid-template-columns: 1fr; }
+  .ferramentas .sb-input { min-width: 0; max-width: 100%; flex: 1 1 160px; }
   .ambiente__botao .mono { display: none; }
   /* Celular: a ampliação da interface não cabe; vale o zoom do aparelho
      (o painel de acessibilidade avisa). Os demais recursos continuam. */

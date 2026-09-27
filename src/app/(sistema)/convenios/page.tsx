@@ -24,6 +24,9 @@ const FORM_INICIAL = {
   prazoAutorizacaoDias: "30",
   alertaAntecipacaoDias: "7",
   observacoes: "",
+  integracao: "manual",
+  codigoPrestador: "",
+  nomesAnclinic: "", // um por linha
 };
 type FormConvenio = typeof FORM_INICIAL;
 
@@ -37,7 +40,15 @@ const formDoConvenio = (c: Convenio): FormConvenio => ({
   prazoAutorizacaoDias: String(c.prazoAutorizacaoDias),
   alertaAntecipacaoDias: String(c.alertaAntecipacaoDias),
   observacoes: c.observacoes ?? "",
+  integracao: c.integracao,
+  codigoPrestador: c.codigoPrestador ?? "",
+  nomesAnclinic: c.nomesAnclinic.join("\n"),
 });
+
+const ROTULO_INTEGRACAO: Record<Convenio["integracao"], string> = {
+  manual: "Manual (portal)",
+  tiss_amil: "Webservice TISS Amil",
+};
 
 // [campo, rótulo, tipo, obrigatório, ocupa a linha inteira]
 const CAMPOS: [keyof FormConvenio, string, string, boolean?, boolean?][] = [
@@ -61,7 +72,7 @@ function ConveniosPage({ url }: { url: URLSearchParams }) {
 
   const { data: convenios, carregando, erro, recarregar } = useFetch(convenioService.listar);
 
-  const aoMudar = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+  const aoMudar = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
     setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
 
   const abrir = (c: Convenio | null) => {
@@ -79,9 +90,13 @@ function ConveniosPage({ url }: { url: URLSearchParams }) {
   const aoEnviar = async (e: FormEvent) => {
     e.preventDefault();
     setSalvando(true);
+    const dados = {
+      ...form,
+      nomesAnclinic: form.nomesAnclinic.split("\n").map((n) => n.trim()).filter(Boolean),
+    };
     try {
-      if (editando) await convenioService.atualizar(editando.id, form);
-      else await convenioService.criar(form);
+      if (editando) await convenioService.atualizar(editando.id, dados);
+      else await convenioService.criar(dados);
       toast.success(editando ? "Convênio atualizado." : "Convênio cadastrado.");
       fechar();
       recarregar();
@@ -117,6 +132,7 @@ function ConveniosPage({ url }: { url: URLSearchParams }) {
                 <tr>
                   <th scope="col">Nome</th>
                   <th scope="col">Código ANS</th>
+                  <th scope="col">Integração</th>
                   <th scope="col">Contato</th>
                   <th scope="col" className="sb-end">
                     Prazo
@@ -135,7 +151,7 @@ function ConveniosPage({ url }: { url: URLSearchParams }) {
               <tbody>
                 {(convenios ?? []).length === 0 ? (
                   <tr>
-                    <td colSpan={podeEditar ? 7 : 6} className="vazio">
+                    <td colSpan={podeEditar ? 8 : 7} className="vazio">
                       Nenhum convênio cadastrado.
                     </td>
                   </tr>
@@ -144,6 +160,10 @@ function ConveniosPage({ url }: { url: URLSearchParams }) {
                     <tr key={c.id}>
                       <td className="sb-strong">{c.nome}</td>
                       <td className="sb-mono">{c.codigoAns || "—"}</td>
+                      <td>
+                        {ROTULO_INTEGRACAO[c.integracao]}
+                        {c.codigoPrestador && <span className="texto-suave mono"> · {c.codigoPrestador}</span>}
+                      </td>
                       <td>
                         {c.contatoNome || "—"}
                         {c.contatoTelefone && <span className="texto-suave mono"> · {c.contatoTelefone}</span>}
@@ -207,6 +227,48 @@ function ConveniosPage({ url }: { url: URLSearchParams }) {
                 />
               </div>
             ))}
+            <div className="sb-field">
+              <label className="sb-label" htmlFor="conv-integracao">
+                Solicitação de autorização
+              </label>
+              <select id="conv-integracao" name="integracao" className="sb-input" value={form.integracao} onChange={aoMudar}>
+                {Object.entries(ROTULO_INTEGRACAO).map(([valor, rotulo]) => (
+                  <option key={valor} value={valor}>
+                    {rotulo}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="sb-field">
+              <label className="sb-label" htmlFor="conv-codigoPrestador">
+                Código do prestador na operadora
+              </label>
+              <input
+                id="conv-codigoPrestador"
+                name="codigoPrestador"
+                inputMode="numeric"
+                className="sb-input mono"
+                value={form.codigoPrestador}
+                onChange={aoMudar}
+              />
+            </div>
+            <div className="sb-field inteira">
+              <label className="sb-label" htmlFor="conv-nomesAnclinic">
+                Nomes na agenda do AnClinic
+              </label>
+              <textarea
+                id="conv-nomesAnclinic"
+                name="nomesAnclinic"
+                className="sb-input"
+                rows={2}
+                value={form.nomesAnclinic}
+                onChange={aoMudar}
+                aria-describedby="conv-nomesAnclinic-ajuda"
+              />
+              <span id="conv-nomesAnclinic-ajuda" className="sb-help">
+                Um por linha, como aparecem na coluna Convênio da planilha. A importação usa isso para ligar as sessões a este convênio.
+              </span>
+            </div>
             <div className="sb-field inteira">
               <label className="sb-label" htmlFor="conv-observacoes">
                 Observações

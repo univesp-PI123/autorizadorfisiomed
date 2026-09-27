@@ -23,6 +23,9 @@ const CAMPOS_SO_DATA = new Set([
   "dataSolicitacao",
   "dataResposta",
   "dataAtendimento",
+  "data", // agendamento
+  "dataPedido",
+  "validoAte",
 ]);
 
 export function serializar(valor: unknown, chave?: string): unknown {

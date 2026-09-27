@@ -51,6 +51,56 @@ const CAMINHOS = {
       <path d="M8 14h3" />
     </>
   ),
+  agenda: (
+    <>
+      <rect x="3.5" y="5" width="17" height="15.5" rx="2" />
+      <path d="M8 3v4" />
+      <path d="M16 3v4" />
+      <path d="M3.5 10h17" />
+      <path d="M9 15l2 2 4-4" />
+    </>
+  ),
+  importar: (
+    <>
+      <path d="M12 3v12" />
+      <path d="M7.5 10.5L12 15l4.5-4.5" />
+      <path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" />
+    </>
+  ),
+  profissionais: (
+    <>
+      <rect x="3" y="5" width="18" height="15" rx="2" />
+      <circle cx="9" cy="11" r="2.5" />
+      <path d="M5.5 17c.6-1.7 1.9-2.6 3.5-2.6s2.9.9 3.5 2.6" />
+      <path d="M15 10h3" />
+      <path d="M15 14h3" />
+      <path d="M10 5V3h4v2" />
+    </>
+  ),
+  procedimentos: (
+    <>
+      <path d="M9 6h11" />
+      <path d="M9 12h11" />
+      <path d="M9 18h11" />
+      <path d="M4 6h.01" />
+      <path d="M4 12h.01" />
+      <path d="M4 18h.01" />
+    </>
+  ),
+  unidades: (
+    <>
+      <path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z" />
+      <circle cx="12" cy="10" r="2.5" />
+    </>
+  ),
+  pdf: (
+    <>
+      <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />
+      <path d="M14 3v5h5" />
+      <path d="M9 13h6" />
+      <path d="M9 17h4" />
+    </>
+  ),
   configuracoes: (
     <>
       <path d="M12 3l8 3v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6z" />

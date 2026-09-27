@@ -1,15 +1,22 @@
 import { api } from "./api";
 import type {
+  Agenda,
   Atendimento,
   Autorizacao,
   AutorizacoesPorConvenio,
+  Clinica,
   Convenio,
   Dashboard,
   EvolucaoMes,
+  Importacao,
   Paciente,
   Paginado,
+  PedidoMedico,
+  Procedimento,
+  Profissional,
   ResumoGlosas,
   Usuario,
+  Unidade,
   UsuarioLogado,
   Vinculo,
 } from "./tipos";
@@ -72,4 +79,41 @@ export const usuarioService = {
   atualizar: (id: string, dados: unknown) => api.put<Usuario>(`/usuarios/${id}`, dados),
   alterarSenha: (dados: { senhaAtual: string; novaSenha: string }) =>
     api.patch("/usuarios/me/senha", dados),
+};
+
+export const agendaService = {
+  buscar: (params: Filtros = {}) => api.get<Agenda>("/agenda", params),
+};
+
+export const importacaoService = {
+  listar: () => api.get<Importacao[]>("/importacoes"),
+  buscarPorId: (id: string) => api.get<Importacao>(`/importacoes/${id}`),
+  enviar: (form: FormData) => api.post<Importacao>("/importacoes", form),
+};
+
+export const clinicaService = {
+  buscar: () => api.get<Clinica | null>("/clinica"),
+  salvar: (dados: unknown) => api.put<Clinica>("/clinica", dados),
+};
+
+export const unidadeService = {
+  listar: () => api.get<Unidade[]>("/unidades"),
+  atualizar: (id: string, dados: unknown) => api.put<Unidade>(`/unidades/${id}`, dados),
+};
+
+export const profissionalService = {
+  listar: (params: Filtros = {}) => api.get<Paginado<Profissional>>("/profissionais", params),
+  atualizar: (id: string, dados: unknown) => api.put<Profissional>(`/profissionais/${id}`, dados),
+};
+
+export const procedimentoService = {
+  listar: () => api.get<Procedimento[]>("/procedimentos"),
+  atualizar: (id: string, dados: unknown) => api.put<Procedimento>(`/procedimentos/${id}`, dados),
+};
+
+export const pedidoMedicoService = {
+  listar: (pacienteId: string) => api.get<PedidoMedico[]>(`/pacientes/${pacienteId}/pedidos`),
+  criar: (pacienteId: string, form: FormData) => api.post<PedidoMedico>(`/pacientes/${pacienteId}/pedidos`, form),
+  alterarAtivo: (id: string, ativo: boolean) => api.patch<PedidoMedico>(`/pedidos/${id}`, { ativo }),
+  urlArquivo: (pedidoId: string, arquivoId: string) => `/api/pedidos/${pedidoId}/arquivos/${arquivoId}`,
 };

@@ -44,6 +44,18 @@ enum StatusCobranca {
   cancelado
 }
 
+// manual: autorizações feitas fora do sistema (portal). tiss_amil: pedidos
+// enviados pelo webservice TISS da Amil.
+enum TipoIntegracao {
+  manual
+  tiss_amil
+}
+
+enum TipoImportacao {
+  agenda
+  profissionais
+}
+
 // --- Entidades ---------------------------------------------------------
 
 model Usuario {
@@ -60,52 +72,64 @@ model Usuario {
   autorizacoesCriadas    Autorizacao[]     @relation("AutorizacaoCriadaPor")
   atendimentosRealizados Atendimento[]
   historicoStatus        HistoricoStatus[]
+  importacoes            Importacao[]
+  pedidosMedicos         PedidoMedico[]
 
   @@map("usuarios")
 }
 
 model Paciente {
-  id             String   @id @default(uuid()) @db.Uuid
-  nome           String   @db.VarChar(200)
-  dataNascimento DateTime @db.Date
-  cpf            String?  @unique @db.VarChar(14)
-  responsavel    String?  @db.VarChar(200)
-  telefone       String?  @db.VarChar(20)
-  email          String?  @db.VarChar(255)
+  id             String    @id @default(uuid()) @db.Uuid
+  nome           String    @db.VarChar(200)
+  dataNascimento DateTime? @db.Date // pode faltar em pacientes vindos do AnClinic
+  cpf            String?   @unique @db.VarChar(14)
+  responsavel    String?   @db.VarChar(200)
+  telefone       String?   @db.VarChar(20)
+  email          String?   @db.VarChar(255)
   endereco       String?
   diagnostico    String?
-  cid            String?  @db.VarChar(20) // CID-10 do diagnóstico principal
-  ativo          Boolean  @default(true)
+  cid            String?   @db.VarChar(20) // CID-10 do diagnóstico principal
+  ativo          Boolean   @default(true)
   observacoes    String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
-  vinculos     PacienteConvenio[]
-  autorizacoes Autorizacao[]
-  atendimentos Atendimento[]
+  vinculos       PacienteConvenio[]
+  autorizacoes   Autorizacao[]
+  atendimentos   Atendimento[]
+  agendamentos   Agendamento[]
+  pedidosMedicos PedidoMedico[]
 
   @@index([nome])
   @@map("pacientes")
 }
 
 model Convenio {
-  id                    String   @id @default(uuid()) @db.Uuid
-  nome                  String   @unique @db.VarChar(200)
-  codigoAns             String?  @db.VarChar(20) // código da operadora na ANS
-  cnpj                  String?  @db.VarChar(18)
-  contatoNome           String?  @db.VarChar(150)
-  contatoTelefone       String?  @db.VarChar(20)
-  contatoEmail          String?  @db.VarChar(255)
-  prazoAutorizacaoDias  Int      @default(30)
-  alertaAntecipacaoDias Int      @default(7)
-  procedimentosCobertos String[] @default([])
-  ativo                 Boolean  @default(true)
+  id                    String         @id @default(uuid()) @db.Uuid
+  nome                  String         @unique @db.VarChar(200)
+  codigoAns             String?        @db.VarChar(20) // código da operadora na ANS
+  cnpj                  String?        @db.VarChar(18)
+  contatoNome           String?        @db.VarChar(150)
+  contatoTelefone       String?        @db.VarChar(20)
+  contatoEmail          String?        @db.VarChar(255)
+  prazoAutorizacaoDias  Int            @default(30)
+  alertaAntecipacaoDias Int            @default(7)
+  procedimentosCobertos String[]       @default([])
+  ativo                 Boolean        @default(true)
   observacoes           String?
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  // Integração: código da clínica nesta operadora (TISS) e os nomes com que
+  // o convênio aparece na agenda exportada do AnClinic.
+  integracao            TipoIntegracao @default(manual)
+  codigoPrestador       String?        @db.VarChar(20)
+  nomesAnclinic         String[]       @default([])
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
 
-  vinculos     PacienteConvenio[]
-  autorizacoes Autorizacao[]
+  vinculos       PacienteConvenio[]
+  autorizacoes   Autorizacao[]
+  agendamentos   Agendamento[]
+  credenciados   ProfissionalConvenio[]
+  pedidosMedicos PedidoMedico[]
 
   @@map("convenios")
 }
@@ -211,4 +235,198 @@ model Atendimento {
   @@index([dataAtendimento])
   @@index([statusCobranca])
   @@map("atendimentos")
+}
+
+// --- Integração AnClinic / TISS ------------------------------------------
+
+// Dados da clínica usados no cabeçalho das guias TISS. Uma linha só.
+model Clinica {
+  id           String   @id @default(uuid()) @db.Uuid
+  razaoSocial  String   @db.VarChar(200)
+  nomeFantasia String?  @db.VarChar(200)
+  cnpj         String   @db.VarChar(18)
+  updatedAt    DateTime @updatedAt
+
+  @@map("clinica")
+}
+
+// Unidade de atendimento (cada uma com seu CNES).
+model Unidade {
+  id             String   @id @default(uuid()) @db.Uuid
+  nome           String   @db.VarChar(150)
+  nomeAnclinic   String   @unique @db.VarChar(200) // como aparece na agenda
+  cnes           String?  @db.VarChar(7)
+  cep            String?  @db.VarChar(9)
+  tipoLogradouro String?  @db.VarChar(30)
+  logradouro     String?  @db.VarChar(200)
+  numero         String?  @db.VarChar(20)
+  complemento    String?  @db.VarChar(100)
+  bairro         String?  @db.VarChar(100)
+  municipio      String?  @db.VarChar(100)
+  uf             String?  @db.VarChar(2)
+  ativo          Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  agendamentos Agendamento[]
+
+  @@map("unidades")
+}
+
+// Profissional executante (terapeuta), com os dados de conselho que a guia exige.
+model Profissional {
+  id             String   @id @default(uuid()) @db.Uuid
+  nome           String   @db.VarChar(200)
+  cpf            String   @unique @db.VarChar(11) // só dígitos
+  cns            String?  @db.VarChar(15)
+  conselho       String?  @db.VarChar(10) // CRP, CREFITO, CRFA…
+  numeroConselho String?  @db.VarChar(15)
+  ufConselho     String?  @db.VarChar(2)
+  cbo            String?  @db.VarChar(6)
+  especialidades String?  @db.VarChar(300)
+  ativo          Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  credenciamentos ProfissionalConvenio[]
+  agendamentos    Agendamento[]
+
+  @@index([nome])
+  @@map("profissionais")
+}
+
+// Profissional cadastrado (credenciado) na operadora.
+model ProfissionalConvenio {
+  profissionalId String   @db.Uuid
+  convenioId     String   @db.Uuid
+  createdAt      DateTime @default(now())
+
+  profissional Profissional @relation(fields: [profissionalId], references: [id], onDelete: Cascade)
+  convenio     Convenio     @relation(fields: [convenioId], references: [id], onDelete: Cascade)
+
+  @@id([profissionalId, convenioId])
+  @@map("profissional_convenios")
+}
+
+// Procedimento como cadastrado no AnClinic, com o código TUSS da guia.
+model Procedimento {
+  id             String   @id @default(uuid()) @db.Uuid
+  codigoAnclinic String   @unique @db.VarChar(20)
+  descricao      String   @db.VarChar(200)
+  codigoTuss     String?  @db.VarChar(10)
+  tabelaTuss     String?  @db.VarChar(2) // 22 = TUSS procedimentos, 98 = tabela própria…
+  ativo          Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  agendamentos Agendamento[]
+
+  @@map("procedimentos")
+}
+
+// Sessão da agenda importada do AnClinic. Os campos "*Anclinic" guardam o
+// texto original, para conferência e para vincular depois.
+model Agendamento {
+  id                    String    @id @default(uuid()) @db.Uuid
+  idAnclinic            String    @unique @db.VarChar(20)
+  data                  DateTime  @db.Date
+  horaInicio            String?   @db.VarChar(5)
+  horaFim               String?   @db.VarChar(5)
+  pacienteId            String?   @db.Uuid
+  profissionalId        String?   @db.Uuid
+  convenioId            String?   @db.Uuid
+  procedimentoId        String?   @db.Uuid
+  unidadeId             String?   @db.Uuid
+  pacienteAnclinic      String?   @db.VarChar(200)
+  convenioAnclinic      String?   @db.VarChar(200)
+  carteirinha           String?   @db.VarChar(100)
+  statusAnclinic        String?   @db.VarChar(60)
+  statusFaturamento     String?   @db.VarChar(60)
+  senhaAutorizacao      String?   @db.VarChar(40)
+  senhaExecucao         String?   @db.VarChar(40)
+  agendamentosRestantes Int?
+  valorFaturamento      Decimal?  @db.Decimal(10, 2)
+  agenda                String?   @db.VarChar(200)
+  sala                  String?   @db.VarChar(200)
+  removidoEm            DateTime? // sumiu de uma importação posterior do mesmo dia
+  importacaoId          String?   @db.Uuid
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  paciente     Paciente?     @relation(fields: [pacienteId], references: [id])
+  profissional Profissional? @relation(fields: [profissionalId], references: [id])
+  convenio     Convenio?     @relation(fields: [convenioId], references: [id])
+  procedimento Procedimento? @relation(fields: [procedimentoId], references: [id])
+  unidade      Unidade?      @relation(fields: [unidadeId], references: [id])
+  importacao   Importacao?   @relation(fields: [importacaoId], references: [id], onDelete: SetNull)
+
+  @@index([data])
+  @@index([pacienteId])
+  @@map("agendamentos")
+}
+
+// Registro de cada arquivo importado, com o resumo mostrado ao usuário.
+model Importacao {
+  id          String         @id @default(uuid()) @db.Uuid
+  tipo        TipoImportacao
+  arquivoNome String         @db.VarChar(255)
+  usuarioId   String?        @db.Uuid
+  linhas      Int            @default(0)
+  criados     Int            @default(0)
+  atualizados Int            @default(0)
+  ignorados   Int            @default(0)
+  resumo      Json // avisos agrupados, período, contagens por convênio…
+  createdAt   DateTime       @default(now())
+
+  usuario      Usuario?      @relation(fields: [usuarioId], references: [id])
+  agendamentos Agendamento[]
+
+  @@index([createdAt])
+  @@map("importacoes")
+}
+
+// Pedido médico que acompanha a solicitação de autorização: dados do médico
+// solicitante e do diagnóstico, mais os PDFs enviados como anexo.
+model PedidoMedico {
+  id               String    @id @default(uuid()) @db.Uuid
+  pacienteId       String    @db.Uuid
+  convenioId       String?   @db.Uuid
+  medicoNome       String    @db.VarChar(200)
+  conselho         String    @default("CRM") @db.VarChar(10)
+  numeroConselho   String    @db.VarChar(15)
+  ufConselho       String    @db.VarChar(2)
+  cbo              String?   @db.VarChar(6)
+  cid              String?   @db.VarChar(20)
+  indicacaoClinica String?
+  dataPedido       DateTime  @db.Date
+  validoAte        DateTime? @db.Date
+  ativo            Boolean   @default(true)
+  observacoes      String?
+  usuarioId        String?   @db.Uuid
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  paciente Paciente        @relation(fields: [pacienteId], references: [id])
+  convenio Convenio?       @relation(fields: [convenioId], references: [id])
+  usuario  Usuario?        @relation(fields: [usuarioId], references: [id])
+  arquivos ArquivoPedido[]
+
+  @@index([pacienteId])
+  @@map("pedidos_medicos")
+}
+
+// PDF do pedido médico, gravado em disco (ARQUIVOS_DIR), fora da pasta pública.
+model ArquivoPedido {
+  id           String   @id @default(uuid()) @db.Uuid
+  pedidoId     String   @db.Uuid
+  nomeOriginal String   @db.VarChar(255)
+  caminho      String   @db.VarChar(255) // relativo a ARQUIVOS_DIR
+  tamanho      Int
+  sha256       String   @db.VarChar(64)
+  createdAt    DateTime @default(now())
+
+  pedido PedidoMedico @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+
+  @@index([pedidoId])
+  @@map("arquivos_pedido")
 }

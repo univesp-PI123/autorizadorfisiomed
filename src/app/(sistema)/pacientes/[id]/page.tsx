@@ -6,10 +6,12 @@ import { useCallback, useState, type ChangeEvent, type FormEvent } from "react";
 import toast from "react-hot-toast";
 import FormPaciente, { formDoPaciente, type DadosFormPaciente } from "@/components/FormPaciente";
 import Icone from "@/components/Icone";
+import PedidosMedicos from "@/components/PedidosMedicos";
 import Carregando from "@/components/ui/Carregando";
 import MensagemErro from "@/components/ui/MensagemErro";
 import Modal from "@/components/ui/Modal";
 import StatusBadge, { Badge } from "@/components/ui/StatusBadge";
+import { useSessao } from "@/contextos/SessaoContexto";
 import { formatarData } from "@/lib/analiseDados";
 import { mensagemDeErro } from "@/lib/cliente/api";
 import { useFetch } from "@/lib/cliente/hooks";
@@ -19,6 +21,7 @@ const VINCULO_VAZIO = { convenioId: "", numeroCarteirinha: "", plano: "", titula
 
 export default function PacienteDetalhe() {
   const { id } = useParams<{ id: string }>();
+  const { usuario } = useSessao();
   const buscar = useCallback(() => pacienteService.buscarPorId(id), [id]);
   const { data: paciente, carregando, erro, recarregar } = useFetch(buscar);
 
@@ -221,6 +224,12 @@ export default function PacienteDetalhe() {
           </table>
         </div>
       </section>
+
+      <PedidosMedicos
+        pacienteId={paciente.id}
+        convenios={convenios ?? []}
+        podeEditar={usuario.perfil === "admin" || usuario.perfil === "recepcionista"}
+      />
 
       <Modal
         aberto={edicao !== null}

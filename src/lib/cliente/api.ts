@@ -27,12 +27,14 @@ async function requisicao<T>(
   caminho: string,
   { params, corpo }: { params?: Parametros; corpo?: unknown } = {},
 ): Promise<T> {
+  // FormData (upload de arquivos) vai como multipart; o navegador põe o cabeçalho.
+  const formulario = corpo instanceof FormData;
   let resposta: Response;
   try {
     resposta = await fetch(montarUrl(caminho, params), {
       method: metodo,
-      headers: corpo !== undefined ? { "Content-Type": "application/json" } : undefined,
-      body: corpo !== undefined ? JSON.stringify(corpo) : undefined,
+      headers: corpo !== undefined && !formulario ? { "Content-Type": "application/json" } : undefined,
+      body: corpo === undefined ? undefined : formulario ? corpo : JSON.stringify(corpo),
       credentials: "same-origin",
     });
   } catch {
