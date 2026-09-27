@@ -1,6 +1,10 @@
 // Schema do banco de dados do SGA — Sistema de Gestão de Autorizações
-// Modelo baseado nas 7 entidades da proposta técnica (Paciente, Convenio,
-// Autorizacao, HistoricoStatus, Agendamento, Alerta, Usuario).
+// Modelo unificado a partir do sistema integrado (frontfisiomed): Usuario,
+// Paciente, Convenio, PacienteConvenio, Autorizacao e Atendimento, mais a
+// trilha de auditoria HistoricoStatus da proposta técnica.
+//
+// Os valores dos enums ficam em minúsculas porque são os mesmos usados pela
+// API e pelas telas (ex.: status "em_analise").
 
 generator client {
   provider = "prisma-client-js"
@@ -14,131 +18,197 @@ datasource db {
 // --- Enums -----------------------------------------------------------
 
 enum PerfilUsuario {
-  RECEPCAO
-  AUTORIZADOR
-  GESTOR
+  admin
+  recepcionista
+  terapeuta
+  financeiro
 }
 
-// Máquina de estados da autorização (seção 3 do documento).
-// As transições válidas são controladas em código, não aqui —
-// veja src/lib/autorizacao/maquina-estados.ts na próxima fase.
+// Máquina de estados da autorização. As transições válidas ficam em
+// src/lib/regras/autorizacao.ts.
 enum StatusAutorizacao {
-  RASCUNHO
-  SOLICITADA
-  EM_ANALISE
-  AUTORIZADA
-  NEGADA
-  PARCIAL
-  VENCIDA
-  ESGOTADA
+  pendente
+  em_analise
+  autorizada
+  negada
+  vencida
+  cancelada
+  esgotada
 }
 
-enum TipoAlerta {
-  VENCIMENTO
-  SALDO_BAIXO
-  SEM_AUTORIZACAO
-}
-
-enum SituacaoAlerta {
-  PENDENTE
-  VISUALIZADO
-  RESOLVIDO
+enum StatusCobranca {
+  pendente
+  faturado
+  pago
+  glosado
+  cancelado
 }
 
 // --- Entidades ---------------------------------------------------------
 
 model Usuario {
-  id        String        @id @default(cuid())
-  nome      String
-  email     String        @unique
-  senhaHash String
-  perfil    PerfilUsuario
-  criadoEm  DateTime      @default(now())
+  id           String        @id @default(uuid()) @db.Uuid
+  nome         String        @db.VarChar(150)
+  email        String        @unique @db.VarChar(255)
+  senhaHash    String
+  perfil       PerfilUsuario @default(recepcionista)
+  ativo        Boolean       @default(true)
+  ultimoAcesso DateTime?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
 
-  alertas Alerta[]
+  autorizacoesCriadas    Autorizacao[]     @relation("AutorizacaoCriadaPor")
+  atendimentosRealizados Atendimento[]
+  historicoStatus        HistoricoStatus[]
+
+  @@map("usuarios")
 }
 
 model Paciente {
-  id             String   @id @default(cuid())
-  nome           String
-  dataNascimento DateTime
-  carteirinha    String // número da carteirinha no convênio
-  convenioId     String
-  criadoEm       DateTime @default(now())
+  id             String   @id @default(uuid()) @db.Uuid
+  nome           String   @db.VarChar(200)
+  dataNascimento DateTime @db.Date
+  cpf            String?  @unique @db.VarChar(14)
+  responsavel    String?  @db.VarChar(200)
+  telefone       String?  @db.VarChar(20)
+  email          String?  @db.VarChar(255)
+  endereco       String?
+  diagnostico    String?
+  cid            String?  @db.VarChar(20) // CID-10 do diagnóstico principal
+  ativo          Boolean  @default(true)
+  observacoes    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  convenio      Convenio       @relation(fields: [convenioId], references: [id])
-  autorizacoes  Autorizacao[]
-  agendamentos  Agendamento[]
+  vinculos     PacienteConvenio[]
+  autorizacoes Autorizacao[]
+  atendimentos Atendimento[]
+
+  @@index([nome])
+  @@map("pacientes")
 }
 
 model Convenio {
-  id              String @id @default(cuid())
-  nome            String
-  // qual adapter usar para integrar (ex: "AmilMockAdapter", "AmilTissAdapter")
-  adapterConfig   String
+  id                    String   @id @default(uuid()) @db.Uuid
+  nome                  String   @unique @db.VarChar(200)
+  codigoAns             String?  @db.VarChar(20) // código da operadora na ANS
+  cnpj                  String?  @db.VarChar(18)
+  contatoNome           String?  @db.VarChar(150)
+  contatoTelefone       String?  @db.VarChar(20)
+  contatoEmail          String?  @db.VarChar(255)
+  prazoAutorizacaoDias  Int      @default(30)
+  alertaAntecipacaoDias Int      @default(7)
+  procedimentosCobertos String[] @default([])
+  ativo                 Boolean  @default(true)
+  observacoes           String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 
-  pacientes    Paciente[]
+  vinculos     PacienteConvenio[]
   autorizacoes Autorizacao[]
+
+  @@map("convenios")
+}
+
+// Vínculo paciente ↔ convênio (carteirinha). Um paciente pode ter vários.
+model PacienteConvenio {
+  id                String    @id @default(uuid()) @db.Uuid
+  pacienteId        String    @db.Uuid
+  convenioId        String    @db.Uuid
+  numeroCarteirinha String    @db.VarChar(100)
+  plano             String?   @db.VarChar(100)
+  titular           String?   @db.VarChar(200) // se diferente do paciente
+  dataValidade      DateTime? @db.Date
+  ativo             Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  paciente     Paciente      @relation(fields: [pacienteId], references: [id])
+  convenio     Convenio      @relation(fields: [convenioId], references: [id])
+  autorizacoes Autorizacao[]
+
+  @@unique([pacienteId, convenioId])
+  @@map("paciente_convenios")
 }
 
 model Autorizacao {
-  id                  String            @id @default(cuid())
-  pacienteId          String
-  convenioId          String
-  numeroGuia          String?
-  codigoProcedimento  String // código TUSS
-  valorProcedimento   Decimal           @db.Decimal(10, 2)
-  sessoesAutorizadas  Int               @default(0)
-  sessoesUtilizadas   Int               @default(0)
-  validade            DateTime?
-  status              StatusAutorizacao @default(RASCUNHO)
-  criadoEm            DateTime          @default(now())
-  atualizadoEm        DateTime          @updatedAt
+  id                   String            @id @default(uuid()) @db.Uuid
+  pacienteId           String            @db.Uuid
+  convenioId           String            @db.Uuid
+  pacienteConvenioId   String?           @db.Uuid
+  numeroAutorizacao    String?           @db.VarChar(100) // fornecido pelo convênio
+  protocolo            String?           @db.VarChar(100)
+  procedimento         String            @db.VarChar(200)
+  codigoProcedimento   String?           @db.VarChar(30) // TUSS/CBHPM
+  quantidadeSolicitada Int               @default(1)
+  quantidadeAutorizada Int?
+  quantidadeUtilizada  Int               @default(0)
+  dataInicioVigencia   DateTime?         @db.Date
+  dataFimVigencia      DateTime?         @db.Date
+  dataSolicitacao      DateTime          @default(now()) @db.Date
+  dataResposta         DateTime?         @db.Date
+  status               StatusAutorizacao @default(pendente)
+  motivoNegativa       String?
+  usuarioCriouId       String?           @db.Uuid
+  observacoes          String?
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
 
-  paciente  Paciente        @relation(fields: [pacienteId], references: [id])
-  convenio  Convenio        @relation(fields: [convenioId], references: [id])
-  historico HistoricoStatus[]
-  agendamentos Agendamento[]
-  alertas   Alerta[]
+  paciente     Paciente          @relation(fields: [pacienteId], references: [id])
+  convenio     Convenio          @relation(fields: [convenioId], references: [id])
+  vinculo      PacienteConvenio? @relation(fields: [pacienteConvenioId], references: [id])
+  usuarioCriou Usuario?          @relation("AutorizacaoCriadaPor", fields: [usuarioCriouId], references: [id])
+  atendimentos Atendimento[]
+  historico    HistoricoStatus[]
 
   @@index([status])
-  @@index([validade])
+  @@index([dataFimVigencia])
+  @@index([pacienteId])
+  @@map("autorizacoes")
 }
 
-// Trilha de auditoria — uma linha por transição de status (seção 3).
+// Trilha de auditoria — uma linha por mudança de status.
 model HistoricoStatus {
-  id            String            @id @default(cuid())
-  autorizacaoId String
+  id             String             @id @default(uuid()) @db.Uuid
+  autorizacaoId  String             @db.Uuid
   statusAnterior StatusAutorizacao?
-  statusNovo    StatusAutorizacao
-  observacao    String?
-  criadoEm      DateTime          @default(now())
+  statusNovo     StatusAutorizacao
+  observacao     String?
+  usuarioId      String?            @db.Uuid // nulo = mudança automática do sistema
+  createdAt      DateTime           @default(now())
 
-  autorizacao Autorizacao @relation(fields: [autorizacaoId], references: [id])
+  autorizacao Autorizacao @relation(fields: [autorizacaoId], references: [id], onDelete: Cascade)
+  usuario     Usuario?    @relation(fields: [usuarioId], references: [id])
+
+  @@index([autorizacaoId])
+  @@map("historico_status")
 }
 
-model Agendamento {
-  id             String   @id @default(cuid())
-  pacienteId     String
-  autorizacaoId  String? // pode ser nulo -> agendamento sem autorização vigente (gera alerta/receita em risco)
-  dataHora       DateTime
-  realizado      Boolean  @default(false)
-  criadoEm       DateTime @default(now())
+model Atendimento {
+  id                 String         @id @default(uuid()) @db.Uuid
+  pacienteId         String         @db.Uuid
+  autorizacaoId      String?        @db.Uuid
+  terapeutaId        String?        @db.Uuid
+  dataAtendimento    DateTime       @db.Date
+  horaInicio         String?        @db.VarChar(5) // HH:MM
+  horaFim            String?        @db.VarChar(5)
+  procedimento       String         @db.VarChar(200)
+  codigoProcedimento String?        @db.VarChar(30)
+  statusCobranca     StatusCobranca @default(pendente)
+  valorCobrado       Decimal?       @db.Decimal(10, 2)
+  valorPago          Decimal?       @db.Decimal(10, 2)
+  motivoGlosa        String?
+  semAutorizacao     Boolean        @default(false) // realizado sem autorização vigente
+  evolucao           String?
+  observacoes        String?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
 
   paciente    Paciente     @relation(fields: [pacienteId], references: [id])
   autorizacao Autorizacao? @relation(fields: [autorizacaoId], references: [id])
-}
+  terapeuta   Usuario?     @relation(fields: [terapeutaId], references: [id])
 
-// Alertas de vencimento, saldo baixo e sessão sem autorização (regra de negócio 1 e 2).
-model Alerta {
-  id            String         @id @default(cuid())
-  tipo          TipoAlerta
-  situacao      SituacaoAlerta @default(PENDENTE)
-  destinatarioId String
-  autorizacaoId String?
-  mensagem      String
-  criadoEm      DateTime       @default(now())
-
-  destinatario Usuario      @relation(fields: [destinatarioId], references: [id])
-  autorizacao  Autorizacao? @relation(fields: [autorizacaoId], references: [id])
+  @@index([dataAtendimento])
+  @@index([statusCobranca])
+  @@map("atendimentos")
 }

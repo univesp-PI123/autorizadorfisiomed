@@ -1,37 +1,67 @@
 # SGA — Fisiomed ABA
 
-Sistema de Gestão de Autorizações. Este README acompanha o andamento do
-projeto fase a fase — a Fase 1 (esta) só cria a fundação: projeto Next.js
-rodando + banco de dados modelado.
+Sistema de Gestão de Autorizações de Convênios. Centraliza pacientes,
+carteirinhas, autorizações e atendimentos para reduzir sessões realizadas sem
+cobertura e perdas de receita por glosa.
 
-A aplicação e o banco PostgreSQL rodam **no mesmo servidor na AWS (EC2)**.
-Não usamos Neon nem Vercel.
+Aplicação única em **Next.js** (telas + API) com **PostgreSQL**, rodando no
+mesmo servidor na **AWS (EC2)**. Não usamos Neon nem Vercel.
 
-## O que já existe nesta fase
+> As telas vieram do projeto `frontfisiomed` (React + Express + SQLite), que
+> foi incorporado aqui: as telas viraram páginas do Next.js e a API Express
+> virou rotas do próprio Next, sobre o PostgreSQL.
 
-- **`prisma/schema.prisma`** — modelo das 7 entidades do sistema (Paciente,
-  Convenio, Autorizacao, HistoricoStatus, Agendamento, Alerta, Usuario) e o
-  enum `StatusAutorizacao`, que representa a máquina de estados descrita na
-  proposta técnica.
-- **`prisma/migrations/`** — o SQL que cria as tabelas. É versionado no Git
-  para que o servidor aplique exatamente as mesmas mudanças.
-- **`src/lib/prisma.ts`** — conexão reutilizável com o banco.
-- **`src/app/`** — esqueleto do Next.js (App Router).
+## Funcionalidades
 
-Ainda **não há**: login, telas de cadastro, API de autorizações, dashboard.
-Isso vem nas próximas fases, em cima desta base.
+- **Dashboard** — indicadores (autorizações ativas, pendentes, vencendo,
+  glosas, atendimentos sem autorização) e gráficos.
+- **Pacientes** — cadastro, edição, desativação e carteirinhas de convênio.
+- **Convênios** — cadastro de operadoras, prazos e antecedência dos alertas.
+- **Autorizações** — ciclo completo com histórico:
+  `pendente → em análise → autorizada/negada`, e `vencida`/`esgotada`
+  aplicados automaticamente pelo sistema.
+- **Atendimentos** — cada sessão consome a autorização do paciente (dentro da
+  vigência e do saldo); sessões sem autorização ficam marcadas. Registro de
+  cobrança: faturado, pago ou glosado.
+- **Alertas** — autorizações vencendo em 7 dias, no topo da tela.
+- **Relatórios** — evolução mensal, autorizações por convênio, glosas;
+  exportação CSV/JSON.
+- **Configurações** — troca da própria senha; gestão de usuários (admin).
+
+## Perfis de acesso
+
+| Tela / ação                         | Admin | Recepção | Terapeuta | Financeiro |
+|-------------------------------------|:-----:|:--------:|:---------:|:----------:|
+| Dashboard, Configurações (própria senha) | ✅ | ✅ | ✅ | ✅ |
+| Pacientes                           | ✅ | ✅ | ✅ |    |
+| Convênios (ver)                     | ✅ | ✅ |    | ✅ |
+| Convênios (criar/editar)            | ✅ |    |    | ✅ |
+| Autorizações                        | ✅ | ✅ |    | ✅ |
+| Atendimentos (registrar)            | ✅ | ✅ | ✅ |    |
+| Atendimentos (cobrança/glosa)       | ✅ | ✅ |    | ✅ |
+| Relatórios                          | ✅ |    |    | ✅ |
+| Gestão de usuários                  | ✅ |    |    |    |
+
+As permissões são verificadas na API, não só escondidas na tela.
 
 ## Estrutura de pastas
 
 ```
 .
-├── .env.example          # modelo das variáveis de ambiente
+├── .env.example            # modelo das variáveis de ambiente
 ├── prisma/
-│   ├── schema.prisma     # modelo de dados
-│   └── migrations/       # SQL gerado a partir do schema
-└── src/
-    ├── app/              # páginas (Next.js App Router)
-    └── lib/prisma.ts     # cliente do banco
+│   ├── schema.prisma       # modelo de dados
+│   ├── migrations/         # SQL versionado, aplicado com "migrate deploy"
+│   └── seed.ts             # cria o primeiro administrador (e dados de teste)
+├── src/
+│   ├── app/
+│   │   ├── (sistema)/      # telas internas (exigem login)
+│   │   ├── login/          # tela de login
+│   │   └── api/            # API REST (route handlers)
+│   ├── components/         # layout, modal, tabelas, badges...
+│   ├── contextos/          # sessão e alertas
+│   └── lib/                # regras de negócio, validação, sessão, datas
+└── tests/                  # testes automatizados (npm test)
 ```
 
 > **Atenção ao subir arquivos pelo site do GitHub:** o upload pelo navegador
@@ -136,6 +166,7 @@ No `.env`:
 ```bash
 npm ci
 npx prisma migrate deploy
+npm run db:seed
 npm run build
 ```
 
@@ -147,6 +178,10 @@ npm run build
 - `prisma migrate deploy` aplica o SQL de `prisma/migrations/` no banco.
   (No servidor usamos `deploy`, **não** `migrate dev` — veja a seção de
   desenvolvimento abaixo.)
+- `npm run db:seed` cria o **primeiro administrador**: pergunta nome, e-mail e
+  senha (a senha não aparece enquanto você digita). Os demais usuários são
+  criados depois, pela tela *Configurações*. Pode rodar de novo sem risco: se
+  o e-mail já existir, nada muda.
 
 Para conferir as tabelas: `sudo -u postgres psql -d sga -c '\dt'`
 
@@ -187,13 +222,15 @@ sudo rm -f /etc/nginx/sites-enabled/default
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
-Abra `http://IP_PUBLICO_DA_INSTANCIA` no navegador — deve aparecer a página
-"SGA — Fisiomed ABA".
+Abra `http://IP_PUBLICO_DA_INSTANCIA` no navegador — deve aparecer a tela de
+login. Entre com o administrador criado no passo 5.
 
 > **Dica:** associe um *Elastic IP* à instância (EC2 → Elastic IPs). Sem ele,
 > o IP público muda toda vez que a máquina é parada e ligada.
 
-### 8. HTTPS (recomendado antes de ter login)
+### 8. HTTPS (necessário antes de usar com dados reais)
+
+Sem HTTPS, a senha e os dados dos pacientes trafegam abertos pela internet.
 
 Precisa de um domínio apontando (registro A) para o IP da instância. Com o
 `server_name` do Nginx ajustado para esse domínio:
@@ -203,7 +240,8 @@ sudo apt install -y certbot python3-certbot-nginx
 sudo certbot --nginx -d seu-dominio.com.br
 ```
 
-O certificado é renovado automaticamente.
+O certificado é renovado automaticamente. A aplicação percebe o HTTPS pelo
+Nginx e passa a marcar o cookie de sessão como `Secure` sozinha.
 
 ### 9. Backup do banco
 
@@ -238,6 +276,28 @@ npm run build
 pm2 restart sga
 ```
 
+Para conferir se subiu: `curl -s localhost:3000/api/health` deve responder
+`{"status":"ok",...}` (só responde "ok" se o banco estiver acessível).
+
+### Vindo da Fase 1 (servidor já instalado)
+
+Se o servidor foi instalado com a versão anterior (Fase 1, só a página
+inicial), a atualização é a de cima, **mais um passo: criar o administrador**:
+
+```bash
+cd ~/autorizadorfisiomed
+git pull
+npm ci
+npx prisma migrate deploy   # troca as tabelas da Fase 1 pelas do sistema
+npm run db:seed             # cria o primeiro administrador
+npm run build
+pm2 restart sga
+```
+
+A migração `sistema_integrado` **apaga as tabelas da Fase 1** e cria as novas.
+Elas não eram usadas por nenhuma tela, então devem estar vazias — mas, se
+você inseriu algo nelas manualmente, faça um backup antes (passo 9).
+
 ---
 
 ## Desenvolvimento local (no seu computador)
@@ -253,10 +313,22 @@ pm2 restart sga
 
    **Não** faça isso no servidor de produção.
 
-2. `cp .env.example .env` e ajuste a `DATABASE_URL`.
+2. `cp .env.example .env` e ajuste a `DATABASE_URL` e o `JWT_SECRET`.
 3. `npm install`
 4. `npx prisma migrate deploy` (cria as tabelas a partir das migrações)
-5. `npm run dev` e abra `http://localhost:3000`.
+5. `npm run db:seed -- --demo` — cria o administrador e **dados fictícios**
+   para testar (convênios, pacientes, autorizações, atendimentos e usuários
+   `recepcao@demo.local`, `terapeuta@demo.local`, `financeiro@demo.local`,
+   todos com a senha `Demo@12345`). **Nunca use `--demo` no servidor.**
+6. `npm run dev` e abra `http://localhost:3000`.
+
+### Verificações
+
+```bash
+npm test          # testes automatizados
+npm run lint      # padrões de código
+npx tsc --noEmit  # checagem de tipos
+```
 
 ### Mudando o modelo de dados
 
@@ -269,7 +341,10 @@ npx prisma migrate dev --name descricao-da-mudanca
 Isso gera uma nova pasta em `prisma/migrations/`. Faça commit dela junto com
 o schema — no servidor, o `migrate deploy` vai aplicá-la.
 
-## Próxima fase
+## Próximos passos sugeridos
 
-Fase 2: cadastro de usuários, login com sessão e o CRUD de pacientes e
-convênios.
+- Busca de paciente por nome nos formulários (hoje as listas trazem até 200
+  pacientes ativos).
+- Tela para editar autorização (vigência, protocolo, código TUSS) — a API já
+  existe (`PUT /api/autorizacoes/:id`).
+- Integração com os convênios (TISS) para solicitar autorizações.

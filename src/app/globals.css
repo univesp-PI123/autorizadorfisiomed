@@ -1,0 +1,245 @@
+/* ================================================================
+   Fisiomed ABA — Estilos globais com suporte a acessibilidade
+   WCAG 2.1 AA compliant
+   ================================================================ */
+
+:root {
+  /* Paleta de cores */
+  --color-primary: #2563eb;
+  --color-primary-dark: #1d4ed8;
+  --color-primary-light: #dbeafe;
+  --color-secondary: #0891b2;
+  --color-success: #16a34a;
+  --color-warning: #d97706;
+  --color-danger: #dc2626;
+  --color-info: #0284c7;
+
+  /* Neutros */
+  --color-gray-50: #f9fafb;
+  --color-gray-100: #f3f4f6;
+  --color-gray-200: #e5e7eb;
+  --color-gray-300: #d1d5db;
+  --color-gray-500: #6b7280;
+  --color-gray-700: #374151;
+  --color-gray-900: #111827;
+
+  /* Tipografia */
+  --font-sans: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.875rem;
+  --font-size-base: 1rem;
+  --font-size-lg: 1.125rem;
+  --font-size-xl: 1.25rem;
+  --font-size-2xl: 1.5rem;
+
+  /* Espaçamento */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+
+  /* Bordas */
+  --radius-sm: 4px;
+  --radius: 8px;
+  --radius-lg: 12px;
+  --radius-full: 9999px;
+
+  /* Sombras */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+
+  /* Sidebar */
+  --sidebar-width: 260px;
+  --header-height: 60px;
+}
+
+/* ── Reset ──────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { font-size: 16px; scroll-behavior: smooth; }
+
+body {
+  font-family: var(--font-sans);
+  font-size: var(--font-size-base);
+  color: var(--color-gray-900);
+  background: var(--color-gray-50);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Acessibilidade: foco visível (WCAG 2.4.7) ──────────────────── */
+:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* Remove outline para mouse, mantém para teclado */
+:focus:not(:focus-visible) { outline: none; }
+
+/* ── Links ──────────────────────────────────────────────────────── */
+a { color: var(--color-primary); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ── Imagens acessíveis ─────────────────────────────────────────── */
+img { max-width: 100%; height: auto; display: block; }
+
+/* ── Utilitários ────────────────────────────────────────────────── */
+.sr-only {
+  position: absolute; width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+
+.loading-fullscreen {
+  display: flex; align-items: center; justify-content: center;
+  height: 100vh; font-size: var(--font-size-lg); color: var(--color-gray-500);
+}
+
+/* ── Cards ──────────────────────────────────────────────────────── */
+.card {
+  background: #fff;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  padding: var(--space-6);
+}
+
+/* ── Badges de status ───────────────────────────────────────────── */
+.badge {
+  display: inline-flex; align-items: center; gap: var(--space-1);
+  padding: 2px 10px; border-radius: var(--radius-full);
+  font-size: var(--font-size-xs); font-weight: 600; line-height: 1.4;
+}
+.badge-success  { background: #dcfce7; color: #166534; }
+.badge-warning  { background: #fef9c3; color: #854d0e; }
+.badge-danger   { background: #fee2e2; color: #991b1b; }
+.badge-info     { background: #e0f2fe; color: #075985; }
+.badge-gray     { background: var(--color-gray-100); color: var(--color-gray-700); }
+.badge-pending  { background: #fff7ed; color: #9a3412; }
+
+/* ── Botões ─────────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  padding: var(--space-2) var(--space-4); border: none; border-radius: var(--radius);
+  font-size: var(--font-size-sm); font-weight: 600; cursor: pointer;
+  transition: background 0.15s, box-shadow 0.15s; line-height: 1.4;
+  text-decoration: none; white-space: nowrap;
+}
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-primary   { background: var(--color-primary); color: #fff; }
+.btn-primary:hover:not(:disabled) { background: var(--color-primary-dark); }
+.btn-secondary { background: var(--color-gray-100); color: var(--color-gray-700); }
+.btn-secondary:hover:not(:disabled) { background: var(--color-gray-200); }
+.btn-danger    { background: var(--color-danger); color: #fff; }
+.btn-danger:hover:not(:disabled) { background: #b91c1c; }
+.btn-success   { background: var(--color-success); color: #fff; }
+.btn-ghost     { background: transparent; color: var(--color-primary); border: 1px solid var(--color-primary); }
+.btn-ghost:hover:not(:disabled) { background: var(--color-primary-light); }
+.btn-sm { padding: var(--space-1) var(--space-3); font-size: var(--font-size-xs); }
+.btn-lg { padding: var(--space-3) var(--space-6); font-size: var(--font-size-base); }
+
+/* ── Formulários ────────────────────────────────────────────────── */
+.form-group { display: flex; flex-direction: column; gap: var(--space-1); }
+.form-label { font-size: var(--font-size-sm); font-weight: 600; color: var(--color-gray-700); }
+.form-label .required { color: var(--color-danger); margin-left: 2px; }
+.form-control {
+  padding: var(--space-2) var(--space-3); border: 1px solid var(--color-gray-300);
+  border-radius: var(--radius); font-size: var(--font-size-sm); width: 100%;
+  transition: border-color 0.15s, box-shadow 0.15s; background: #fff;
+  color: var(--color-gray-900);
+}
+.form-control:focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgb(37 99 235 / 0.15); outline: none; }
+.form-control.error { border-color: var(--color-danger); }
+.form-error { font-size: var(--font-size-xs); color: var(--color-danger); }
+
+/* ── Tabelas ────────────────────────────────────────────────────── */
+.table-container { overflow-x: auto; border-radius: var(--radius-lg); box-shadow: var(--shadow); }
+table { width: 100%; border-collapse: collapse; background: #fff; }
+thead th {
+  padding: var(--space-3) var(--space-4); background: var(--color-gray-50);
+  font-size: var(--font-size-xs); font-weight: 700; color: var(--color-gray-500);
+  text-transform: uppercase; letter-spacing: 0.05em; text-align: left;
+  border-bottom: 1px solid var(--color-gray-200);
+}
+tbody td {
+  padding: var(--space-3) var(--space-4); font-size: var(--font-size-sm);
+  border-bottom: 1px solid var(--color-gray-100); color: var(--color-gray-700);
+}
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:hover { background: var(--color-gray-50); }
+
+/* ── Modais ─────────────────────────────────────────────────────── */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgb(0 0 0 / 0.5);
+  display: flex; align-items: center; justify-content: center; z-index: 1000; padding: var(--space-4);
+}
+.modal {
+  background: #fff; border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);
+  width: 100%; max-width: 560px; max-height: 90vh; overflow-y: auto;
+}
+.modal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: var(--space-4) var(--space-6); border-bottom: 1px solid var(--color-gray-200);
+}
+.modal-title { font-size: var(--font-size-lg); font-weight: 700; }
+.modal-body { padding: var(--space-6); display: flex; flex-direction: column; gap: var(--space-4); }
+.modal-footer {
+  display: flex; gap: var(--space-3); justify-content: flex-end;
+  padding: var(--space-4) var(--space-6); border-top: 1px solid var(--color-gray-200);
+}
+
+/* ── Responsivo ─────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  :root { --sidebar-width: 0px; }
+  .modal { max-width: 100%; margin: var(--space-4); }
+}
+
+/* ── Link "pular para o conteúdo" (WCAG 2.4.1) ─────────────────── */
+.skip-link {
+  position: absolute; top: -40px; left: 0; z-index: 9999;
+  background: var(--color-primary); color: #fff;
+  padding: 8px 16px; font-size: 14px; border-radius: 0 0 4px 0;
+  transition: top 0.2s;
+}
+.skip-link:focus { top: 0; text-decoration: none; }
+
+/* ── Indicador de carregamento ──────────────────────────────────── */
+.carregando {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 48px; gap: 16px; color: var(--color-gray-500);
+}
+.spinner {
+  width: 40px; height: 40px;
+  border: 3px solid var(--color-gray-200);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: girar 0.8s linear infinite;
+}
+@keyframes girar { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .spinner, .header-alerta { animation: none; }
+}
+
+/* ── Utilitários das telas ──────────────────────────────────────── */
+.barra-acoes { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
+.barra-acoes > .empurra { margin-left: auto; }
+.grade-form { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.grade-form .inteira { grid-column: 1 / -1; }
+.grade-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.pilha { display: flex; flex-direction: column; gap: 24px; }
+.vazio { text-align: center; padding: 32px; color: var(--color-gray-500); }
+.dl-grade { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.dl-grade dt { font-size: var(--font-size-xs); color: var(--color-gray-500); font-weight: 600; }
+.dl-grade dd { font-size: var(--font-size-sm); margin-top: 2px; }
+.caixa-cinza { background: var(--color-gray-50); border-radius: var(--radius); padding: 12px; }
+.texto-suave { color: var(--color-gray-500); font-size: var(--font-size-sm); }
+.titulo-secao { margin-bottom: 16px; font-weight: 700; font-size: var(--font-size-base); }
+.cabecalho-pagina { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.cabecalho-pagina h2 { font-size: var(--font-size-xl); font-weight: 700; }
+
+@media (max-width: 768px) {
+  .grade-form, .grade-2, .dl-grade { grid-template-columns: 1fr; }
+}
