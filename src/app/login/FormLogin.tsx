@@ -3,8 +3,9 @@
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import toast from "react-hot-toast";
+import BotaoAcessibilidade from "@/components/Acessibilidade";
 import Icone from "@/components/Icone";
-import Marca from "@/components/Marca";
+import { LogoLogin } from "@/components/Marca";
 import { mensagemDeErro } from "@/lib/cliente/api";
 import { authService } from "@/lib/cliente/servicos";
 
@@ -46,10 +47,11 @@ export default function FormLogin({
 
   return (
     <div className="sb-auth" style={{ "--sb-auth-bg": "url(/fundo-login.webp)" } as React.CSSProperties}>
+      <BotaoAcessibilidade flutuante />
       <main className="sb-auth__center" id="conteudo">
         <div className="sb-auth__card">
           <div className="sb-auth__logo">
-            <Marca />
+            <LogoLogin />
             <p>Use suas credenciais para acessar o painel.</p>
           </div>
           <form className="sb-auth__form" onSubmit={aoEnviar} noValidate aria-label="Entrar no sistema">
@@ -131,7 +133,7 @@ export default function FormLogin({
         </div>
       </main>
       <footer className="sb-auth__footer">
-        <span>© {ano} Fisiomed ABA</span>
+        <span>© {ano} CFTConsult</span>
         <span aria-hidden="true">·</span>
         <span className="sb-version">v{versao}</span>
       </footer>

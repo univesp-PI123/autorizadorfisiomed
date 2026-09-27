@@ -3,11 +3,13 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
+import BotaoAcessibilidade from "@/components/Acessibilidade";
 import BotaoTema from "@/components/BotaoTema";
 import Icone from "@/components/Icone";
 import { useAlertas } from "@/contextos/AlertaContexto";
 import { useSessao } from "@/contextos/SessaoContexto";
 import { itemDaRota, ROTULO_PERFIL } from "@/lib/navegacao";
+import SeletorAmbiente from "./SeletorAmbiente";
 
 // Títulos das páginas de detalhe (o menu só conhece as raízes).
 function tituloDaPagina(pathname: string, rotuloRaiz: string) {
@@ -20,7 +22,7 @@ export default function Topbar() {
   const pathname = usePathname();
   const router = useRouter();
   const { usuario, sair } = useSessao();
-  const { totalAlertas, conectado } = useAlertas();
+  const { totalAlertas } = useAlertas();
   const [busca, setBusca] = useState("");
 
   const item = itemDaRota(pathname);
@@ -37,7 +39,7 @@ export default function Topbar() {
   return (
     <header className="topbar">
       <div className="topbar__title">
-        <span className="caption">
+        <nav className="caption" aria-label="Você está em">
           {item?.grupo ?? "Geral"} / {item && titulo !== item.rotulo ? (
             <>
               <Link href={item.caminho}>{item.rotulo}</Link> / {titulo}
@@ -45,7 +47,7 @@ export default function Topbar() {
           ) : (
             titulo
           )}
-        </span>
+        </nav>
         <h1 className="page-title">{titulo}</h1>
       </div>
 
@@ -69,13 +71,12 @@ export default function Topbar() {
             {totalAlertas} vencendo
           </Link>
         )}
-        <span className={`sb-status ${conectado ? "" : "sb-status--off"}`}>
-          {conectado ? "Sistema conectado" : "Sem conexão"}
-        </span>
+        <SeletorAmbiente />
         <div className="topbar__usuario">
           <strong>{usuario.nome}</strong>
           <span>{ROTULO_PERFIL[usuario.perfil]}</span>
         </div>
+        <BotaoAcessibilidade />
         <BotaoTema />
         <button type="button" className="sb-btn sb-btn--icon" onClick={sair} aria-label="Sair" title="Sair">
           <Icone nome="sair" />

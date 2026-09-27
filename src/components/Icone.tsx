@@ -119,6 +119,15 @@ const CAMINHOS = {
       <path d="M8 11V7a4 4 0 0 1 8 0v4" />
     </>
   ),
+  check: <path d="M5 12l5 5L20 7" />,
+  acessibilidade: (
+    <>
+      <circle cx="12" cy="4.5" r="1.5" />
+      <path d="M5 8.5l7 1.5 7-1.5" />
+      <path d="M12 10v5" />
+      <path d="M9 21l3-6 3 6" />
+    </>
+  ),
   busca: (
     <>
       <circle cx="11" cy="11" r="7" />

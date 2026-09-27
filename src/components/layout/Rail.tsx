@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import Icone from "@/components/Icone";
+import { LogoMenu } from "@/components/Marca";
 import { useAlertas } from "@/contextos/AlertaContexto";
 import { useSessao } from "@/contextos/SessaoContexto";
 import { ITENS_MENU } from "@/lib/navegacao";
@@ -29,12 +30,9 @@ export default function Rail() {
 
   return (
     <aside className={`sb-rail ${aberta ? "sb-rail--open" : ""}`}>
-      <div className="sb-rail__brand">
-        <div className="sb-rail__mark" aria-hidden="true">
-          F
-        </div>
-        <span className="sb-nav-text sb-rail__nome">Fisiomed ABA</span>
-      </div>
+      <Link href="/dashboard" className="sb-rail__brand" aria-label="Fisiomed ABA — Visão geral">
+        <LogoMenu />
+      </Link>
       <button
         type="button"
         className="sb-rail__toggle"

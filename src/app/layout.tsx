@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
+import { VLibras } from "@/components/Acessibilidade";
 import Notificacoes from "@/components/Notificacoes";
+import { SCRIPT_ACESSIBILIDADE } from "@/lib/acessibilidade";
 import { CHAVE_TEMA } from "@/lib/tema";
 import "@/styles/sobrio/tokens.css";
 import "@/styles/sobrio/sobrio.css";
@@ -33,14 +35,15 @@ export const viewport: Viewport = {
   ],
 };
 
-// Aplica o tema salvo antes da primeira pintura (evita piscar claro→escuro).
+// Aplica o tema e as preferências de acessibilidade salvos antes da primeira
+// pintura (evita a tela piscar no formato padrão e depois mudar).
 const scriptTema = `try{var t=localStorage.getItem(${JSON.stringify(CHAVE_TEMA)});if(t==="dark"||t==="light")document.documentElement.dataset.theme=t}catch(e){}`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="pt-BR" data-theme="light" className={`${plexSans.variable} ${plexMono.variable}`} suppressHydrationWarning>
       <head>
-        <script dangerouslySetInnerHTML={{ __html: scriptTema }} />
+        <script dangerouslySetInnerHTML={{ __html: scriptTema + SCRIPT_ACESSIBILIDADE }} />
       </head>
       <body className="sb-root">
         <a href="#conteudo" className="skip-link">
@@ -48,6 +51,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </a>
         {children}
         <Notificacoes />
+        <VLibras />
       </body>
     </html>
   );
