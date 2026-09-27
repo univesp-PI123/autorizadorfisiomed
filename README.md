@@ -28,6 +28,53 @@ mesmo servidor na **AWS (EC2)**. Não usamos Neon nem Vercel.
 - **Relatórios** — evolução mensal, autorizações por convênio, glosas;
   exportação CSV/JSON.
 - **Configurações** — troca da própria senha; gestão de usuários (admin).
+- **Agenda e importações** — importação da agenda do AnClinic e da lista de
+  profissionais credenciados; situação de cada sessão em relação à
+  autorização (veja abaixo).
+- **Clínica, unidades, profissionais e procedimentos** — os dados que a guia
+  TISS exige (CNES, conselho e CBO, código TUSS).
+- **Pedidos médicos** — médico solicitante, CID e os PDFs do pedido, na
+  página do paciente.
+
+## Integração AnClinic → Amil (em construção)
+
+Objetivo: solicitar as autorizações sozinho, na véspera (D-1), a partir da
+agenda do AnClinic, pelo webservice TISS da Amil. **Etapa atual:** importação
+e conferência dos dados. O envio à Amil entra quando ela liberar o acesso ao
+webservice.
+
+Rotina:
+
+1. **Importações → Agenda do AnClinic:** no AnClinic, exporte o *Relatório de
+   Agendamento* em Excel (um ou mais dias, todas as unidades) e envie o
+   `.xlsx`. O relatório mostra o que entrou, os convênios do AnClinic ainda não
+   ligados a um convênio do sistema e os avisos, com as linhas da planilha.
+   Importar o mesmo dia de novo atualiza; sessões que sumiram da agenda ficam
+   como excluídas.
+2. **Agenda:** cada sessão aparece como *com pendência* (e o que falta),
+   *pronta para solicitar*, *coberta* (autorização vigente com saldo ou senha
+   no AnClinic), *fora da integração* (outros convênios, ou faturamento por
+   "Assinatura") ou *cancelada*. "O que falta para solicitar" agrupa as
+   pendências e leva à tela onde se resolve cada uma.
+
+Preparação (uma vez):
+
+- **Convênios → Amil:** "Solicitação de autorização" = Webservice TISS Amil,
+  código do prestador e, em "Nomes na agenda do AnClinic", o nome exato da
+  coluna Convênio (ex.: `Amil Assitencia Medica Internacional S.a.`).
+- **Importações → Profissionais credenciados:** planilha com Nome, CPF,
+  Conselho, Número no conselho, UF e Especialidades, escolhendo o convênio. O
+  CBO é sugerido pela especialidade; confira em **Profissionais**.
+- **Clínica e unidades:** razão social, CNPJ e o CNES de cada unidade (as
+  unidades são criadas pela importação da agenda).
+- **Procedimentos:** o código TUSS de cada procedimento do AnClinic (4440,
+  4415…), o mesmo usado hoje no portal da Amil.
+- **Pacientes → Pedidos médicos:** médico solicitante (CRM/UF), CID, validade
+  e os PDFs (até 5, 10 MB cada).
+
+Os PDFs ficam em disco, fora da pasta pública, em `ARQUIVOS_DIR` (padrão:
+`dados/arquivos` dentro do projeto) e só são abertos com login. Entram no
+backup (passo 9).
 
 ## Visual (design system Sóbrio)
 
@@ -101,6 +148,11 @@ não existe um login único entre ambientes; cada um autentica separadamente.)
 | Atendimentos (ver)                  | ✅ | ✅ | ✅ | ✅ |
 | Atendimentos (cobrança/glosa)       | ✅ | ✅ |    | ✅ |
 | Relatórios                          | ✅ |    |    | ✅ |
+| Agenda, histórico de importações, cadastros da integração (ver) | ✅ | ✅ |    | ✅ |
+| Importar planilhas; editar profissionais e procedimentos | ✅ | ✅ |    |    |
+| Dados da clínica e unidades (editar) | ✅ |    |    |    |
+| Pedidos médicos (ver)               | ✅ | ✅ | ✅ |    |
+| Pedidos médicos (cadastrar)         | ✅ | ✅ |    |    |
 | Gestão de usuários                  | ✅ |    |    |    |
 
 As permissões são verificadas na API, não só escondidas na tela.
@@ -265,6 +317,9 @@ server {
     listen 80;
     server_name _;   # troque pelo seu domínio, se tiver
 
+    # Planilhas do AnClinic e PDFs dos pedidos médicos (o padrão do Nginx é 1 MB)
+    client_max_body_size 60m;
+
     location / {
         proxy_pass http://127.0.0.1:3000;
         proxy_http_version 1.1;
@@ -320,6 +375,13 @@ Adicione a linha:
 0 3 * * * pg_dump "postgresql://sga:SENHA_FORTE@localhost:5432/sga" | gzip > ~/backups/sga-$(date +\%F).sql.gz && find ~/backups -name 'sga-*.sql.gz' -mtime +14 -delete
 ```
 
+Os PDFs dos pedidos médicos não estão no banco: inclua a pasta deles no backup
+(outra linha no `crontab -e`):
+
+```
+30 3 * * * tar -czf ~/backups/arquivos-$(date +\%F).tar.gz -C ~/autorizadorfisiomed dados && find ~/backups -name 'arquivos-*.tar.gz' -mtime +14 -delete
+```
+
 Esses arquivos ficam no mesmo disco da máquina — se ela for perdida, os
 backups também vão. Vale copiá-los para um bucket S3 ou ativar snapshots
 automáticos do volume EBS (EC2 → Lifecycle Manager).
@@ -336,6 +398,12 @@ npx prisma migrate deploy
 npm run build
 pm2 restart sga
 ```
+
+> **Atualizando para a versão com importação do AnClinic:** o `migrate deploy`
+> cria as tabelas novas (nada é apagado). Ajuste também o Nginx para aceitar
+> uploads maiores: acrescente `client_max_body_size 60m;` dentro do bloco
+> `server` em `/etc/nginx/sites-available/sga` (e no bloco criado pelo
+> certbot, se for outro) e rode `sudo nginx -t && sudo systemctl reload nginx`.
 
 Para conferir se subiu: `curl -s localhost:3000/api/health` deve responder
 `{"status":"ok",...}` (só responde "ok" se o banco estiver acessível).
@@ -411,4 +479,5 @@ o schema — no servidor, o `migrate deploy` vai aplicá-la.
   pacientes ativos).
 - Tela para editar autorização (vigência, protocolo, código TUSS) — a API já
   existe (`PUT /api/autorizacoes/:id`).
-- Integração com os convênios (TISS) para solicitar autorizações.
+- Envio das solicitações à Amil pelo webservice TISS (aguardando a liberação
+  do acesso), consulta do status e relatório do que foi aprovado ou negado.

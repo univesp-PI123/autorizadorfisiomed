@@ -53,6 +53,19 @@ export const ITENS_MENU: ItemMenu[] = [
     ],
   },
   {
+    caminho: "/agenda",
+    rotulo: "Agenda",
+    grupo: "Operação",
+    icone: "agenda",
+    perfis: ["admin", "recepcionista", "financeiro"],
+    subitens: [
+      { rotulo: "Sessões de amanhã", href: "/agenda" },
+      { rotulo: "Com pendência", href: "/agenda?situacao=pendente" },
+      { rotulo: "Prontas para solicitar", href: "/agenda?situacao=pronta" },
+      { rotulo: "Importar agenda", href: "/importacoes", perfis: ["admin", "recepcionista"] },
+    ],
+  },
+  {
     caminho: "/atendimentos",
     rotulo: "Atendimentos",
     grupo: "Operação",
@@ -86,6 +99,48 @@ export const ITENS_MENU: ItemMenu[] = [
     subitens: [
       { rotulo: "Lista", href: "/convenios" },
       { rotulo: "Novo convênio", href: "/convenios?novo=1", perfis: ["admin", "financeiro"] },
+    ],
+  },
+  {
+    caminho: "/profissionais",
+    rotulo: "Profissionais",
+    grupo: "Cadastros",
+    icone: "profissionais",
+    perfis: ["admin", "recepcionista", "financeiro"],
+    subitens: [
+      { rotulo: "Todos", href: "/profissionais" },
+      { rotulo: "Com dados faltando", href: "/profissionais?filtro=incompletos" },
+    ],
+  },
+  {
+    caminho: "/procedimentos",
+    rotulo: "Procedimentos",
+    grupo: "Cadastros",
+    icone: "procedimentos",
+    perfis: ["admin", "recepcionista", "financeiro"],
+    subitens: [{ rotulo: "Códigos TUSS", href: "/procedimentos" }],
+  },
+  {
+    caminho: "/unidades",
+    rotulo: "Clínica e unidades",
+    grupo: "Cadastros",
+    icone: "unidades",
+    perfis: ["admin", "recepcionista", "financeiro"],
+    subitens: [
+      { rotulo: "Dados da clínica", href: "/unidades#clinica" },
+      { rotulo: "Unidades (CNES)", href: "/unidades#unidades" },
+    ],
+  },
+  {
+    caminho: "/importacoes",
+    rotulo: "Importações",
+    grupo: "Sistema",
+    icone: "importar",
+    perfis: ["admin", "recepcionista", "financeiro"],
+    subitens: [
+      { rotulo: "Importar agenda", href: "/importacoes#importar-agenda", perfis: ["admin", "recepcionista"] },
+      { rotulo: "Importar profissionais", href: "/importacoes#importar-profissionais", perfis: ["admin", "recepcionista"] },
+      { rotulo: "Histórico", href: "/importacoes#historico" },
     ],
   },
   {

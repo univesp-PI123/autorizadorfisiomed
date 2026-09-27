@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { ehDataISO, paraDate } from "@/lib/datas";
+import { SIGLAS_CONSELHO, UFS } from "@/lib/tiss/dominios";
 
 // Os formulários enviam "" em campos não preenchidos e números como texto.
 // Estes auxiliares normalizam isso antes de validar.
@@ -127,7 +128,109 @@ export const esquemaConvenio = z.object({
   procedimentosCobertos: z.array(texto(200)).max(100).optional(),
   ativo: z.boolean().optional(),
   observacoes: textoOpcional(2000),
+  integracao: z.enum(["manual", "tiss_amil"], { message: "Integração inválida." }).optional(),
+  codigoPrestador: z.preprocess(
+    vazioParaNulo,
+    z.string().trim().regex(/^\d{1,20}$/, "Código do prestador: só números.").nullable().optional(),
+  ),
+  nomesAnclinic: z.array(texto(200).min(1)).max(20).optional(),
 });
+
+// --- Cadastros da integração (clínica, unidades, profissionais…) ------
+
+const digitos = (n: number, mensagem: string) =>
+  z.preprocess(
+    (v) => (typeof v === "string" ? v.replace(/\D/g, "") : v),
+    z.string().length(n, mensagem),
+  );
+const digitosOpcional = (n: number, mensagem: string) =>
+  z.preprocess(
+    (v) => (typeof v === "string" ? v.replace(/\D/g, "") || null : v),
+    z.string().length(n, mensagem).nullable().optional(),
+  );
+const uf = (mensagem: string) =>
+  z.preprocess(
+    (v) => (typeof v === "string" ? v.trim().toUpperCase() || null : v),
+    z.enum(UFS, { message: mensagem }).nullable().optional(),
+  );
+const conselho = z.preprocess(
+  (v) => (typeof v === "string" ? v.trim().toUpperCase() || null : v),
+  z.enum(SIGLAS_CONSELHO as [string, ...string[]], { message: "Conselho inválido." }).nullable().optional(),
+);
+const numeroConselho = z.preprocess(
+  vazioParaNulo,
+  z.string().trim().regex(/^\d{1,15}$/, "Número do conselho: só números.").nullable().optional(),
+);
+
+export const esquemaClinica = z.object({
+  razaoSocial: textoObrigatorio(200, "Razão social é obrigatória."),
+  nomeFantasia: textoOpcional(200),
+  cnpj: digitos(14, "CNPJ deve ter 14 dígitos."),
+});
+
+export const esquemaUnidade = z.object({
+  nome: textoObrigatorio(150, "Nome é obrigatório."),
+  cnes: digitosOpcional(7, "CNES deve ter 7 dígitos."),
+  cep: digitosOpcional(8, "CEP deve ter 8 dígitos."),
+  tipoLogradouro: textoOpcional(30),
+  logradouro: textoOpcional(200),
+  numero: textoOpcional(20),
+  complemento: textoOpcional(100),
+  bairro: textoOpcional(100),
+  municipio: textoOpcional(100),
+  uf: uf("UF inválida."),
+  ativo: z.boolean().optional(),
+});
+
+export const esquemaProfissional = z.object({
+  nome: textoObrigatorio(200, "Nome é obrigatório."),
+  cns: digitosOpcional(15, "CNS deve ter 15 dígitos."),
+  conselho,
+  numeroConselho,
+  ufConselho: uf("UF do conselho inválida."),
+  cbo: digitosOpcional(6, "CBO deve ter 6 dígitos."),
+  ativo: z.boolean().optional(),
+  convenioIds: z.array(uuid("Convênio inválido.")).max(50).optional(),
+});
+
+export const esquemaProcedimento = z.object({
+  descricao: textoObrigatorio(200, "Descrição é obrigatória."),
+  codigoTuss: z.preprocess(
+    vazioParaNulo,
+    z.string().trim().regex(/^\d{8,10}$/, "Código TUSS: 8 a 10 dígitos.").nullable().optional(),
+  ),
+  tabelaTuss: z.preprocess(
+    vazioParaNulo,
+    z.string().trim().regex(/^\d{2}$/, "Tabela: 2 dígitos (ex.: 22).").nullable().optional(),
+  ),
+  ativo: z.boolean().optional(),
+});
+
+// Chega por formulário multipart (junto com os PDFs): todos os campos em texto.
+export const esquemaPedidoMedico = z
+  .object({
+    convenioId: uuidOpcional("Convênio inválido."),
+    medicoNome: textoObrigatorio(200, "Nome do médico é obrigatório."),
+    conselho: z.preprocess(
+      (v) => (typeof v === "string" ? v.trim().toUpperCase() || "CRM" : v ?? "CRM"),
+      z.enum(SIGLAS_CONSELHO as [string, ...string[]], { message: "Conselho inválido." }),
+    ),
+    numeroConselho: z.string().trim().regex(/^\d{1,15}$/, "Número do conselho: só números."),
+    ufConselho: z.preprocess(
+      (v) => (typeof v === "string" ? v.trim().toUpperCase() : v),
+      z.enum(UFS, { message: "UF do conselho inválida." }),
+    ),
+    cbo: digitosOpcional(6, "CBO deve ter 6 dígitos."),
+    cid: textoOpcional(20),
+    indicacaoClinica: textoOpcional(2000),
+    dataPedido: data("Data do pedido inválida."),
+    validoAte: dataOpcional("Validade inválida."),
+    observacoes: textoOpcional(2000),
+  })
+  .refine((d) => !d.validoAte || d.validoAte >= d.dataPedido, {
+    message: "A validade não pode ser antes da data do pedido.",
+    path: ["validoAte"],
+  });
 
 // --- Autorizações ------------------------------------------------------
 
