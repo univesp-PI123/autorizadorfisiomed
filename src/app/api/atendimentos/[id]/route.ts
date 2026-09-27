@@ -20,8 +20,9 @@ export const GET = rota<Params>(async (req, { params }) => {
   return json(atendimento);
 });
 
+// Edição (cobrança/glosa): perfis administrativos, não o terapeuta.
 export const PUT = rota<Params>(async (req, { params }) => {
-  await exigirSessao(req);
+  await exigirSessao(req, ["admin", "financeiro", "recepcionista"]);
   const { id } = await params;
   const dados = await lerCorpo(req, esquemaAtendimentoEdicao);
   if (!(await prisma.atendimento.findUnique({ where: { id } }))) naoEncontrado("Atendimento");

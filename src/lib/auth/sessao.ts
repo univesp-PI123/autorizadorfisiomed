@@ -74,8 +74,7 @@ async function usuarioDoToken(token: string | undefined): Promise<UsuarioSessao 
       select: { id: true, nome: true, email: true, perfil: true, ativo: true },
     });
     if (!usuario || !usuario.ativo) return null;
-    const { ativo: _ativo, ...dados } = usuario;
-    return dados;
+    return { id: usuario.id, nome: usuario.nome, email: usuario.email, perfil: usuario.perfil };
   } catch {
     return null;
   }

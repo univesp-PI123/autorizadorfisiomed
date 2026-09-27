@@ -71,16 +71,18 @@ async function criarDemo(adminId: string) {
   const hoje = hojeISO();
   const senhaDemo = await bcrypt.hash("Demo@12345", 12);
 
+  const terapeutas: string[] = [];
   for (const [nome, email, perfil] of [
     ["Ana Recepcionista", "recepcao@demo.local", "recepcionista"],
     ["Carlos Terapeuta", "terapeuta@demo.local", "terapeuta"],
     ["Fernanda Financeiro", "financeiro@demo.local", "financeiro"],
   ] as const) {
-    await prisma.usuario.upsert({
+    const u = await prisma.usuario.upsert({
       where: { email },
       update: {},
       create: { nome, email, perfil, senhaHash: senhaDemo },
     });
+    if (perfil === "terapeuta") terapeutas.push(u.id);
   }
 
   const convenios = [];
@@ -137,7 +139,7 @@ async function criarDemo(adminId: string) {
   }
 
   const exemplos = [
-    { i: 0, status: "autorizada", qtd: 20, inicio: hoje, fim: somarDias(hoje, 30), usadas: 4 },
+    { i: 0, status: "autorizada", qtd: 20, inicio: somarDias(hoje, -10), fim: somarDias(hoje, 30), usadas: 4 },
     { i: 1, status: "autorizada", qtd: 16, inicio: somarDias(hoje, -20), fim: somarDias(hoje, 5), usadas: 13 },
     { i: 2, status: "pendente", qtd: 10 },
     { i: 3, status: "negada", qtd: 8, motivo: "Procedimento não coberto pelo plano contratado." },
@@ -170,9 +172,10 @@ async function criarDemo(adminId: string) {
         data: {
           pacienteId: paciente.id,
           autorizacaoId: aut.id,
-          terapeutaId: adminId,
+          terapeutaId: terapeutas[0],
           procedimento: "Sessão de ABA",
-          dataAtendimento: paraDate(somarDias(e.inicio, k)),
+          // Do dia anterior para trás, sempre dentro da vigência.
+          dataAtendimento: paraDate(somarDias(hoje, -(k + 1))),
           valorCobrado: 150,
           statusCobranca: k === 0 ? "glosado" : "faturado",
           motivoGlosa: k === 0 ? "Exemplo de glosa." : null,
