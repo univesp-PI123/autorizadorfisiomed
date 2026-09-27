@@ -70,6 +70,14 @@ function tratarErro(erro: unknown) {
     if (erro.code === "P2025" || erro.code === "P2023") {
       return NextResponse.json({ error: "Registro não encontrado." }, { status: 404 });
     }
+    // Conexão com o banco caiu (ex.: PostgreSQL reiniciado); o Prisma
+    // reconecta sozinho na próxima requisição.
+    if (erro.code === "P1017" || erro.code === "P1001") {
+      return NextResponse.json(
+        { error: "Banco de dados temporariamente indisponível. Tente novamente." },
+        { status: 503 },
+      );
+    }
     if (erro.code === "P2003") {
       return NextResponse.json({ error: "Registro relacionado não encontrado." }, { status: 422 });
     }
