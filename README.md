@@ -85,7 +85,8 @@ sudo apt install -y nodejs git nginx postgresql
 sudo npm install -g pm2
 ```
 
-Confira: `node -v` (deve mostrar v22.x) e `sudo systemctl status postgresql`.
+Confira: `node -v` (deve mostrar v22.x; o mínimo aceito pelo Next.js 16 é
+v20.9) e `sudo systemctl status postgresql`.
 
 **Instância pequena (t2/t3.micro, 1 GB de RAM)?** O `npm run build` pode
 travar por falta de memória. Crie um swap de 2 GB antes:
@@ -139,6 +140,10 @@ npm run build
 ```
 
 - `npm ci` instala exatamente as versões do `package-lock.json`.
+  Ao final ele deve mostrar `found 0 vulnerabilities`. Se um dia aparecerem
+  vulnerabilidades, **não rode `npm audit fix --force`** direto no servidor:
+  ele pode trocar versões principais e quebrar a aplicação. Corrija no
+  computador de desenvolvimento, teste e envie o `package-lock.json` pelo Git.
 - `prisma migrate deploy` aplica o SQL de `prisma/migrations/` no banco.
   (No servidor usamos `deploy`, **não** `migrate dev` — veja a seção de
   desenvolvimento abaixo.)
