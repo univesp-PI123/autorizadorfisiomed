@@ -188,11 +188,11 @@ export async function gravarAgenda(
       data: { tipo: "agenda", arquivoNome: arquivoNome.slice(0, 255), usuarioId, linhas: sessoes.length + interpretada.ignoradas, resumo: {} },
     });
 
-    const existentes = new Set(
+    const existentes = new Map(
       (await tx.agendamento.findMany({
         where: { idAnclinic: { in: sessoes.map((s) => s.idAnclinic) } },
-        select: { idAnclinic: true },
-      })).map((a) => a.idAnclinic),
+        select: { idAnclinic: true, unidadeManual: true },
+      })).map((a) => [a.idAnclinic, a]),
     );
 
     const porConvenio = new Map<string, { nome: string; convenioId: string | null; convenio: string | null; sessoes: number }>();
@@ -231,10 +231,12 @@ export async function gravarAgenda(
         removidoEm: null,
         importacaoId: importacao.id,
       };
+      // Unidade escolhida no sistema não é trocada pela do AnClinic.
+      const { unidadeId, ...semUnidade } = dados;
       await tx.agendamento.upsert({
         where: { idAnclinic: s.idAnclinic },
         create: { idAnclinic: s.idAnclinic, ...dados },
-        update: dados,
+        update: existentes.get(s.idAnclinic)?.unidadeManual ? semUnidade : { ...semUnidade, unidadeId },
       });
       if (existentes.has(s.idAnclinic)) atualizados++;
       else criados++;

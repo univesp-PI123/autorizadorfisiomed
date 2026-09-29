@@ -21,10 +21,11 @@ mesmo servidor na **AWS (EC2)**. Não usamos Neon nem Vercel.
 - **Autorizações** — ciclo completo com histórico:
   `pendente → em análise → autorizada/negada`, e `vencida`/`esgotada`
   aplicados automaticamente pelo sistema.
-- **Atendimentos** — gerados a partir da agenda: sessão realizada e coberta
-  por autorização vira atendimento *aguardando confirmação*, com o valor do
-  faturamento do AnClinic; o operador confirma (desconta a sessão da
-  autorização) ou cancela, com motivo. Registro manual só pelo operador, em
+- **Atendimentos** — gerados a partir da agenda: ao aprovar uma autorização,
+  as sessões que ela cobre (na vigência, até o saldo, inclusive as futuras)
+  viram atendimentos *aguardando confirmação*, com o valor do faturamento do
+  AnClinic; depois que a sessão acontece, o operador confirma (desconta a
+  sessão da autorização) ou cancela, com motivo. Registro manual só pelo operador, em
   sessões de 1 hora (início em hora cheia ou meia hora). Cobrança: faturado,
   pago ou glosado, com motivo da glosa em lista.
 - **Alertas** — autorizações vencendo em 7 dias, no topo da tela.
@@ -62,8 +63,22 @@ Rotina:
    agrupa o que falta e leva à tela onde se resolve cada item; o filtro "Sem
    unidade de atendimento" acha as sessões que precisam ser corrigidas no
    AnClinic.
-3. **Atendimentos → Aguardando confirmação:** depois que a autorização sai,
-   as sessões realizadas aparecem para o operador confirmar ou cancelar.
+3. **Atendimentos → Aguardando confirmação:** ao aprovar a autorização, as
+   sessões que ela cobre vão para Atendimentos (a tela da autorização mostra
+   quantas); o operador confirma cada uma depois que ela acontece, ou cancela.
+   A autorização cobre a sessão pelo código do procedimento ou, nas lançadas
+   à mão, pelo nome/especialidade (ex.: "Psicologia" cobre "PSICOLOGIA ABA").
+
+**Unidade de atendimento:** vem da coluna "Unidade de Atendimento" do
+AnClinic. Para atribuir ou trocar, marque as sessões na **Agenda** (há o filtro
+"Sem unidade de atendimento"), escolha a unidade e clique em *Aplicar* — dá
+para incluir de uma vez as outras sessões sem unidade dos mesmos pacientes. A
+escolha feita no sistema não é desfeita pelas próximas importações. Unidades
+que não existem no AnClinic podem ser criadas em **Clínica e unidades**.
+
+**Busca de paciente:** nas autorizações (lista e nova autorização) e no
+registro de atendimento, um campo único acha o paciente pelo nome, CPF ou
+número da carteirinha.
 
 Preparação (uma vez):
 
@@ -96,6 +111,9 @@ Três tabelas, na tela **Procedimentos**:
   Termo` e `Termo`), usada para mostrar o nome de cada código.
 
 ### Documentos: planos terapêuticos e pedidos médicos
+
+Validade do pedido médico: a informada ou, em branco, **1 ano** a partir da
+data do pedido (vale também para o pedido criado pelo plano terapêutico).
 
 Onde ficam: os dados do pedido médico (médico, CRM, CID, data, validade e as
 sessões por semana do plano) na tabela `pedidos_medicos`; cada PDF na tabela
@@ -153,19 +171,6 @@ na barra superior; a escolha fica salva no navegador).
 As fontes são baixadas do Google Fonts **durante o `npm run build`** e
 servidas pelo próprio site (o navegador dos usuários não acessa o Google).
 Por isso o servidor precisa de acesso à internet na hora do build.
-
-## Ambientes (tenants)
-
-No lugar do antigo "Sistema conectado", a barra superior mostra o ambiente em
-uso (`autofisiomed.cftconsult.com.br`) e um ponto de status: **verde**
-conectado, **âmbar** sem resposta do servidor. Ao clicar, abre a lista de
-ambientes.
-
-O modelo é **um subdomínio por cliente**, cada um com a própria instalação e
-o próprio banco — trocar de ambiente é abrir o endereço do outro cliente, que
-tem o seu próprio login. A lista fica em `src/lib/ambientes.ts`; para um novo
-cliente, instale a aplicação no subdomínio dele e acrescente-o ali. (Ainda
-não existe um login único entre ambientes; cada um autentica separadamente.)
 
 ## Acessibilidade
 
@@ -533,8 +538,6 @@ o schema — no servidor, o `migrate deploy` vai aplicá-la.
 - Recuperação de senha por e-mail (o link "Esqueci minha senha" do login já
   existe, mas por enquanto só orienta a procurar o administrador).
 
-- Busca de paciente por nome nos formulários (hoje as listas trazem até 200
-  pacientes ativos).
 - Tela para editar autorização (vigência, protocolo, código TUSS) — a API já
   existe (`PUT /api/autorizacoes/:id`).
 - Envio das solicitações à Amil pelo webservice TISS (aguardando a liberação

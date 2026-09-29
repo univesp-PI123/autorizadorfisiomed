@@ -41,6 +41,7 @@ export const GET = rota(async (req) => {
         numeroConselho: a.profissional.numeroConselho,
       },
       unidade: a.unidade && { id: a.unidade.id, nome: a.unidade.nome },
+      unidadeManual: a.unidadeManual,
       statusAnclinic: a.statusAnclinic,
       agendamentosRestantes: a.agendamentosRestantes,
       atendimento: a.atendimento,

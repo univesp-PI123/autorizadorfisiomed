@@ -386,6 +386,7 @@ model Agendamento {
   agenda                String?   @db.VarChar(200)
   sala                  String?   @db.VarChar(200)
   removidoEm            DateTime? // sumiu de uma importação posterior do mesmo dia
+  unidadeManual         Boolean   @default(false) // unidade escolhida no sistema: a importação não troca
   importacaoId          String?   @db.Uuid
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt

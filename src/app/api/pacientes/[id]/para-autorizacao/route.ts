@@ -1,25 +1,23 @@
-import { ErroHttp, json, rota } from "@/lib/api/http";
+import { json, naoEncontrado, rota } from "@/lib/api/http";
 import { exigirSessao } from "@/lib/auth/sessao";
 import { deDate, hojeISO, paraDate, somarDias } from "@/lib/datas";
-import { cpfValido, formatarCpf } from "@/lib/importacao/planilha";
 import { prisma } from "@/lib/prisma";
 import { codigoParaGuia } from "@/lib/regras/codigoGuia";
 
-// Busca o paciente pelo CPF e reúne o que a nova autorização precisa: as
-// carteirinhas, os procedimentos que ele tem na agenda (por convênio) e o
+// O que a nova autorização precisa do paciente escolhido: as carteirinhas, os
+// procedimentos que ele tem na agenda (por convênio) e o pedido médico com o
 // plano terapêutico vigente.
-export const GET = rota(async (req) => {
+export const GET = rota<{ id: string }>(async (req, { params }) => {
   await exigirSessao(req, ["admin", "recepcionista", "financeiro"]);
-  const digitos = (req.nextUrl.searchParams.get("cpf") ?? "").replace(/\D/g, "");
-  if (!cpfValido(digitos)) throw new ErroHttp(422, "CPF inválido.");
+  const { id } = await params;
   const paciente = await prisma.paciente.findUnique({
-    where: { cpf: formatarCpf(digitos) },
+    where: { id },
     select: {
       id: true, nome: true, cpf: true, dataNascimento: true, ativo: true, cid: true,
       vinculos: { where: { ativo: true }, select: { convenioId: true, numeroCarteirinha: true, convenio: { select: { id: true, nome: true } } } },
     },
   });
-  if (!paciente) throw new ErroHttp(404, "Nenhum paciente com este CPF. Importe a agenda do AnClinic ou cadastre o paciente.");
+  if (!paciente) naoEncontrado("Paciente");
 
   const hoje = hojeISO();
   const [agendamentos, pedido] = await Promise.all([

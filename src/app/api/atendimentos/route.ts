@@ -26,6 +26,7 @@ export const GET = rota(async (req) => {
 
   const where: Prisma.AtendimentoWhereInput = {};
   if (sp.get("pacienteId")) where.pacienteId = sp.get("pacienteId")!;
+  if (sp.get("autorizacaoId")) where.autorizacaoId = sp.get("autorizacaoId")!;
   const status = sp.get("statusCobranca");
   if (status && (STATUS_COBRANCA as readonly string[]).includes(status)) {
     where.statusCobranca = status as StatusCobranca;

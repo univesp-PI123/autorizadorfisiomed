@@ -17,6 +17,7 @@ export type ItemMenu = {
 
 // Itens do menu, seus grupos e quais perfis veem cada tela. Usado pela barra
 // lateral e para barrar quem digitar o endereço de uma tela fora do perfil.
+// Nos submenus, as ações ("Nova…", "Registrar…", "Importar…") vêm primeiro.
 export const ITENS_MENU: ItemMenu[] = [
   {
     caminho: "/dashboard",
@@ -45,11 +46,11 @@ export const ITENS_MENU: ItemMenu[] = [
     icone: "autorizacoes",
     perfis: ["admin", "recepcionista", "financeiro"],
     subitens: [
+      { rotulo: "Nova autorização", href: "/autorizacoes?novo=1" },
       { rotulo: "Todas", href: "/autorizacoes" },
       { rotulo: "Pendentes", href: "/autorizacoes?status=pendente" },
       { rotulo: "Em análise", href: "/autorizacoes?status=em_analise" },
       { rotulo: "Vencendo em 7 dias", href: "/autorizacoes?vencendoEm=7" },
-      { rotulo: "Nova autorização", href: "/autorizacoes?novo=1" },
     ],
   },
   {
@@ -59,11 +60,11 @@ export const ITENS_MENU: ItemMenu[] = [
     icone: "agenda",
     perfis: ["admin", "recepcionista", "financeiro"],
     subitens: [
+      { rotulo: "Importar agenda", href: "/importacoes#importar-agenda", perfis: ["admin", "recepcionista"] },
       { rotulo: "Sessões", href: "/agenda" },
       { rotulo: "Com pendência", href: "/agenda?situacao=pendente" },
       { rotulo: "Prontas para solicitar", href: "/agenda?situacao=pronta" },
       { rotulo: "Sem unidade de atendimento", href: "/agenda?unidade=sem" },
-      { rotulo: "Importar agenda", href: "/importacoes", perfis: ["admin", "recepcionista"] },
     ],
   },
   {
@@ -73,11 +74,11 @@ export const ITENS_MENU: ItemMenu[] = [
     icone: "atendimentos",
     perfis: TODOS,
     subitens: [
+      { rotulo: "Registrar atendimento", href: "/atendimentos?novo=1", perfis: ["admin", "recepcionista"] },
       { rotulo: "Todos", href: "/atendimentos" },
       { rotulo: "Aguardando confirmação", href: "/atendimentos?situacao=aguardando_confirmacao" },
       { rotulo: "Sem autorização", href: "/atendimentos?semAutorizacao=true" },
       { rotulo: "Glosados", href: "/atendimentos?statusCobranca=glosado" },
-      { rotulo: "Registrar atendimento", href: "/atendimentos?novo=1", perfis: ["admin", "recepcionista"] },
     ],
   },
   {
@@ -87,9 +88,9 @@ export const ITENS_MENU: ItemMenu[] = [
     icone: "pacientes",
     perfis: ["admin", "recepcionista", "terapeuta"],
     subitens: [
+      { rotulo: "Novo paciente", href: "/pacientes?novo=1" },
       { rotulo: "Ativos", href: "/pacientes" },
       { rotulo: "Inativos", href: "/pacientes?ativo=false" },
-      { rotulo: "Novo paciente", href: "/pacientes?novo=1" },
     ],
   },
   {
@@ -99,8 +100,8 @@ export const ITENS_MENU: ItemMenu[] = [
     icone: "convenios",
     perfis: ["admin", "recepcionista", "financeiro"],
     subitens: [
-      { rotulo: "Lista", href: "/convenios" },
       { rotulo: "Novo convênio", href: "/convenios?novo=1", perfis: ["admin", "financeiro"] },
+      { rotulo: "Lista", href: "/convenios" },
     ],
   },
   {
@@ -111,7 +112,6 @@ export const ITENS_MENU: ItemMenu[] = [
     perfis: ["admin", "recepcionista", "financeiro"],
     subitens: [
       { rotulo: "Todos", href: "/profissionais" },
-      { rotulo: "Com dados faltando", href: "/profissionais?filtro=incompletos" },
     ],
   },
   {
@@ -129,8 +129,7 @@ export const ITENS_MENU: ItemMenu[] = [
     icone: "unidades",
     perfis: ["admin", "recepcionista", "financeiro"],
     subitens: [
-      { rotulo: "Dados da clínica", href: "/unidades#clinica" },
-      { rotulo: "Unidades (CNES)", href: "/unidades#unidades" },
+      { rotulo: "Clínica e unidades", href: "/unidades" },
     ],
   },
   {

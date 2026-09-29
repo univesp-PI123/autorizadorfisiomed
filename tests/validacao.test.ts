@@ -75,3 +75,12 @@ describe("confirmação e glosa", () => {
     expect(fimDaSessao("23:30")).toBe("00:30");
   });
 });
+
+describe("validade do pedido médico", () => {
+  it("em branco, vale 1 ano a partir da data do pedido", async () => {
+    const { esquemaPedidoMedico } = await import("@/lib/validacao");
+    const base = { medicoNome: "Dra. X", numeroConselho: "123", ufConselho: "SP", dataPedido: "2025-12-11" };
+    expect(esquemaPedidoMedico.parse(base).validoAte?.toISOString().slice(0, 10)).toBe("2026-12-10");
+    expect(esquemaPedidoMedico.parse({ ...base, validoAte: "2026-03-01" }).validoAte?.toISOString().slice(0, 10)).toBe("2026-03-01");
+  });
+});

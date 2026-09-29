@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { ehDataISO, paraDate } from "@/lib/datas";
+import { validadePadrao } from "@/lib/regras/pedidoMedico";
 import { SIGLAS_CONSELHO, UFS } from "@/lib/tiss/dominios";
 
 // Os formulários enviam "" em campos não preenchidos e números como texto.
@@ -247,7 +248,9 @@ export const esquemaPedidoMedico = z
   .refine((d) => !d.validoAte || d.validoAte >= d.dataPedido, {
     message: "A validade não pode ser antes da data do pedido.",
     path: ["validoAte"],
-  });
+  })
+  // Sem validade informada, vale 1 ano.
+  .transform((d) => ({ ...d, validoAte: d.validoAte ?? validadePadrao(d.dataPedido) }));
 
 // --- Autorizações ------------------------------------------------------
 

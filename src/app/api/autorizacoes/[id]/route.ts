@@ -36,7 +36,9 @@ export const GET = rota<Params>(async (req, { params }) => {
       documentos: { select: { id: true, tipo: true, nomeOriginal: true, tamanho: true, origem: true, createdAt: true } },
     },
   });
-  return json({ ...autorizacao, plano });
+  const porSituacao = await prisma.atendimento.groupBy({ by: ["situacao"], where: { autorizacaoId: id }, _count: true });
+  const atendimentos = Object.fromEntries(porSituacao.map((g) => [g.situacao, g._count]));
+  return json({ ...autorizacao, plano, atendimentos });
 });
 
 // Edita os dados descritivos. Status tem rota própria (/status).

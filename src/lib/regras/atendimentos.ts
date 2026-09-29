@@ -1,7 +1,8 @@
-// Atendimentos a partir da agenda: toda sessão já realizada (até hoje) que
-// está coberta por uma autorização vira um atendimento "aguardando
-// confirmação", com o valor do faturamento do AnClinic. O operador confirma
-// (aí a sessão é descontada da autorização) ou cancela, com motivo.
+// Atendimentos a partir da agenda: assim que uma autorização é aprovada, as
+// sessões da agenda que ela cobre (dentro da vigência, até o saldo) viram
+// atendimentos "aguardando confirmação", com o valor do faturamento do
+// AnClinic. Depois que a sessão acontece, o operador confirma (aí ela é
+// descontada da autorização) ou cancela, com motivo.
 
 import { Prisma } from "@prisma/client";
 import { analisarAgendamentos } from "@/lib/agenda";
@@ -66,7 +67,7 @@ export async function consumirSessao(tx: Tx, autorizacaoId: string, pacienteId: 
   }
 }
 
-const JANELA_DIAS = 60; // sessões mais antigas que isso não geram atendimento
+const JANELA_DIAS = 60; // sessões mais antigas que isso não geram atendimento (as futuras, sim)
 
 /**
  * Cria os atendimentos pendentes das sessões cobertas e cancela os pendentes
@@ -98,9 +99,9 @@ export async function sincronizarAtendimentos() {
     }
   }
 
-  // 2. Sessões realizadas e cobertas por autorização, ainda sem atendimento.
+  // 2. Sessões cobertas por autorização aprovada, ainda sem atendimento.
   const sessoes = await analisarAgendamentos({
-    data: { gte: paraDate(somarDias(hoje, -JANELA_DIAS)), lte: paraDate(hoje) },
+    data: { gte: paraDate(somarDias(hoje, -JANELA_DIAS)) },
     atendimento: null,
     removidoEm: null,
     pacienteId: { not: null },

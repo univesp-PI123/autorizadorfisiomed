@@ -332,7 +332,7 @@ export default function PedidosMedicos({
             </div>
             {campo("cbo", "CBO do médico", { inputMode: "numeric", placeholder: "Ex.: 225124 (pediatra)" })}
             {campo("dataPedido", "Data do pedido", { required: true, type: "date" })}
-            {campo("validoAte", "Válido até", { type: "date" })}
+            {campo("validoAte", "Válido até (em branco: 1 ano)", { type: "date" })}
             {campo("cid", "CID-10", { placeholder: "F84.0" })}
             <div className="sb-field">
               <label className="sb-label" htmlFor="ped-convenioId">
