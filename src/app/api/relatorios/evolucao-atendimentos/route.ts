@@ -20,7 +20,7 @@ export const GET = rota(async (req) => {
            COUNT(*) FILTER (WHERE "semAutorizacao")::int                     AS "semAutorizacao",
            COUNT(*) FILTER (WHERE "statusCobranca" = 'glosado')::int         AS glosados
       FROM atendimentos
-     WHERE "dataAtendimento" >= ${inicio}
+     WHERE "dataAtendimento" >= ${inicio} AND situacao = 'confirmado'
   GROUP BY 1
   ORDER BY 1`;
 

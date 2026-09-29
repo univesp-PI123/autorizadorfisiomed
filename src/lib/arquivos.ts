@@ -32,16 +32,18 @@ export async function lerPdfEnviado(arquivo: File): Promise<Buffer> {
   return conteudo;
 }
 
+export const sha256 = (conteudo: Buffer) => createHash("sha256").update(conteudo).digest("hex");
+
 export async function salvarPdf(conteudo: Buffer) {
   const mes = new Date().toISOString().slice(0, 7);
-  const relativo = path.posix.join("pedidos", mes, `${randomUUID()}.pdf`);
+  const relativo = path.posix.join("documentos", mes, `${randomUUID()}.pdf`);
   const abs = caminhoAbsoluto(relativo);
   await mkdir(path.dirname(abs), { recursive: true, mode: 0o750 });
   await writeFile(abs, conteudo, { mode: 0o640, flag: "wx" });
   return {
     caminho: relativo,
     tamanho: conteudo.length,
-    sha256: createHash("sha256").update(conteudo).digest("hex"),
+    sha256: sha256(conteudo),
   };
 }
 

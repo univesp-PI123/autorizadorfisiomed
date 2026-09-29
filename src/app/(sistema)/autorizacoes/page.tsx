@@ -15,7 +15,19 @@ import { diasParaVencimento, formatarData } from "@/lib/analiseDados";
 import { mensagemDeErro } from "@/lib/cliente/api";
 import { useFetch, usePaginacao } from "@/lib/cliente/hooks";
 import { autorizacaoService, convenioService, pacienteService } from "@/lib/cliente/servicos";
+import type { PacientePorCpf } from "@/lib/cliente/tipos";
 import { hojeISO } from "@/lib/datas";
+import { sessoesPorSemana } from "@/lib/documentos/especialidades";
+
+const SEMANAS_POR_PEDIDO = 4; // quantidade sugerida: sessões do plano por semana × 4 semanas
+
+const mascararCpf = (v: string) =>
+  v
+    .replace(/\D/g, "")
+    .slice(0, 11)
+    .replace(/(\d{3})(\d)/, "$1.$2")
+    .replace(/(\d{3})(\d)/, "$1.$2")
+    .replace(/(\d{3})(\d{1,2})$/, "$1-$2");
 
 const STATUS = ["pendente", "em_analise", "autorizada", "negada", "vencida", "cancelada", "esgotada"];
 
@@ -39,6 +51,11 @@ function AutorizacoesPage({ url }: { url: URLSearchParams }) {
   const [modalAberto, setModalAberto] = useState(url.get("novo") === "1" && usuario.perfil !== "terapeuta");
   const [form, setForm] = useState(formInicial);
   const [salvando, setSalvando] = useState(false);
+  const [cpf, setCpf] = useState("");
+  const [achado, setAchado] = useState<PacientePorCpf | null>(null);
+  const [buscandoCpf, setBuscandoCpf] = useState(false);
+  const [erroCpf, setErroCpf] = useState<string | null>(null);
+  const [porNome, setPorNome] = useState(false);
   const { pagina, limite, setPagina, resetar } = usePaginacao(20);
 
   const buscar = useCallback(
@@ -56,9 +73,10 @@ function AutorizacoesPage({ url }: { url: URLSearchParams }) {
   const autorizacoes = data?.data ?? [];
 
   // Listas do formulário: só carregam quando o modal abre.
+  // Busca por nome só para paciente sem CPF cadastrado.
   const buscarPacientes = useCallback(
-    () => (modalAberto ? pacienteService.listar({ limit: 200, ativo: true }) : Promise.resolve(null)),
-    [modalAberto],
+    () => (modalAberto && porNome ? pacienteService.listar({ limit: 200, ativo: true }) : Promise.resolve(null)),
+    [modalAberto, porNome],
   );
   const buscarConvenios = useCallback(
     () => (modalAberto ? convenioService.listar({ ativo: true }) : Promise.resolve(null)),
@@ -74,6 +92,53 @@ function AutorizacoesPage({ url }: { url: URLSearchParams }) {
     setModalAberto(false);
     tirarNovoDaUrl();
     setForm(formInicial());
+    setCpf("");
+    setAchado(null);
+    setErroCpf(null);
+    setPorNome(false);
+  };
+
+  // Escolhe o procedimento da agenda: preenche nome, código da guia e a
+  // quantidade pelo plano terapêutico.
+  const aplicarSessao = (r: PacientePorCpf, i: number) => {
+    const a = r.agenda[i];
+    if (!a) return;
+    const porSemana = sessoesPorSemana(r.pedido?.planoItens, a.procedimento.descricao);
+    setForm((f) => ({
+      ...f,
+      convenioId: a.convenio.id,
+      procedimento: a.procedimento.descricao,
+      codigoProcedimento: a.codigo ?? "",
+      quantidadeSolicitada: porSemana ? String(porSemana * SEMANAS_POR_PEDIDO) : f.quantidadeSolicitada,
+    }));
+  };
+
+  const buscarCpf = async () => {
+    setErroCpf(null);
+    setAchado(null);
+    if (cpf.replace(/\D/g, "").length !== 11) {
+      setErroCpf("Digite os 11 números do CPF.");
+      return;
+    }
+    setBuscandoCpf(true);
+    try {
+      const r = await pacienteService.porCpf(cpf);
+      setAchado(r);
+      const pedido = r.pedido;
+      setForm((f) => ({
+        ...f,
+        pacienteId: r.paciente.id,
+        convenioId: r.agenda[0]?.convenio.id ?? r.paciente.vinculos[0]?.convenioId ?? "",
+        observacoes: pedido
+          ? `Pedido médico: ${pedido.medicoNome} (CRM ${pedido.numeroConselho}/${pedido.ufConselho})${pedido.cid ? `, CID ${pedido.cid}` : ""}, de ${pedido.dataPedido.split("-").reverse().join("/")}.`
+          : f.observacoes,
+      }));
+      if (r.agenda.length) aplicarSessao(r, 0);
+    } catch (err) {
+      setErroCpf(mensagemDeErro(err, "Não foi possível buscar o CPF."));
+    } finally {
+      setBuscandoCpf(false);
+    }
   };
 
   const aoEnviar = async (e: FormEvent) => {
@@ -257,19 +322,58 @@ function AutorizacoesPage({ url }: { url: URLSearchParams }) {
       >
         <form id="form-autorizacao" onSubmit={aoEnviar} noValidate>
           <div className="form-grade">
-            <div className="sb-field">
-              <label className="sb-label" htmlFor="aut-pacienteId">
-                Paciente<span className="obrigatorio" aria-hidden="true">*</span>
-              </label>
-              <select id="aut-pacienteId" name="pacienteId" className="sb-input" value={form.pacienteId} onChange={aoMudar} required>
-                <option value="">Selecione…</option>
-                {(pacientes?.data ?? []).map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.nome}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {porNome ? (
+              <div className="sb-field">
+                <label className="sb-label" htmlFor="aut-pacienteId">
+                  Paciente<span className="obrigatorio" aria-hidden="true">*</span>
+                </label>
+                <select id="aut-pacienteId" name="pacienteId" className="sb-input" value={form.pacienteId} onChange={aoMudar} required>
+                  <option value="">Selecione…</option>
+                  {(pacientes?.data ?? []).map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.nome}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              <div className={`sb-field ${erroCpf ? "sb-field--error" : ""}`}>
+                <label className="sb-label" htmlFor="aut-cpf">
+                  CPF do paciente<span className="obrigatorio" aria-hidden="true">*</span>
+                </label>
+                <div className="ferramentas" style={{ flexWrap: "nowrap" }}>
+                  <input
+                    id="aut-cpf"
+                    className="sb-input mono"
+                    inputMode="numeric"
+                    placeholder="000.000.000-00"
+                    value={cpf}
+                    onChange={(e) => setCpf(mascararCpf(e.target.value))}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        buscarCpf();
+                      }
+                    }}
+                    aria-describedby="aut-cpf-ajuda"
+                    aria-invalid={!!erroCpf}
+                  />
+                  <button type="button" className="sb-btn" onClick={buscarCpf} disabled={buscandoCpf}>
+                    <Icone nome="busca" />
+                    {buscandoCpf ? "Buscando…" : "Buscar"}
+                  </button>
+                </div>
+                <span id="aut-cpf-ajuda" className="sb-help" aria-live="polite">
+                  {erroCpf ??
+                    (achado
+                      ? `${achado.paciente.nome}${achado.paciente.dataNascimento ? ` · nasc. ${achado.paciente.dataNascimento.split("-").reverse().join("/")}` : ""}${achado.paciente.vinculos.length ? ` · carteirinha ${achado.paciente.vinculos.map((v) => `${v.convenio.nome} ${v.numeroCarteirinha}`).join(", ")}` : ""}`
+                      : "Os demais campos são preenchidos pela agenda e pelo plano terapêutico.")}
+                </span>
+                <button type="button" className="link-botao" style={{ alignSelf: "flex-start", fontSize: 12 }} onClick={() => setPorNome(true)}>
+                  Paciente sem CPF? Buscar por nome
+                </button>
+              </div>
+            )}
             <div className="sb-field">
               <label className="sb-label" htmlFor="aut-convenioId">
                 Convênio<span className="obrigatorio" aria-hidden="true">*</span>
@@ -283,8 +387,33 @@ function AutorizacoesPage({ url }: { url: URLSearchParams }) {
                 ))}
               </select>
             </div>
+            {achado && achado.agenda.length > 0 && (
+              <div className="sb-field inteira">
+                <label className="sb-label" htmlFor="aut-sessao">
+                  Procedimento na agenda
+                </label>
+                <select id="aut-sessao" className="sb-input" defaultValue="0" onChange={(e) => aplicarSessao(achado, Number(e.target.value))} aria-describedby="aut-sessao-ajuda">
+                  {achado.agenda.map((a, i) => (
+                    <option key={`${a.convenio.id}-${a.procedimento.id}`} value={i}>
+                      {a.procedimento.descricao} · {a.convenio.nome} · {a.sessoes} sessão(ões) na agenda
+                    </option>
+                  ))}
+                </select>
+                <span id="aut-sessao-ajuda" className="sb-help">
+                  {(() => {
+                    const escolhido = achado.agenda.find((a) => a.procedimento.descricao === form.procedimento);
+                    const porSemana = escolhido ? sessoesPorSemana(achado.pedido?.planoItens, escolhido.procedimento.descricao) : null;
+                    return porSemana
+                      ? `Plano terapêutico: ${porSemana} por semana × ${SEMANAS_POR_PEDIDO} semanas = ${porSemana * SEMANAS_POR_PEDIDO} sessões.`
+                      : achado.pedido
+                        ? "O plano terapêutico não tem esta especialidade: informe a quantidade."
+                        : "Paciente sem plano terapêutico: informe a quantidade.";
+                  })()}
+                </span>
+              </div>
+            )}
             {campo("procedimento", "Procedimento", { required: true, placeholder: "Sessão de ABA" })}
-            {campo("codigoProcedimento", "Código TUSS")}
+            {campo("codigoProcedimento", "Código do procedimento (guia)")}
             {campo("quantidadeSolicitada", "Sessões solicitadas", { required: true, type: "number", min: 1 })}
             {campo("dataSolicitacao", "Data da solicitação", { type: "date" })}
             {campo("dataInicioVigencia", "Início da vigência", { type: "date" })}

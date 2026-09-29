@@ -54,6 +54,24 @@ enum TipoIntegracao {
 enum TipoImportacao {
   agenda
   profissionais
+  documentos
+  tabela_operadora
+  tuss
+}
+
+enum TipoDocumento {
+  pedido_medico
+  plano_terapeutico
+  relatorio
+  outro
+}
+
+// Atendimentos criados a partir da agenda esperam o operador confirmar que a
+// sessão aconteceu (ou cancelar, com motivo).
+enum SituacaoAtendimento {
+  aguardando_confirmacao
+  confirmado
+  cancelado
 }
 
 // --- Entidades ---------------------------------------------------------
@@ -69,11 +87,13 @@ model Usuario {
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 
-  autorizacoesCriadas    Autorizacao[]     @relation("AutorizacaoCriadaPor")
-  atendimentosRealizados Atendimento[]
-  historicoStatus        HistoricoStatus[]
-  importacoes            Importacao[]
-  pedidosMedicos         PedidoMedico[]
+  autorizacoesCriadas     Autorizacao[]     @relation("AutorizacaoCriadaPor")
+  atendimentosRealizados  Atendimento[]     @relation("AtendimentoTerapeuta")
+  atendimentosConfirmados Atendimento[]     @relation("AtendimentoConfirmadoPor")
+  documentos              Documento[]
+  historicoStatus         HistoricoStatus[]
+  importacoes             Importacao[]
+  pedidosMedicos          PedidoMedico[]
 
   @@map("usuarios")
 }
@@ -99,6 +119,7 @@ model Paciente {
   atendimentos   Atendimento[]
   agendamentos   Agendamento[]
   pedidosMedicos PedidoMedico[]
+  Documento      Documento[]
 
   @@index([nome])
   @@map("pacientes")
@@ -130,6 +151,7 @@ model Convenio {
   agendamentos   Agendamento[]
   credenciados   ProfissionalConvenio[]
   pedidosMedicos PedidoMedico[]
+  tabela         ProcedimentoOperadora[]
 
   @@map("convenios")
 }
@@ -209,31 +231,43 @@ model HistoricoStatus {
 }
 
 model Atendimento {
-  id                 String         @id @default(uuid()) @db.Uuid
-  pacienteId         String         @db.Uuid
-  autorizacaoId      String?        @db.Uuid
-  terapeutaId        String?        @db.Uuid
-  dataAtendimento    DateTime       @db.Date
-  horaInicio         String?        @db.VarChar(5) // HH:MM
-  horaFim            String?        @db.VarChar(5)
-  procedimento       String         @db.VarChar(200)
-  codigoProcedimento String?        @db.VarChar(30)
-  statusCobranca     StatusCobranca @default(pendente)
-  valorCobrado       Decimal?       @db.Decimal(10, 2)
-  valorPago          Decimal?       @db.Decimal(10, 2)
+  id                 String              @id @default(uuid()) @db.Uuid
+  pacienteId         String              @db.Uuid
+  autorizacaoId      String?             @db.Uuid
+  terapeutaId        String?             @db.Uuid
+  dataAtendimento    DateTime            @db.Date
+  horaInicio         String?             @db.VarChar(5) // HH:MM
+  horaFim            String?             @db.VarChar(5)
+  procedimento       String              @db.VarChar(200)
+  codigoProcedimento String?             @db.VarChar(30)
+  statusCobranca     StatusCobranca      @default(pendente)
+  valorCobrado       Decimal?            @db.Decimal(10, 2)
+  valorPago          Decimal?            @db.Decimal(10, 2)
   motivoGlosa        String?
-  semAutorizacao     Boolean        @default(false) // realizado sem autorização vigente
-  evolucao           String?
+  semAutorizacao     Boolean             @default(false) // realizado sem autorização vigente
+  evolucao           String? // não é mais preenchida pelo formulário
   observacoes        String?
-  createdAt          DateTime       @default(now())
-  updatedAt          DateTime       @updatedAt
+  situacao           SituacaoAtendimento @default(confirmado)
+  motivoCancelamento String?
+  confirmadoEm       DateTime?
+  confirmadoPorId    String?             @db.Uuid
+  agendamentoId      String?             @unique @db.Uuid // sessão da agenda que originou
+  profissionalId     String?             @db.Uuid
+  procedimentoId     String?             @db.Uuid
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
 
-  paciente    Paciente     @relation(fields: [pacienteId], references: [id])
-  autorizacao Autorizacao? @relation(fields: [autorizacaoId], references: [id])
-  terapeuta   Usuario?     @relation(fields: [terapeutaId], references: [id])
+  paciente        Paciente      @relation(fields: [pacienteId], references: [id])
+  autorizacao     Autorizacao?  @relation(fields: [autorizacaoId], references: [id])
+  terapeuta       Usuario?      @relation("AtendimentoTerapeuta", fields: [terapeutaId], references: [id])
+  confirmadoPor   Usuario?      @relation("AtendimentoConfirmadoPor", fields: [confirmadoPorId], references: [id])
+  agendamento     Agendamento?  @relation(fields: [agendamentoId], references: [id], onDelete: SetNull)
+  profissional    Profissional? @relation(fields: [profissionalId], references: [id])
+  procedimentoRef Procedimento? @relation(fields: [procedimentoId], references: [id])
 
   @@index([dataAtendimento])
   @@index([statusCobranca])
+  @@index([situacao])
   @@map("atendimentos")
 }
 
@@ -290,6 +324,7 @@ model Profissional {
 
   credenciamentos ProfissionalConvenio[]
   agendamentos    Agendamento[]
+  atendimentos    Atendimento[]
 
   @@index([nome])
   @@map("profissionais")
@@ -319,7 +354,9 @@ model Procedimento {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  agendamentos Agendamento[]
+  agendamentos  Agendamento[]
+  atendimentos  Atendimento[]
+  equivalencias ProcedimentoOperadora[]
 
   @@map("procedimentos")
 }
@@ -359,6 +396,7 @@ model Agendamento {
   procedimento Procedimento? @relation(fields: [procedimentoId], references: [id])
   unidade      Unidade?      @relation(fields: [unidadeId], references: [id])
   importacao   Importacao?   @relation(fields: [importacaoId], references: [id], onDelete: SetNull)
+  atendimento  Atendimento?
 
   @@index([data])
   @@index([pacienteId])
@@ -398,6 +436,8 @@ model PedidoMedico {
   cbo              String?   @db.VarChar(6)
   cid              String?   @db.VarChar(20)
   indicacaoClinica String?
+  sessoesSemanais  Int? // do plano terapêutico
+  planoItens       Json? // [{ especialidade, dias: {seg..sab}, total }]
   dataPedido       DateTime  @db.Date
   validoAte        DateTime? @db.Date
   ativo            Boolean   @default(true)
@@ -406,27 +446,68 @@ model PedidoMedico {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
-  paciente Paciente        @relation(fields: [pacienteId], references: [id])
-  convenio Convenio?       @relation(fields: [convenioId], references: [id])
-  usuario  Usuario?        @relation(fields: [usuarioId], references: [id])
-  arquivos ArquivoPedido[]
+  paciente   Paciente    @relation(fields: [pacienteId], references: [id])
+  convenio   Convenio?   @relation(fields: [convenioId], references: [id])
+  usuario    Usuario?    @relation(fields: [usuarioId], references: [id])
+  documentos Documento[]
 
   @@index([pacienteId])
   @@map("pedidos_medicos")
 }
 
-// PDF do pedido médico, gravado em disco (ARQUIVOS_DIR), fora da pasta pública.
-model ArquivoPedido {
-  id           String   @id @default(uuid()) @db.Uuid
-  pedidoId     String   @db.Uuid
-  nomeOriginal String   @db.VarChar(255)
-  caminho      String   @db.VarChar(255) // relativo a ARQUIVOS_DIR
+// Documento do paciente (PDF) gravado em disco (ARQUIVOS_DIR), fora da pasta
+// pública. Pode estar ligado a um pedido médico ou avulso (enviado em lote sem
+// pedido ainda cadastrado).
+model Documento {
+  id           String        @id @default(uuid()) @db.Uuid
+  pacienteId   String        @db.Uuid
+  pedidoId     String?       @db.Uuid
+  tipo         TipoDocumento
+  nomeOriginal String        @db.VarChar(255)
+  caminho      String        @db.VarChar(255) // relativo a ARQUIVOS_DIR
   tamanho      Int
-  sha256       String   @db.VarChar(64)
-  createdAt    DateTime @default(now())
+  sha256       String        @db.VarChar(64)
+  dados        Json? // dados lidos do plano terapêutico
+  origem       String        @default("manual") @db.VarChar(10) // manual | lote
+  usuarioId    String?       @db.Uuid
+  createdAt    DateTime      @default(now())
 
-  pedido PedidoMedico @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+  paciente Paciente      @relation(fields: [pacienteId], references: [id])
+  pedido   PedidoMedico? @relation(fields: [pedidoId], references: [id], onDelete: SetNull)
+  usuario  Usuario?      @relation(fields: [usuarioId], references: [id])
 
+  @@unique([pacienteId, sha256]) // o mesmo arquivo não entra duas vezes
   @@index([pedidoId])
-  @@map("arquivos_pedido")
+  @@map("documentos")
+}
+
+// Tabela 22 da TUSS (ANS): códigos de procedimentos e eventos.
+model TussProcedimento {
+  codigo String @id @db.VarChar(10)
+  termo  String @db.VarChar(500)
+
+  @@map("tuss_procedimentos")
+}
+
+// Tabela de procedimentos da operadora e o de/para: código do AnClinic →
+// código da operadora → código TUSS (tabela 22).
+model ProcedimentoOperadora {
+  id             String   @id @default(uuid()) @db.Uuid
+  convenioId     String   @db.Uuid
+  procedimentoId String?  @db.Uuid // procedimento do AnClinic equivalente
+  codigo         String   @db.VarChar(20)
+  descricao      String   @db.VarChar(300)
+  tabela         String   @default("22") @db.VarChar(2) // 22 TUSS, 98/00 próprias
+  codigoTuss     String?  @db.VarChar(10)
+  valor          Decimal? @db.Decimal(10, 2)
+  ativo          Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  convenio     Convenio      @relation(fields: [convenioId], references: [id], onDelete: Cascade)
+  procedimento Procedimento? @relation(fields: [procedimentoId], references: [id], onDelete: SetNull)
+
+  @@unique([convenioId, codigo])
+  @@unique([convenioId, procedimentoId]) // um equivalente por procedimento em cada operadora
+  @@map("procedimentos_operadora")
 }

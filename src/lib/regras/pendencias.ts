@@ -9,6 +9,8 @@
 //
 // Função pura, para ser usada pela tela da agenda e pelo robô de envio.
 
+import { chaveNome } from "@/lib/importacao/planilha";
+
 export type SituacaoSessao = "cancelada" | "fora" | "coberta" | "pronta" | "pendente";
 
 export type SessaoParaAnalise = {
@@ -21,7 +23,9 @@ export type SessaoParaAnalise = {
   convenioAnclinic: string | null;
   pacienteId: string | null;
   convenio: { id: string; integracao: string; codigoPrestador: string | null } | null;
-  procedimento: { codigoTuss: string | null } | null;
+  // codigoGuia: código que vai na guia (de/para da operadora ou TUSS);
+  // codigosAceitos: códigos que, numa autorização, cobrem este procedimento.
+  procedimento: { codigoGuia: string | null; codigosAceitos: string[]; descricao?: string } | null;
   profissional: {
     conselho: string | null;
     numeroConselho: string | null;
@@ -38,8 +42,10 @@ export type ContextoAnalise = {
   pedidos: { convenioId: string | null; dataPedido: string; validoAte: string | null; arquivos: number }[];
   // Autorizações do paciente, para saber se a sessão já está coberta.
   autorizacoes: {
+    id?: string;
     convenioId: string;
     codigoProcedimento: string | null;
+    procedimento?: string; // nome na autorização (autorizações manuais podem não ter código)
     status: string;
     dataInicioVigencia: string | null;
     dataFimVigencia: string | null;
@@ -60,29 +66,34 @@ export function exigeAutorizacao(statusFaturamento: string | null): boolean {
 export function analisarSessao(
   s: SessaoParaAnalise,
   ctx: ContextoAnalise,
-): { situacao: SituacaoSessao; pendencias: string[]; motivo?: string } {
+): { situacao: SituacaoSessao; pendencias: string[]; motivo?: string; autorizacaoId?: string } {
   if (s.removidoEm) return { situacao: "cancelada", pendencias: [], motivo: "Excluída da agenda do AnClinic." };
   if (sessaoInativa(s.statusAnclinic)) return { situacao: "cancelada", pendencias: [], motivo: s.statusAnclinic ?? undefined };
   if (!s.convenioAnclinic) return { situacao: "fora", pendencias: [], motivo: "Sem convênio." };
   if (!s.convenio) return { situacao: "fora", pendencias: [], motivo: "Convênio do AnClinic não vinculado a um convênio do sistema." };
-  if (s.convenio.integracao === "manual") return { situacao: "fora", pendencias: [], motivo: "Convênio sem envio automático." };
-  if (!exigeAutorizacao(s.statusFaturamento)) {
-    return { situacao: "fora", pendencias: [], motivo: `Não exige autorização (${s.statusFaturamento}).` };
-  }
 
-  if (s.senhaAutorizacao) return { situacao: "coberta", pendencias: [], motivo: `Senha ${s.senhaAutorizacao} no AnClinic.` };
-  const tuss = s.procedimento?.codigoTuss ?? null;
+  // Cobertura vale para qualquer convênio: autorização registrada no sistema
+  // (automática ou manual) ou senha já lançada no AnClinic.
+  const codigoGuia = s.procedimento?.codigoGuia ?? null;
+  const aceitos = s.procedimento?.codigosAceitos ?? [];
+  const nome = s.procedimento?.descricao ? chaveNome(s.procedimento.descricao) : null;
   const cobertura = ctx.autorizacoes.find(
     (a) =>
       a.convenioId === s.convenio!.id &&
       a.status === "autorizada" &&
-      !!tuss &&
-      a.codigoProcedimento === tuss &&
+      ((!!a.codigoProcedimento && aceitos.includes(a.codigoProcedimento)) ||
+        (!!nome && !!a.procedimento && chaveNome(a.procedimento).includes(nome))) &&
       (!a.dataInicioVigencia || a.dataInicioVigencia <= s.data) &&
       (!a.dataFimVigencia || a.dataFimVigencia >= s.data) &&
       (a.saldo === null || a.saldo > 0),
   );
-  if (cobertura) return { situacao: "coberta", pendencias: [], motivo: "Autorização vigente com saldo." };
+  if (cobertura) return { situacao: "coberta", pendencias: [], motivo: "Autorização vigente com saldo.", autorizacaoId: cobertura.id };
+  if (s.senhaAutorizacao) return { situacao: "coberta", pendencias: [], motivo: `Senha ${s.senhaAutorizacao} no AnClinic.` };
+
+  if (s.convenio.integracao === "manual") return { situacao: "fora", pendencias: [], motivo: "Convênio sem envio automático." };
+  if (!exigeAutorizacao(s.statusFaturamento)) {
+    return { situacao: "fora", pendencias: [], motivo: `Não exige autorização (${s.statusFaturamento}).` };
+  }
 
   const pendencias: string[] = [];
   if (!ctx.clinicaCadastrada) pendencias.push("Dados da clínica não cadastrados");
@@ -92,7 +103,7 @@ export function analisarSessao(
   if (!s.pacienteId) pendencias.push("Paciente não identificado");
   if (!s.carteirinha) pendencias.push("Sem carteirinha");
   if (!s.procedimento) pendencias.push("Sem procedimento");
-  else if (!tuss) pendencias.push("Procedimento sem código TUSS");
+  else if (!codigoGuia) pendencias.push("Procedimento sem código para a operadora");
   const p = s.profissional;
   if (!p) pendencias.push("Profissional não identificado");
   else {

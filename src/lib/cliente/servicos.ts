@@ -6,13 +6,19 @@ import type {
   AutorizacoesPorConvenio,
   Clinica,
   Convenio,
+  DocumentoResumo,
   Dashboard,
   EvolucaoMes,
   Importacao,
   Paciente,
+  PacientePorCpf,
   Paginado,
   PedidoMedico,
+  PlanoLido,
   Procedimento,
+  ProcedimentoOperadora,
+  TussProcedimento,
+  ResultadoDocumento,
   Profissional,
   ResumoGlosas,
   Usuario,
@@ -33,6 +39,7 @@ export const pacienteService = {
   listar: (params: Filtros = {}) => api.get<Paginado<Paciente>>("/pacientes", params),
   buscarPorId: (id: string) =>
     api.get<Paciente & { autorizacoes: Autorizacao[] }>(`/pacientes/${id}`),
+  porCpf: (cpf: string) => api.get<PacientePorCpf>("/pacientes/por-cpf", { cpf }),
   criar: (dados: unknown) => api.post<Paciente>("/pacientes", dados),
   atualizar: (id: string, dados: unknown) => api.put<Paciente>(`/pacientes/${id}`, dados),
   desativar: (id: string) => api.patch(`/pacientes/${id}/desativar`),
@@ -59,7 +66,10 @@ export const autorizacaoService = {
 };
 
 export const atendimentoService = {
-  listar: (params: Filtros = {}) => api.get<Paginado<Atendimento>>("/atendimentos", params),
+  listar: (params: Filtros = {}) =>
+    api.get<Paginado<Atendimento> & { aguardandoConfirmacao: number }>("/atendimentos", params),
+  confirmar: (id: string) => api.patch<Atendimento>(`/atendimentos/${id}/situacao`, { acao: "confirmar" }),
+  cancelar: (id: string, motivo: string) => api.patch<Atendimento>(`/atendimentos/${id}/situacao`, { acao: "cancelar", motivo }),
   criar: (dados: unknown) => api.post<Atendimento>("/atendimentos", dados),
   atualizar: (id: string, dados: unknown) => api.put<Atendimento>(`/atendimentos/${id}`, dados),
   resumoGlosas: () => api.get<ResumoGlosas>("/atendimentos/resumo/glosas"),
@@ -107,13 +117,23 @@ export const profissionalService = {
 };
 
 export const procedimentoService = {
-  listar: () => api.get<Procedimento[]>("/procedimentos"),
+  listar: (convenioId?: string) => api.get<Procedimento[]>("/procedimentos", { convenioId }),
+  operadora: (params: Filtros) => api.get<Paginado<ProcedimentoOperadora>>("/procedimentos/operadora", params),
+  tuss: (params: Filtros) => api.get<Paginado<TussProcedimento>>("/procedimentos/tuss", params),
   atualizar: (id: string, dados: unknown) => api.put<Procedimento>(`/procedimentos/${id}`, dados),
 };
 
 export const pedidoMedicoService = {
-  listar: (pacienteId: string) => api.get<PedidoMedico[]>(`/pacientes/${pacienteId}/pedidos`),
+  listar: (pacienteId: string) =>
+    api.get<{ pedidos: PedidoMedico[]; avulsos: DocumentoResumo[] }>(`/pacientes/${pacienteId}/pedidos`),
   criar: (pacienteId: string, form: FormData) => api.post<PedidoMedico>(`/pacientes/${pacienteId}/pedidos`, form),
   alterarAtivo: (id: string, ativo: boolean) => api.patch<PedidoMedico>(`/pedidos/${id}`, { ativo }),
-  urlArquivo: (pedidoId: string, arquivoId: string) => `/api/pedidos/${pedidoId}/arquivos/${arquivoId}`,
+  lerPlano: (form: FormData) => api.post<PlanoLido>("/documentos/ler-plano", form),
+};
+
+export const documentoService = {
+  url: (id: string) => `/api/documentos/${id}`,
+  ligarAoPedido: (id: string, pedidoId: string | null) => api.patch(`/documentos/${id}`, { pedidoId }),
+  enviarLote: (form: FormData) =>
+    api.post<{ importacaoId: string; resultados: ResultadoDocumento[] }>("/documentos/lote", form),
 };

@@ -2,6 +2,7 @@
 
 import { useRef, useState, type FormEvent } from "react";
 import toast from "react-hot-toast";
+import EnvioDocumentos from "@/components/EnvioDocumentos";
 import Icone from "@/components/Icone";
 import ResumoImportacao from "@/components/ResumoImportacao";
 import Carregando from "@/components/ui/Carregando";
@@ -14,7 +15,13 @@ import { useFetch } from "@/lib/cliente/hooks";
 import { convenioService, importacaoService } from "@/lib/cliente/servicos";
 import type { Importacao } from "@/lib/cliente/tipos";
 
-const ROTULO_TIPO = { agenda: "Agenda", profissionais: "Profissionais" };
+const ROTULO_TIPO: Record<Importacao["tipo"], string> = {
+  agenda: "Agenda",
+  profissionais: "Profissionais",
+  documentos: "Documentos",
+  tabela_operadora: "Tabela da operadora",
+  tuss: "Tabela TUSS",
+};
 
 function FormImportacao({
   tipo,
@@ -22,7 +29,7 @@ function FormImportacao({
   children,
   aoImportar,
 }: {
-  tipo: Importacao["tipo"];
+  tipo: "agenda" | "profissionais";
   titulo: string;
   children?: React.ReactNode;
   aoImportar: (i: Importacao) => void;
@@ -129,6 +136,7 @@ export default function ImportacoesPage() {
           </FormImportacao>
         </section>
       )}
+      {podeImportar && <EnvioDocumentos aoConcluir={historico.recarregar} />}
 
       <section className="sb-card" id="historico" aria-labelledby="titulo-historico">
         <div className="sb-card__header">

@@ -12,7 +12,7 @@ import { formatarData } from "@/lib/analiseDados";
 import { useFetch } from "@/lib/cliente/hooks";
 import { agendaService, convenioService } from "@/lib/cliente/servicos";
 import type { SituacaoSessao } from "@/lib/cliente/tipos";
-import { hojeISO, somarDias } from "@/lib/datas";
+import { hojeISO } from "@/lib/datas";
 
 type Tom = "warning" | "success" | "neutro";
 const SITUACOES: { valor: SituacaoSessao; rotulo: string; badge: string; tom: Tom; sub: string }[] = [
@@ -28,7 +28,7 @@ const POR_VALOR = Object.fromEntries(SITUACOES.map((s) => [s.valor, s]));
 const ONDE_RESOLVER: [RegExp, string, boolean][] = [
   [/clínica/, "/unidades#clinica", true],
   [/Unidade sem CNES/, "/unidades#unidades", true],
-  [/TUSS/, "/procedimentos", true],
+  [/código para a operadora/, "/procedimentos", true],
   [/Profissional sem/, "/profissionais?filtro=incompletos", true],
   [/credenciado/, "/profissionais", true],
   [/código do prestador/, "/convenios", true],
@@ -41,10 +41,12 @@ const ondeResolver = (p: string) => {
 
 function AgendaPage({ url }: { url: URLSearchParams }) {
   const { usuario } = useSessao();
-  const [data, setData] = useState(url.get("data") ?? somarDias(hojeISO(), 1));
+  const [data, setData] = useState(url.get("data") ?? hojeISO());
   const [convenioId, setConvenioId] = useState(url.get("convenioId") ?? "");
   const [situacao, setSituacao] = useState<SituacaoSessao | "">((url.get("situacao") as SituacaoSessao) ?? "");
   const [busca, setBusca] = useState("");
+  // "" = todas; "sem" = sessões sem unidade de atendimento; senão, o id da unidade.
+  const [unidade, setUnidade] = useState(url.get("unidade") ?? "");
 
   const buscar = useCallback(() => agendaService.buscar({ data, convenioId: convenioId || undefined }), [data, convenioId]);
   const agenda = useFetch(buscar);
@@ -55,11 +57,17 @@ function AgendaPage({ url }: { url: URLSearchParams }) {
     return (agenda.data?.sessoes ?? []).filter(
       (s) =>
         (!situacao || s.situacao === situacao) &&
+        (!unidade || (unidade === "sem" ? !s.unidade : s.unidade?.id === unidade)) &&
         (!termo ||
           [s.paciente?.nome ?? s.pacienteAnclinic, s.profissional?.nome, s.carteirinha]
             .some((v) => v?.toLowerCase().includes(termo))),
     );
-  }, [agenda.data, situacao, busca]);
+  }, [agenda.data, situacao, unidade, busca]);
+  const unidades = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const s of agenda.data?.sessoes ?? []) if (s.unidade) m.set(s.unidade.id, s.unidade.nome);
+    return [...m].sort((a, b) => a[1].localeCompare(b[1]));
+  }, [agenda.data]);
 
   return (
     <>
@@ -126,7 +134,7 @@ function AgendaPage({ url }: { url: URLSearchParams }) {
               <section className="sb-card" aria-labelledby="titulo-pendencias">
                 <div className="sb-card__header">
                   <h2 className="sb-card__title" id="titulo-pendencias">
-                    O que falta para solicitar
+                    Pendências
                   </h2>
                 </div>
                 <div className="tabela-rolagem">
@@ -180,6 +188,15 @@ function AgendaPage({ url }: { url: URLSearchParams }) {
                       </option>
                     ))}
                   </select>
+                  <select className="sb-input sb-input--sm" value={unidade} onChange={(e) => setUnidade(e.target.value)} aria-label="Unidade de atendimento">
+                    <option value="">Todas as unidades</option>
+                    {unidades.map(([id, nome]) => (
+                      <option key={id} value={id}>
+                        {nome}
+                      </option>
+                    ))}
+                    <option value="sem">Sem unidade de atendimento ({agenda.data.semUnidade})</option>
+                  </select>
                 </div>
               </div>
               <div className="tabela-rolagem">
@@ -217,7 +234,7 @@ function AgendaPage({ url }: { url: URLSearchParams }) {
                             {s.procedimento && (
                               <span className="texto-suave mono">
                                 {s.procedimento.codigoAnclinic}
-                                {s.procedimento.codigoTuss && ` · TUSS ${s.procedimento.codigoTuss}`}
+                                {s.procedimento.codigoGuia && ` · guia ${s.procedimento.codigoGuia}`}
                               </span>
                             )}
                           </td>

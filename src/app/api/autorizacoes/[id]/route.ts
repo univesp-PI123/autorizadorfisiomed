@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { json, naoEncontrado, rota } from "@/lib/api/http";
 import { exigirSessao } from "@/lib/auth/sessao";
 import { deDate, hojeISO } from "@/lib/datas";
@@ -25,7 +26,17 @@ export const GET = rota<Params>(async (req, { params }) => {
     },
   });
   if (!autorizacao) naoEncontrado("Autorização");
-  return json(autorizacao);
+  // Plano terapêutico do paciente (pedido médico ativo mais recente com plano).
+  const plano = await prisma.pedidoMedico.findFirst({
+    where: { pacienteId: autorizacao.pacienteId, ativo: true, planoItens: { not: Prisma.AnyNull } },
+    orderBy: { dataPedido: "desc" },
+    select: {
+      id: true, medicoNome: true, conselho: true, numeroConselho: true, ufConselho: true, cid: true, dataPedido: true,
+      validoAte: true, sessoesSemanais: true, planoItens: true,
+      documentos: { select: { id: true, tipo: true, nomeOriginal: true, tamanho: true, origem: true, createdAt: true } },
+    },
+  });
+  return json({ ...autorizacao, plano });
 });
 
 // Edita os dados descritivos. Status tem rota própria (/status).

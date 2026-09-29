@@ -14,36 +14,53 @@ import { useSessao } from "@/contextos/SessaoContexto";
 import { formatarData, formatarMoeda } from "@/lib/analiseDados";
 import { mensagemDeErro } from "@/lib/cliente/api";
 import { useFetch, usePaginacao } from "@/lib/cliente/hooks";
-import { atendimentoService, autorizacaoService, pacienteService } from "@/lib/cliente/servicos";
-import type { Atendimento, Autorizacao } from "@/lib/cliente/tipos";
+import { atendimentoService, autorizacaoService, pacienteService, procedimentoService } from "@/lib/cliente/servicos";
+import type { Atendimento, Autorizacao, SituacaoAtendimento } from "@/lib/cliente/tipos";
 import { hojeISO } from "@/lib/datas";
+import { MOTIVOS_GLOSA, OUTROS } from "@/lib/glosa";
 
 const STATUS_COBRANCA = ["pendente", "faturado", "pago", "glosado", "cancelado"];
+
+const SITUACAO: Record<SituacaoAtendimento, { rotulo: string; tom: "warning" | "success" | "neutro" }> = {
+  aguardando_confirmacao: { rotulo: "Aguardando confirmação", tom: "warning" },
+  confirmado: { rotulo: "Confirmado", tom: "success" },
+  cancelado: { rotulo: "Cancelado", tom: "neutro" },
+};
+
+// Sessões de 1 hora, começando em hora cheia ou meia hora.
+const HORARIOS = Array.from({ length: 32 }, (_, i) => {
+  const minutos = 6 * 60 + i * 30; // 06:00 a 21:30
+  return `${String(Math.floor(minutos / 60)).padStart(2, "0")}:${minutos % 60 ? "30" : "00"}`;
+});
+const maisUmaHora = (h: string) => {
+  const [hh, mm] = h.split(":").map(Number);
+  return `${String((hh + 1) % 24).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
+};
 
 const formInicial = () => ({
   pacienteId: "",
   autorizacaoId: "",
-  procedimento: "",
+  procedimentoId: "",
   dataAtendimento: hojeISO(),
   horaInicio: "",
-  horaFim: "",
   valorCobrado: "",
-  evolucao: "",
 });
 
-type FormCobranca = { statusCobranca: string; valorCobrado: string; valorPago: string; motivoGlosa: string };
+type FormCobranca = { statusCobranca: string; valorCobrado: string; valorPago: string; motivoGlosa: string; outroMotivo: string };
 
 function AtendimentosPage({ url }: { url: URLSearchParams }) {
   const { usuario } = useSessao();
-  const podeRegistrar = usuario.perfil !== "financeiro";
+  const operador = usuario.perfil === "admin" || usuario.perfil === "recepcionista";
   const podeCobrar = usuario.perfil !== "terapeuta";
 
   const [filtroStatus, setFiltroStatus] = useState(url.get("statusCobranca") ?? "");
   const [filtroSemAut, setFiltroSemAut] = useState(url.get("semAutorizacao") ?? "");
-  const [modalAberto, setModalAberto] = useState(podeRegistrar && url.get("novo") === "1");
+  const [filtroSituacao, setFiltroSituacao] = useState(url.get("situacao") ?? "");
+  const [modalAberto, setModalAberto] = useState(operador && url.get("novo") === "1");
   const [form, setForm] = useState(formInicial);
   const [autsPaciente, setAutsPaciente] = useState<Autorizacao[]>([]);
   const [cobranca, setCobranca] = useState<{ atendimento: Atendimento; form: FormCobranca } | null>(null);
+  const [cancelando, setCancelando] = useState<{ atendimento: Atendimento; motivo: string } | null>(null);
   const [salvando, setSalvando] = useState(false);
   const { pagina, limite, setPagina, resetar } = usePaginacao(20);
 
@@ -54,8 +71,9 @@ function AtendimentosPage({ url }: { url: URLSearchParams }) {
         limit: limite,
         statusCobranca: filtroStatus || undefined,
         semAutorizacao: filtroSemAut || undefined,
+        situacao: filtroSituacao || undefined,
       }),
-    [pagina, limite, filtroStatus, filtroSemAut],
+    [pagina, limite, filtroStatus, filtroSemAut, filtroSituacao],
   );
   const { data, carregando, erro, recarregar } = useFetch(buscar);
   const atendimentos = data?.data ?? [];
@@ -65,9 +83,13 @@ function AtendimentosPage({ url }: { url: URLSearchParams }) {
     [modalAberto],
   );
   const { data: pacientes } = useFetch(buscarPacientes);
+  const buscarProcedimentos = useCallback(
+    () => (modalAberto ? procedimentoService.listar() : Promise.resolve(null)),
+    [modalAberto],
+  );
+  const { data: procedimentos } = useFetch(buscarProcedimentos);
 
-  const aoMudar = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
-    setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
+  const aoMudar = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
 
   // Ao escolher o paciente, carrega as autorizações vigentes dele.
   const aoMudarPaciente = async (e: ChangeEvent<HTMLSelectElement>) => {
@@ -90,55 +112,105 @@ function AtendimentosPage({ url }: { url: URLSearchParams }) {
     setAutsPaciente([]);
   };
 
-  const aoEnviar = async (e: FormEvent) => {
-    e.preventDefault();
+  const executar = async (acao: () => Promise<unknown>, sucesso: string, aoConcluir: () => void, erroPadrao: string) => {
     setSalvando(true);
     try {
-      await atendimentoService.criar(form);
-      toast.success(form.autorizacaoId ? "Atendimento registrado." : "Atendimento registrado sem autorização.");
-      fechar();
+      await acao();
+      toast.success(sucesso);
+      aoConcluir();
       recarregar();
     } catch (err) {
-      toast.error(mensagemDeErro(err, "Não foi possível registrar o atendimento."));
+      toast.error(mensagemDeErro(err, erroPadrao));
     } finally {
       setSalvando(false);
     }
   };
 
-  const abrirCobranca = (a: Atendimento) =>
+  const aoEnviar = (e: FormEvent) => {
+    e.preventDefault();
+    executar(
+      () => atendimentoService.criar(form),
+      form.autorizacaoId ? "Atendimento registrado." : "Atendimento registrado sem autorização.",
+      fechar,
+      "Não foi possível registrar o atendimento.",
+    );
+  };
+
+  const confirmar = (a: Atendimento) =>
+    executar(() => atendimentoService.confirmar(a.id), "Atendimento confirmado.", () => {}, "Não foi possível confirmar.");
+
+  const aoCancelar = (e: FormEvent) => {
+    e.preventDefault();
+    if (!cancelando) return;
+    if (cancelando.motivo.trim().length < 3) {
+      toast.error("Informe o motivo do cancelamento.");
+      return;
+    }
+    executar(
+      () => atendimentoService.cancelar(cancelando.atendimento.id, cancelando.motivo.trim()),
+      "Atendimento cancelado.",
+      () => setCancelando(null),
+      "Não foi possível cancelar.",
+    );
+  };
+
+  const abrirCobranca = (a: Atendimento) => {
+    const motivo = a.motivoGlosa ?? "";
+    const conhecido = (MOTIVOS_GLOSA as readonly string[]).includes(motivo);
     setCobranca({
       atendimento: a,
       form: {
         statusCobranca: a.statusCobranca,
         valorCobrado: a.valorCobrado ?? "",
         valorPago: a.valorPago ?? "",
-        motivoGlosa: a.motivoGlosa ?? "",
+        motivoGlosa: !motivo ? "" : conhecido ? motivo : OUTROS,
+        outroMotivo: conhecido ? "" : motivo,
       },
     });
+  };
 
-  const aoSalvarCobranca = async (e: FormEvent) => {
+  const aoSalvarCobranca = (e: FormEvent) => {
     e.preventDefault();
     if (!cobranca) return;
-    setSalvando(true);
-    try {
-      await atendimentoService.atualizar(cobranca.atendimento.id, cobranca.form);
-      toast.success("Cobrança atualizada.");
-      setCobranca(null);
-      recarregar();
-    } catch (err) {
-      toast.error(mensagemDeErro(err, "Não foi possível atualizar a cobrança."));
-    } finally {
-      setSalvando(false);
+    const { outroMotivo, motivoGlosa, ...resto } = cobranca.form;
+    const motivo = resto.statusCobranca === "glosado" ? (motivoGlosa === OUTROS ? outroMotivo.trim() : motivoGlosa) : "";
+    if (resto.statusCobranca === "glosado" && !motivo) {
+      toast.error("Informe o motivo da glosa.");
+      return;
     }
+    executar(
+      () => atendimentoService.atualizar(cobranca.atendimento.id, { ...resto, motivoGlosa: motivo }),
+      "Cobrança atualizada.",
+      () => setCobranca(null),
+      "Não foi possível atualizar a cobrança.",
+    );
   };
 
   const mudarCobranca = (campo: keyof FormCobranca, valor: string) =>
     setCobranca((c) => c && { ...c, form: { ...c.form, [campo]: valor } });
 
-  const colunas = podeCobrar ? 8 : 7;
+  const aguardando = data?.aguardandoConfirmacao ?? 0;
 
   return (
     <>
+      {aguardando > 0 && filtroSituacao !== "aguardando_confirmacao" && (
+        <div className="aviso aviso--atencao ferramentas">
+          <span>
+            <span className="mono">{aguardando}</span> atendimento(s) de sessões autorizadas aguardando confirmação.
+          </span>
+          <button
+            type="button"
+            className="sb-btn sb-btn--sm empurra"
+            onClick={() => {
+              setFiltroSituacao("aguardando_confirmacao");
+              resetar();
+            }}
+          >
+            Ver e confirmar
+          </button>
+        </div>
+      )}
+
       <section className="sb-card">
         <div className="sb-card__header">
           <h2 className="sb-card__title">
@@ -150,6 +222,22 @@ function AtendimentosPage({ url }: { url: URLSearchParams }) {
             )}
           </h2>
           <div className="ferramentas">
+            <select
+              className="sb-input sb-input--sm"
+              value={filtroSituacao}
+              onChange={(e) => {
+                setFiltroSituacao(e.target.value);
+                resetar();
+              }}
+              aria-label="Situação"
+            >
+              <option value="">Todas as situações</option>
+              {Object.entries(SITUACAO).map(([v, s]) => (
+                <option key={v} value={v}>
+                  {s.rotulo}
+                </option>
+              ))}
+            </select>
             <select
               className="sb-input sb-input--sm"
               value={filtroStatus}
@@ -179,7 +267,7 @@ function AtendimentosPage({ url }: { url: URLSearchParams }) {
               <option value="true">Sem autorização</option>
               <option value="false">Com autorização</option>
             </select>
-            {podeRegistrar && (
+            {operador && (
               <button type="button" className="sb-btn sb-btn--primary" onClick={() => setModalAberto(true)}>
                 <Icone nome="mais" />
                 Registrar atendimento
@@ -203,8 +291,8 @@ function AtendimentosPage({ url }: { url: URLSearchParams }) {
                     <th scope="col">Data</th>
                     <th scope="col">Paciente</th>
                     <th scope="col">Procedimento</th>
-                    <th scope="col">Terapeuta</th>
-                    <th scope="col">Autorização</th>
+                    <th scope="col">Profissional</th>
+                    <th scope="col">Situação</th>
                     <th scope="col">Cobrança</th>
                     <th scope="col" className="sb-end">
                       Valor
@@ -219,34 +307,70 @@ function AtendimentosPage({ url }: { url: URLSearchParams }) {
                 <tbody>
                   {atendimentos.length === 0 ? (
                     <tr>
-                      <td colSpan={colunas} className="vazio">
+                      <td colSpan={podeCobrar ? 8 : 7} className="vazio">
                         Nenhum atendimento encontrado.
                       </td>
                     </tr>
                   ) : (
                     atendimentos.map((a) => (
                       <tr key={a.id}>
-                        <td className="sb-mono">{formatarData(a.dataAtendimento)}</td>
+                        <td className="sb-mono" style={{ whiteSpace: "nowrap" }}>
+                          {formatarData(a.dataAtendimento)}
+                          {a.horaInicio && <span className="texto-suave">{a.horaInicio}{a.horaFim && `–${a.horaFim}`}</span>}
+                        </td>
                         <td className="sb-strong">
                           <Link href={`/pacientes/${a.pacienteId}`}>{a.paciente?.nome}</Link>
                         </td>
-                        <td>{a.procedimento}</td>
-                        <td>{a.terapeuta?.nome || "—"}</td>
-                        <td>{a.semAutorizacao ? <Badge tom="danger">Sem autorização</Badge> : <Badge tom="success">Autorizado</Badge>}</td>
+                        <td>
+                          {a.procedimento}
+                          {a.semAutorizacao && <span className="texto-suave">sem autorização</span>}
+                        </td>
+                        <td>{a.profissional?.nome ?? a.terapeuta?.nome ?? "—"}</td>
+                        <td>
+                          <Badge tom={SITUACAO[a.situacao].tom}>{SITUACAO[a.situacao].rotulo}</Badge>
+                          {a.motivoCancelamento && <span className="texto-suave">{a.motivoCancelamento}</span>}
+                        </td>
                         <td>
                           <StatusBadge status={a.statusCobranca} />
                         </td>
                         <td className="sb-mono sb-end">{a.valorCobrado ? formatarMoeda(a.valorCobrado) : "—"}</td>
                         {podeCobrar && (
                           <td className="sb-end">
-                            <button
-                              type="button"
-                              className="sb-btn sb-btn--sm"
-                              onClick={() => abrirCobranca(a)}
-                              aria-label={`Cobrança de ${a.paciente?.nome} em ${formatarData(a.dataAtendimento)}`}
-                            >
-                              Cobrança
-                            </button>
+                            {a.situacao === "aguardando_confirmacao" ? (
+                              operador && (
+                                <span className="acoes-linha">
+                                  <button
+                                    type="button"
+                                    className="sb-btn sb-btn--sm sb-btn--primary"
+                                    onClick={() => confirmar(a)}
+                                    disabled={salvando}
+                                    aria-label={`Confirmar atendimento de ${a.paciente?.nome} em ${formatarData(a.dataAtendimento)}`}
+                                  >
+                                    Confirmar
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="sb-btn sb-btn--sm"
+                                    onClick={() => setCancelando({ atendimento: a, motivo: "" })}
+                                    disabled={salvando}
+                                    aria-label={`Cancelar atendimento de ${a.paciente?.nome} em ${formatarData(a.dataAtendimento)}`}
+                                  >
+                                    Cancelar
+                                  </button>
+                                </span>
+                              )
+                            ) : (
+                              a.situacao === "confirmado" && (
+                                <button
+                                  type="button"
+                                  className="sb-btn sb-btn--sm"
+                                  onClick={() => abrirCobranca(a)}
+                                  aria-label={`Cobrança de ${a.paciente?.nome} em ${formatarData(a.dataAtendimento)}`}
+                                >
+                                  Cobrança
+                                </button>
+                              )
+                            )}
                           </td>
                         )}
                       </tr>
@@ -255,12 +379,7 @@ function AtendimentosPage({ url }: { url: URLSearchParams }) {
                 </tbody>
               </table>
             </div>
-            <Paginacao
-              pagina={pagina}
-              totalPaginas={data?.pagination.totalPages ?? 0}
-              total={data?.pagination.total}
-              onPagina={setPagina}
-            />
+            <Paginacao pagina={pagina} totalPaginas={data?.pagination.totalPages ?? 0} total={data?.pagination.total} onPagina={setPagina} />
           </>
         )}
       </section>
@@ -296,18 +415,11 @@ function AtendimentosPage({ url }: { url: URLSearchParams }) {
                 ))}
               </select>
             </div>
-            <div className={`sb-field ${form.pacienteId && !form.autorizacaoId ? "sb-field--error" : ""}`}>
+            <div className="sb-field">
               <label className="sb-label" htmlFor="at-autorizacao">
                 Autorização
               </label>
-              <select
-                id="at-autorizacao"
-                name="autorizacaoId"
-                className="sb-input"
-                value={form.autorizacaoId}
-                onChange={aoMudar}
-                aria-describedby="at-autorizacao-ajuda"
-              >
+              <select id="at-autorizacao" name="autorizacaoId" className="sb-input" value={form.autorizacaoId} onChange={aoMudar} aria-describedby="at-autorizacao-ajuda">
                 <option value="">Sem autorização vinculada</option>
                 {autsPaciente.map((a) => (
                   <option key={a.id} value={a.id}>
@@ -320,16 +432,23 @@ function AtendimentosPage({ url }: { url: URLSearchParams }) {
                   ? "Escolha o paciente para ver as autorizações vigentes."
                   : form.autorizacaoId
                     ? "Consome uma sessão desta autorização."
-                    : autsPaciente.length === 0
-                      ? "Este paciente não tem autorização vigente: o atendimento ficará sem cobertura."
-                      : "Sem autorização vinculada, o atendimento ficará sem cobertura."}
+                    : "Sem autorização vinculada, o atendimento ficará sem cobertura."}
               </span>
             </div>
             <div className="sb-field inteira">
               <label className="sb-label" htmlFor="at-procedimento">
                 Procedimento<span className="obrigatorio" aria-hidden="true">*</span>
               </label>
-              <input id="at-procedimento" name="procedimento" className="sb-input" value={form.procedimento} onChange={aoMudar} required />
+              <select id="at-procedimento" name="procedimentoId" className="sb-input" value={form.procedimentoId} onChange={aoMudar} required>
+                <option value="">Selecione…</option>
+                {(procedimentos ?? [])
+                  .filter((p) => p.ativo)
+                  .map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.codigoAnclinic} — {p.descricao}
+                    </option>
+                  ))}
+              </select>
             </div>
             <div className="sb-field">
               <label className="sb-label" htmlFor="at-data">
@@ -338,31 +457,71 @@ function AtendimentosPage({ url }: { url: URLSearchParams }) {
               <input id="at-data" name="dataAtendimento" type="date" className="sb-input" value={form.dataAtendimento} onChange={aoMudar} required />
             </div>
             <div className="sb-field">
+              <label className="sb-label" htmlFor="at-inicio">
+                Início
+              </label>
+              <select id="at-inicio" name="horaInicio" className="sb-input mono" value={form.horaInicio} onChange={aoMudar} aria-describedby="at-inicio-ajuda">
+                <option value="">—</option>
+                {HORARIOS.map((h) => (
+                  <option key={h} value={h}>
+                    {h}
+                  </option>
+                ))}
+              </select>
+              <span id="at-inicio-ajuda" className="sb-help">
+                {form.horaInicio ? `Sessão de 1 hora: termina às ${maisUmaHora(form.horaInicio)}.` : "Sessão de 1 hora."}
+              </span>
+            </div>
+            <div className="sb-field">
               <label className="sb-label" htmlFor="at-valor">
                 Valor cobrado (R$)
               </label>
               <input id="at-valor" name="valorCobrado" type="number" min="0" step="0.01" className="sb-input" placeholder="0,00" value={form.valorCobrado} onChange={aoMudar} />
             </div>
-            <div className="sb-field">
-              <label className="sb-label" htmlFor="at-inicio">
-                Início
-              </label>
-              <input id="at-inicio" name="horaInicio" type="time" className="sb-input" value={form.horaInicio} onChange={aoMudar} />
-            </div>
-            <div className="sb-field">
-              <label className="sb-label" htmlFor="at-fim">
-                Fim
-              </label>
-              <input id="at-fim" name="horaFim" type="time" className="sb-input" value={form.horaFim} onChange={aoMudar} />
-            </div>
-            <div className="sb-field inteira">
-              <label className="sb-label" htmlFor="at-evolucao">
-                Evolução
-              </label>
-              <textarea id="at-evolucao" name="evolucao" className="sb-input" rows={3} value={form.evolucao} onChange={aoMudar} />
-            </div>
           </div>
         </form>
+      </Modal>
+
+      <Modal
+        aberto={cancelando !== null}
+        onFechar={() => setCancelando(null)}
+        titulo="Cancelar atendimento"
+        rodape={
+          <>
+            <button type="button" className="sb-btn" onClick={() => setCancelando(null)}>
+              Voltar
+            </button>
+            <button type="submit" className="sb-btn sb-btn--primary" form="form-cancelar" disabled={salvando}>
+              {salvando ? "Salvando…" : "Cancelar atendimento"}
+            </button>
+          </>
+        }
+      >
+        {cancelando && (
+          <form id="form-cancelar" onSubmit={aoCancelar} noValidate className="pilha">
+            <p className="texto-apoio">
+              {cancelando.atendimento.paciente?.nome} · {cancelando.atendimento.procedimento} ·{" "}
+              <span className="mono">{formatarData(cancelando.atendimento.dataAtendimento)}</span>
+            </p>
+            <div className="sb-field">
+              <label className="sb-label" htmlFor="cancel-motivo">
+                Motivo<span className="obrigatorio" aria-hidden="true">*</span>
+              </label>
+              <textarea
+                id="cancel-motivo"
+                className="sb-input"
+                rows={3}
+                value={cancelando.motivo}
+                onChange={(e) => setCancelando((c) => c && { ...c, motivo: e.target.value })}
+                required
+                aria-describedby="cancel-motivo-ajuda"
+              />
+              <span id="cancel-motivo-ajuda" className="sb-help">
+                A sessão não é descontada da autorização.
+              </span>
+            </div>
+          </form>
+        )}
       </Modal>
 
       <Modal
@@ -414,9 +573,25 @@ function AtendimentosPage({ url }: { url: URLSearchParams }) {
               {cobranca.form.statusCobranca === "glosado" && (
                 <div className="sb-field inteira">
                   <label className="sb-label" htmlFor="cob-motivo">
-                    Motivo da glosa
+                    Motivo da glosa<span className="obrigatorio" aria-hidden="true">*</span>
                   </label>
-                  <textarea id="cob-motivo" className="sb-input" rows={2} value={cobranca.form.motivoGlosa} onChange={(e) => mudarCobranca("motivoGlosa", e.target.value)} />
+                  <select id="cob-motivo" className="sb-input" value={cobranca.form.motivoGlosa} onChange={(e) => mudarCobranca("motivoGlosa", e.target.value)} required>
+                    <option value="">Selecione…</option>
+                    {MOTIVOS_GLOSA.map((m) => (
+                      <option key={m} value={m}>
+                        {m}
+                      </option>
+                    ))}
+                    <option value={OUTROS}>{OUTROS}</option>
+                  </select>
+                </div>
+              )}
+              {cobranca.form.statusCobranca === "glosado" && cobranca.form.motivoGlosa === OUTROS && (
+                <div className="sb-field inteira">
+                  <label className="sb-label" htmlFor="cob-outro">
+                    Qual o motivo?<span className="obrigatorio" aria-hidden="true">*</span>
+                  </label>
+                  <textarea id="cob-outro" className="sb-input" rows={2} value={cobranca.form.outroMotivo} onChange={(e) => mudarCobranca("outroMotivo", e.target.value)} required />
                 </div>
               )}
             </div>

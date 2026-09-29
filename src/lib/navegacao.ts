@@ -59,9 +59,10 @@ export const ITENS_MENU: ItemMenu[] = [
     icone: "agenda",
     perfis: ["admin", "recepcionista", "financeiro"],
     subitens: [
-      { rotulo: "Sessões de amanhã", href: "/agenda" },
+      { rotulo: "Sessões", href: "/agenda" },
       { rotulo: "Com pendência", href: "/agenda?situacao=pendente" },
       { rotulo: "Prontas para solicitar", href: "/agenda?situacao=pronta" },
+      { rotulo: "Sem unidade de atendimento", href: "/agenda?unidade=sem" },
       { rotulo: "Importar agenda", href: "/importacoes", perfis: ["admin", "recepcionista"] },
     ],
   },
@@ -73,9 +74,10 @@ export const ITENS_MENU: ItemMenu[] = [
     perfis: TODOS,
     subitens: [
       { rotulo: "Todos", href: "/atendimentos" },
+      { rotulo: "Aguardando confirmação", href: "/atendimentos?situacao=aguardando_confirmacao" },
       { rotulo: "Sem autorização", href: "/atendimentos?semAutorizacao=true" },
       { rotulo: "Glosados", href: "/atendimentos?statusCobranca=glosado" },
-      { rotulo: "Registrar atendimento", href: "/atendimentos?novo=1", perfis: ["admin", "recepcionista", "terapeuta"] },
+      { rotulo: "Registrar atendimento", href: "/atendimentos?novo=1", perfis: ["admin", "recepcionista"] },
     ],
   },
   {
@@ -118,7 +120,7 @@ export const ITENS_MENU: ItemMenu[] = [
     grupo: "Cadastros",
     icone: "procedimentos",
     perfis: ["admin", "recepcionista", "financeiro"],
-    subitens: [{ rotulo: "Códigos TUSS", href: "/procedimentos" }],
+    subitens: [{ rotulo: "Equivalências e tabelas", href: "/procedimentos" }],
   },
   {
     caminho: "/unidades",
@@ -140,6 +142,7 @@ export const ITENS_MENU: ItemMenu[] = [
     subitens: [
       { rotulo: "Importar agenda", href: "/importacoes#importar-agenda", perfis: ["admin", "recepcionista"] },
       { rotulo: "Importar profissionais", href: "/importacoes#importar-profissionais", perfis: ["admin", "recepcionista"] },
+      { rotulo: "Enviar documentos", href: "/importacoes#importar-documentos", perfis: ["admin", "recepcionista"] },
       { rotulo: "Histórico", href: "/importacoes#historico" },
     ],
   },
