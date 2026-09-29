@@ -21,9 +21,12 @@ mesmo servidor na **AWS (EC2)**. Não usamos Neon nem Vercel.
 - **Autorizações** — ciclo completo com histórico:
   `pendente → em análise → autorizada/negada`, e `vencida`/`esgotada`
   aplicados automaticamente pelo sistema.
-- **Atendimentos** — cada sessão consome a autorização do paciente (dentro da
-  vigência e do saldo); sessões sem autorização ficam marcadas. Registro de
-  cobrança: faturado, pago ou glosado.
+- **Atendimentos** — gerados a partir da agenda: sessão realizada e coberta
+  por autorização vira atendimento *aguardando confirmação*, com o valor do
+  faturamento do AnClinic; o operador confirma (desconta a sessão da
+  autorização) ou cancela, com motivo. Registro manual só pelo operador, em
+  sessões de 1 hora (início em hora cheia ou meia hora). Cobrança: faturado,
+  pago ou glosado, com motivo da glosa em lista.
 - **Alertas** — autorizações vencendo em 7 dias, no topo da tela.
 - **Relatórios** — evolução mensal, autorizações por convênio, glosas;
   exportação CSV/JSON.
@@ -33,8 +36,9 @@ mesmo servidor na **AWS (EC2)**. Não usamos Neon nem Vercel.
   autorização (veja abaixo).
 - **Clínica, unidades, profissionais e procedimentos** — os dados que a guia
   TISS exige (CNES, conselho e CBO, código TUSS).
-- **Pedidos médicos** — médico solicitante, CID e os PDFs do pedido, na
-  página do paciente.
+- **Pedidos médicos e plano terapêutico** — médico solicitante, CID, sessões
+  por semana e os PDFs, na página do paciente; envio em lote com vínculo
+  automático ao paciente.
 
 ## Integração AnClinic → Amil (em construção)
 
@@ -51,11 +55,15 @@ Rotina:
    ligados a um convênio do sistema e os avisos, com as linhas da planilha.
    Importar o mesmo dia de novo atualiza; sessões que sumiram da agenda ficam
    como excluídas.
-2. **Agenda:** cada sessão aparece como *com pendência* (e o que falta),
-   *pronta para solicitar*, *coberta* (autorização vigente com saldo ou senha
-   no AnClinic), *fora da integração* (outros convênios, ou faturamento por
-   "Assinatura") ou *cancelada*. "O que falta para solicitar" agrupa as
-   pendências e leva à tela onde se resolve cada uma.
+2. **Agenda** (abre no dia de hoje): cada sessão aparece como *com
+   pendência* (e o que falta), *pronta para solicitar*, *coberta* (autorização
+   vigente com saldo ou senha no AnClinic), *fora da integração* (outros
+   convênios, ou faturamento por "Assinatura") ou *cancelada*. "Pendências"
+   agrupa o que falta e leva à tela onde se resolve cada item; o filtro "Sem
+   unidade de atendimento" acha as sessões que precisam ser corrigidas no
+   AnClinic.
+3. **Atendimentos → Aguardando confirmação:** depois que a autorização sai,
+   as sessões realizadas aparecem para o operador confirmar ou cancelar.
 
 Preparação (uma vez):
 
@@ -67,14 +75,58 @@ Preparação (uma vez):
   CBO é sugerido pela especialidade; confira em **Profissionais**.
 - **Clínica e unidades:** razão social, CNPJ e o CNES de cada unidade (as
   unidades são criadas pela importação da agenda).
-- **Procedimentos:** o código TUSS de cada procedimento do AnClinic (4440,
-  4415…), o mesmo usado hoje no portal da Amil.
-- **Pacientes → Pedidos médicos:** médico solicitante (CRM/UF), CID, validade
-  e os PDFs (até 5, 10 MB cada).
+- **Procedimentos:** o de/para de cada procedimento do AnClinic (4440,
+  4415…) para o código da operadora e o código TUSS (tabela 22) — veja
+  abaixo.
+- **Documentos:** planos terapêuticos e pedidos médicos — veja abaixo.
 
-Os PDFs ficam em disco, fora da pasta pública, em `ARQUIVOS_DIR` (padrão:
-`dados/arquivos` dentro do projeto) e só são abertos com login. Entram no
-backup (passo 9).
+### Procedimentos: AnClinic → operadora → TUSS
+
+Três tabelas, na tela **Procedimentos**:
+
+- **Equivalências:** cada procedimento do AnClinic, o equivalente na tabela
+  da operadora escolhida e o código TUSS. "Na guia" é o código que vai na
+  solicitação: o da operadora, ou o TUSS quando não há equivalente.
+- **Tabela da operadora:** importada por planilha (`.xlsx` ou `.csv` com `;`)
+  com as colunas `Código AnClinic` (opcional — faz o de/para), `Código
+  Operadora`, `Descrição Operadora`, `Código TUSS`, `Tabela` e `Valor`. Há um
+  modelo para baixar na tela. Reimportar atualiza pelo código da operadora;
+  cada operadora tem a sua tabela.
+- **TUSS (tabela 22):** a planilha publicada pela ANS (colunas `Código do
+  Termo` e `Termo`), usada para mostrar o nome de cada código.
+
+### Documentos: planos terapêuticos e pedidos médicos
+
+Onde ficam: os dados do pedido médico (médico, CRM, CID, data, validade e as
+sessões por semana do plano) na tabela `pedidos_medicos`; cada PDF na tabela
+`documentos` (tipo, paciente, pedido, tamanho e hash SHA-256 — o mesmo
+arquivo não entra duas vezes para o mesmo paciente) e o arquivo em disco, em
+`ARQUIVOS_DIR/documentos/AAAA-MM/`. `ARQUIVOS_DIR` é, por padrão,
+`dados/arquivos` dentro do projeto; fica fora da pasta pública, os PDFs só
+abrem com login, e a pasta entra no backup (passo 9).
+
+**Envio em lote** (Importações → Documentos): selecione os PDFs ou uma pasta
+inteira. O paciente é achado:
+
+1. pelo **CPF** no nome do arquivo (`123.456.789-09_pedido.pdf` ou
+   `12345678909 pedido.pdf`);
+2. senão, pelo **número da carteirinha** no nome do arquivo;
+3. no plano terapêutico, senão, pelo **nome e data de nascimento** escritos no
+   PDF (aceita nome abreviado no AnClinic: mesmo primeiro nome e dois nomes em
+   comum).
+
+O **plano terapêutico da Amil** (formulário de terapias para TGD, gerado pelo
+Word) é lido: médico prescritor, CRM, CID, data da solicitação e as sessões de
+cada especialidade por dia da semana. Ele cria o pedido médico do paciente (a
+UF do CRM não está no formulário: fica SP, com aviso para conferir). Os
+demais PDFs entram no pedido ativo mais recente; sem pedido, ficam como
+"documentos sem pedido" na página do paciente, onde podem ser ligados depois.
+Arquivo sem paciente não é gravado: o relatório diz o motivo.
+
+O plano aparece na tela da autorização (com a linha do procedimento em
+destaque) e preenche a nova autorização: busca pelo CPF → convênio,
+procedimento e código da guia vindos da agenda, e a quantidade = sessões por
+semana do plano × 4 semanas.
 
 ## Visual (design system Sóbrio)
 
@@ -144,15 +196,15 @@ não existe um login único entre ambientes; cada um autentica separadamente.)
 | Convênios (ver)                     | ✅ | ✅ |    | ✅ |
 | Convênios (criar/editar)            | ✅ |    |    | ✅ |
 | Autorizações                        | ✅ | ✅ |    | ✅ |
-| Atendimentos (registrar)            | ✅ | ✅ | ✅ |    |
+| Atendimentos (registrar, confirmar ou cancelar) | ✅ | ✅ |    |    |
 | Atendimentos (ver)                  | ✅ | ✅ | ✅ | ✅ |
 | Atendimentos (cobrança/glosa)       | ✅ | ✅ |    | ✅ |
 | Relatórios                          | ✅ |    |    | ✅ |
 | Agenda, histórico de importações, cadastros da integração (ver) | ✅ | ✅ |    | ✅ |
 | Importar planilhas; editar profissionais e procedimentos | ✅ | ✅ |    |    |
 | Dados da clínica e unidades (editar) | ✅ |    |    |    |
-| Pedidos médicos (ver)               | ✅ | ✅ | ✅ |    |
-| Pedidos médicos (cadastrar)         | ✅ | ✅ |    |    |
+| Pedidos médicos e documentos (ver)  | ✅ | ✅ | ✅ |    |
+| Pedidos médicos e documentos (enviar) | ✅ | ✅ |    |    |
 | Gestão de usuários                  | ✅ |    |    |    |
 
 As permissões são verificadas na API, não só escondidas na tela.
@@ -398,6 +450,12 @@ npx prisma migrate deploy
 npm run build
 pm2 restart sga
 ```
+
+> **Atualizando para a versão com documentos em lote e atendimentos
+> automáticos:** o `migrate deploy` cria as tabelas de documentos e de
+> procedimentos da operadora e passa os PDFs já anexados aos pedidos médicos
+> para a tabela nova (os arquivos em disco não mudam de lugar). Os
+> atendimentos existentes ficam como confirmados.
 
 > **Atualizando para a versão com importação do AnClinic:** o `migrate deploy`
 > cria as tabelas novas (nada é apagado). Ajuste também o Nginx para aceitar

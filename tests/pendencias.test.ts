@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { codigoParaGuia, codigosAceitos } from "@/lib/regras/codigoGuia";
 import { analisarSessao, type ContextoAnalise, type SessaoParaAnalise } from "@/lib/regras/pendencias";
 
 const AMIL = "conv-amil";
@@ -13,7 +14,7 @@ const sessao = (p: Partial<SessaoParaAnalise> = {}): SessaoParaAnalise => ({
   convenioAnclinic: "Amil",
   pacienteId: "pac-1",
   convenio: { id: AMIL, integracao: "tiss_amil", codigoPrestador: "12493066" },
-  procedimento: { codigoTuss: "50000470" },
+  procedimento: { codigoGuia: "50000470", codigosAceitos: ["50000470"] },
   profissional: { conselho: "CRP", numeroConselho: "123", ufConselho: "SP", cbo: "251510", convenioIds: [AMIL] },
   unidade: { cnes: "4160088" },
   ...p,
@@ -54,7 +55,7 @@ describe("analisarSessao", () => {
   it("lista o que falta", () => {
     const r = analisarSessao(
       sessao({
-        procedimento: { codigoTuss: null },
+        procedimento: { codigoGuia: null, codigosAceitos: [] },
         profissional: { conselho: null, numeroConselho: null, ufConselho: null, cbo: null, convenioIds: [] },
         unidade: { cnes: null },
       }),
@@ -64,7 +65,7 @@ describe("analisarSessao", () => {
     expect(r.pendencias).toEqual([
       "Dados da clínica não cadastrados",
       "Unidade sem CNES",
-      "Procedimento sem código TUSS",
+      "Procedimento sem código para a operadora",
       "Profissional sem conselho/número/UF",
       "Profissional sem CBO",
       "Profissional não credenciado no convênio",
@@ -81,5 +82,35 @@ describe("analisarSessao", () => {
       .toEqual(["Sem pedido médico válido"]);
     expect(analisarSessao(sessao(), ctx({ pedidos: [{ convenioId: AMIL, dataPedido: "2026-09-01", validoAte: null, arquivos: 0 }] })).pendencias)
       .toEqual(["Pedido médico sem PDF anexado"]);
+  });
+});
+
+describe("codigoParaGuia", () => {
+  const proc = {
+    codigoTuss: "50000470",
+    tabelaTuss: "22",
+    equivalencias: [{ convenioId: "amil", codigo: "9001", tabela: "98", codigoTuss: "50000470" }],
+  };
+  it("usa o de/para da operadora quando existe", () => {
+    expect(codigoParaGuia(proc, "amil")).toEqual({ codigo: "9001", tabela: "98", origem: "operadora" });
+    expect(codigosAceitos(proc, "amil")).toEqual(["9001", "50000470"]);
+  });
+  it("sem de/para, usa o TUSS do procedimento", () => {
+    expect(codigoParaGuia(proc, "outro")).toEqual({ codigo: "50000470", tabela: "22", origem: "tuss" });
+    expect(codigoParaGuia({ codigoTuss: null, tabelaTuss: null }, "amil")).toBeNull();
+  });
+});
+
+describe("cobertura por autorização registrada no sistema", () => {
+  const aut = { id: "aut-1", convenioId: AMIL, codigoProcedimento: null, status: "autorizada", dataInicioVigencia: "2026-09-01", dataFimVigencia: "2026-09-30", saldo: 5 };
+  it("vale também para convênio sem envio automático, e diz qual autorização", () => {
+    const manual = sessao({ convenio: { id: AMIL, integracao: "manual", codigoPrestador: null } });
+    const r = analisarSessao(manual, ctx({ autorizacoes: [{ ...aut, codigoProcedimento: "50000470" }] }));
+    expect(r).toMatchObject({ situacao: "coberta", autorizacaoId: "aut-1" });
+  });
+  it("autorização sem código casa pelo nome do procedimento", () => {
+    const s = sessao({ procedimento: { codigoGuia: null, codigosAceitos: [], descricao: "PSICOLOGIA ABA" } });
+    expect(analisarSessao(s, ctx({ autorizacoes: [{ ...aut, procedimento: "Sessão de Psicologia ABA" }] })).situacao).toBe("coberta");
+    expect(analisarSessao(s, ctx({ autorizacoes: [{ ...aut, procedimento: "Fonoaudiologia ABA" }] })).situacao).not.toBe("coberta");
   });
 });

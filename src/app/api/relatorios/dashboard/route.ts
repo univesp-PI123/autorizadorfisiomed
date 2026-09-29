@@ -29,10 +29,11 @@ export const GET = rota(async (req) => {
         dataFimVigencia: { gte: paraDate(hoje), lte: paraDate(somarDias(hoje, 7)) },
       },
     }),
-    prisma.atendimento.count({ where: { dataAtendimento: { gte: inicioMes } } }),
+    // Só os atendimentos confirmados contam (pendentes de confirmação e cancelados, não).
+    prisma.atendimento.count({ where: { dataAtendimento: { gte: inicioMes }, situacao: "confirmado" } }),
     prisma.atendimento.count({ where: { statusCobranca: "glosado" } }),
     prisma.atendimento.count({
-      where: { semAutorizacao: true, dataAtendimento: { gte: inicioMes } },
+      where: { semAutorizacao: true, dataAtendimento: { gte: inicioMes }, situacao: "confirmado" },
     }),
     prisma.atendimento.aggregate({
       where: { statusCobranca: "glosado" },

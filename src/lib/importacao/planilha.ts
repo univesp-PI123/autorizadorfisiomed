@@ -9,14 +9,66 @@ export type Linha = Celula[];
 
 export class ErroPlanilha extends Error {}
 
-export async function lerPlanilha(conteudo: Buffer): Promise<Linha[]> {
-  const { readSheet } = await import("read-excel-file/node");
-  try {
-    return (await readSheet(conteudo)) as Linha[];
-  } catch {
-    throw new ErroPlanilha("Não foi possível ler o arquivo. Envie a planilha .xlsx exportada do AnClinic.");
+/** CSV do Excel brasileiro: separador ";" (ou ","), aspas duplas, UTF-8 ou Latin-1. */
+export function lerCsv(conteudo: Buffer): Linha[] {
+  let texto = conteudo.toString("utf8");
+  if (texto.includes("\uFFFD")) texto = conteudo.toString("latin1");
+  texto = texto.replace(/^\uFEFF/, "");
+  const primeira = texto.split(/\r?\n/, 1)[0] ?? "";
+  const sep = (primeira.match(/;/g)?.length ?? 0) >= (primeira.match(/,/g)?.length ?? 0) ? ";" : ",";
+  const linhas: Linha[] = [];
+  let linha: string[] = [];
+  let campo = "";
+  let aspas = false;
+  for (let i = 0; i < texto.length; i++) {
+    const c = texto[i];
+    if (aspas) {
+      if (c === '"' && texto[i + 1] === '"') {
+        campo += '"';
+        i++;
+      } else if (c === '"') aspas = false;
+      else campo += c;
+    } else if (c === '"') aspas = true;
+    else if (c === sep) {
+      linha.push(campo);
+      campo = "";
+    } else if (c === "\n" || c === "\r") {
+      if (c === "\r" && texto[i + 1] === "\n") i++;
+      linha.push(campo);
+      linhas.push(linha.map((v) => (v === "" ? null : v)));
+      linha = [];
+      campo = "";
+    } else campo += c;
   }
+  if (campo !== "" || linha.length) {
+    linha.push(campo);
+    linhas.push(linha.map((v) => (v === "" ? null : v)));
+  }
+  return linhas;
 }
+
+/**
+ * Como acharCabecalho, mas cada coluna aceita vários nomes (planilhas de
+ * operadoras e da ANS não usam sempre o mesmo título).
+ */
+export function acharColunas<C extends string>(linhas: Linha[], nomes: Record<C, string[]>, obrigatorias: readonly C[], ate = 30) {
+  const norm = (lista: string[]) => lista.map((n) => normalizarTitulo(n));
+  const indice = linhas.slice(0, ate).findIndex((l) => {
+    const titulos = l.map(normalizarTitulo);
+    return obrigatorias.every((c) => norm(nomes[c]).some((n) => titulos.includes(n)));
+  });
+  if (indice < 0) {
+    throw new ErroPlanilha(
+      `Colunas obrigatórias não encontradas: ${obrigatorias.map((c) => nomes[c][0]).join(", ")}. Baixe o modelo e confira os títulos.`,
+    );
+  }
+  const titulos = linhas[indice].map(normalizarTitulo);
+  const posicao = Object.fromEntries(
+    (Object.keys(nomes) as C[]).map((c) => [c, norm(nomes[c]).map((n) => titulos.indexOf(n)).find((i) => i >= 0) ?? -1]),
+  ) as Record<C, number>;
+  return { indice, posicao };
+}
+
 
 const normalizarTitulo = (v: Celula) =>
   texto(v)

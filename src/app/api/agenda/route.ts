@@ -1,110 +1,26 @@
 import { ErroHttp, json, rota } from "@/lib/api/http";
+import { analisarAgendamentos } from "@/lib/agenda";
 import { exigirSessao } from "@/lib/auth/sessao";
-import { deDate, ehDataISO, hojeISO, paraDate, somarDias } from "@/lib/datas";
-import { prisma } from "@/lib/prisma";
-import { analisarSessao, type ContextoAnalise, type SituacaoSessao } from "@/lib/regras/pendencias";
+import { deDate, ehDataISO, hojeISO, paraDate } from "@/lib/datas";
+import type { SituacaoSessao } from "@/lib/regras/pendencias";
 
 const SITUACOES: SituacaoSessao[] = ["pendente", "pronta", "coberta", "fora", "cancelada"];
 
-// Sessões de um dia com a situação de cada uma em relação à autorização.
-// Sem data, mostra amanhã (a rotina é solicitar na véspera).
+// Sessões de um dia (padrão: hoje) com a situação de cada uma em relação à
+// autorização.
 export const GET = rota(async (req) => {
   await exigirSessao(req, ["admin", "recepcionista", "financeiro"]);
   const sp = req.nextUrl.searchParams;
-  const data = sp.get("data") || somarDias(hojeISO(), 1);
+  const data = sp.get("data") || hojeISO();
   if (!ehDataISO(data)) throw new ErroHttp(422, "Data inválida.");
   const convenioId = sp.get("convenioId") || undefined;
   const situacao = sp.get("situacao") as SituacaoSessao | null;
 
-  const agendamentos = await prisma.agendamento.findMany({
-    where: { data: paraDate(data), ...(convenioId && { convenioId }) },
-    orderBy: [{ horaInicio: "asc" }, { pacienteAnclinic: "asc" }],
-    include: {
-      paciente: { select: { id: true, nome: true } },
-      convenio: { select: { id: true, nome: true, integracao: true, codigoPrestador: true } },
-      procedimento: { select: { id: true, codigoAnclinic: true, descricao: true, codigoTuss: true } },
-      profissional: {
-        select: {
-          id: true, nome: true, conselho: true, numeroConselho: true, ufConselho: true, cbo: true,
-          credenciamentos: { select: { convenioId: true } },
-        },
-      },
-      unidade: { select: { id: true, nome: true, cnes: true } },
-    },
-  });
-
-  const pacienteIds = [...new Set(agendamentos.map((a) => a.pacienteId).filter((id): id is string => !!id))];
-  const [clinica, pedidos, autorizacoes] = await Promise.all([
-    prisma.clinica.findFirst({ select: { id: true } }),
-    prisma.pedidoMedico.findMany({
-      where: { pacienteId: { in: pacienteIds }, ativo: true },
-      select: { pacienteId: true, convenioId: true, dataPedido: true, validoAte: true, _count: { select: { arquivos: true } } },
-    }),
-    prisma.autorizacao.findMany({
-      where: { pacienteId: { in: pacienteIds }, status: "autorizada" },
-      select: {
-        pacienteId: true, convenioId: true, codigoProcedimento: true, status: true, dataInicioVigencia: true,
-        dataFimVigencia: true, quantidadeAutorizada: true, quantidadeUtilizada: true,
-      },
-    }),
-  ]);
-
-  const contextoPorPaciente = new Map<string, ContextoAnalise>();
-  const contexto = (pacienteId: string | null): ContextoAnalise => {
-    const vazio = { clinicaCadastrada: !!clinica, pedidos: [], autorizacoes: [] };
-    if (!pacienteId) return vazio;
-    let c = contextoPorPaciente.get(pacienteId);
-    if (!c) {
-      c = {
-        clinicaCadastrada: !!clinica,
-        pedidos: pedidos
-          .filter((p) => p.pacienteId === pacienteId)
-          .map((p) => ({
-            convenioId: p.convenioId,
-            dataPedido: deDate(p.dataPedido),
-            validoAte: p.validoAte && deDate(p.validoAte),
-            arquivos: p._count.arquivos,
-          })),
-        autorizacoes: autorizacoes
-          .filter((a) => a.pacienteId === pacienteId)
-          .map((a) => ({
-            convenioId: a.convenioId,
-            codigoProcedimento: a.codigoProcedimento,
-            status: a.status,
-            dataInicioVigencia: a.dataInicioVigencia && deDate(a.dataInicioVigencia),
-            dataFimVigencia: a.dataFimVigencia && deDate(a.dataFimVigencia),
-            saldo: a.quantidadeAutorizada === null ? null : a.quantidadeAutorizada - a.quantidadeUtilizada,
-          })),
-      };
-      contextoPorPaciente.set(pacienteId, c);
-    }
-    return c;
-  };
-
-  const analisadas = agendamentos.map((a) => {
-    const analise = analisarSessao(
-      {
-        data,
-        statusAnclinic: a.statusAnclinic,
-        statusFaturamento: a.statusFaturamento,
-        senhaAutorizacao: a.senhaAutorizacao,
-        removidoEm: a.removidoEm,
-        carteirinha: a.carteirinha,
-        convenioAnclinic: a.convenioAnclinic,
-        pacienteId: a.pacienteId,
-        convenio: a.convenio,
-        procedimento: a.procedimento,
-        profissional: a.profissional && {
-          ...a.profissional,
-          convenioIds: a.profissional.credenciamentos.map((c) => c.convenioId),
-        },
-        unidade: a.unidade,
-      },
-      contexto(a.pacienteId),
-    );
-    return {
+  const analisadas = (await analisarAgendamentos({ data: paraDate(data), ...(convenioId && { convenioId }) })).map(
+    ({ agendamento: a, codigo, ...analise }) => ({
       id: a.id,
       idAnclinic: a.idAnclinic,
+      data: deDate(a.data),
       horaInicio: a.horaInicio,
       horaFim: a.horaFim,
       paciente: a.paciente,
@@ -112,7 +28,12 @@ export const GET = rota(async (req) => {
       convenio: a.convenio && { id: a.convenio.id, nome: a.convenio.nome },
       convenioAnclinic: a.convenioAnclinic,
       carteirinha: a.carteirinha,
-      procedimento: a.procedimento,
+      procedimento: a.procedimento && {
+        id: a.procedimento.id,
+        codigoAnclinic: a.procedimento.codigoAnclinic,
+        descricao: a.procedimento.descricao,
+        codigoGuia: codigo?.codigo ?? null,
+      },
       profissional: a.profissional && {
         id: a.profissional.id,
         nome: a.profissional.nome,
@@ -122,9 +43,12 @@ export const GET = rota(async (req) => {
       unidade: a.unidade && { id: a.unidade.id, nome: a.unidade.nome },
       statusAnclinic: a.statusAnclinic,
       agendamentosRestantes: a.agendamentosRestantes,
-      ...analise,
-    };
-  });
+      atendimento: a.atendimento,
+      situacao: analise.situacao,
+      pendencias: analise.pendencias,
+      motivo: analise.motivo,
+    }),
+  );
 
   const resumo = Object.fromEntries(SITUACOES.map((s) => [s, 0])) as Record<SituacaoSessao, number>;
   const contagemPendencias = new Map<string, number>();
@@ -137,6 +61,7 @@ export const GET = rota(async (req) => {
     data,
     total: analisadas.length,
     resumo,
+    semUnidade: analisadas.filter((a) => !a.unidade).length,
     pendencias: [...contagemPendencias.entries()]
       .map(([pendencia, quantidade]) => ({ pendencia, quantidade }))
       .sort((a, b) => b.quantidade - a.quantidade),

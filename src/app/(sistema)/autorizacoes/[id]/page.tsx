@@ -4,7 +4,9 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useState, type FormEvent } from "react";
 import toast from "react-hot-toast";
+import GradePlano from "@/components/GradePlano";
 import Icone from "@/components/Icone";
+import { ListaDocumentos } from "@/components/PedidosMedicos";
 import Carregando from "@/components/ui/Carregando";
 import MensagemErro from "@/components/ui/MensagemErro";
 import Modal from "@/components/ui/Modal";
@@ -16,6 +18,7 @@ import { mensagemDeErro } from "@/lib/cliente/api";
 import { useFetch } from "@/lib/cliente/hooks";
 import { autorizacaoService } from "@/lib/cliente/servicos";
 import type { StatusAutorizacao } from "@/lib/cliente/tipos";
+import { especialidadeDe, sessoesPorSemana } from "@/lib/documentos/especialidades";
 import { TRANSICOES_MANUAIS } from "@/lib/regras/transicoes";
 
 const DADOS_VAZIOS = { motivoNegativa: "", numeroAutorizacao: "", dataResposta: "", quantidadeAutorizada: "" };
@@ -70,7 +73,7 @@ export default function AutorizacaoDetalhe() {
     ["Nº da autorização", aut.numeroAutorizacao || "—", true],
     ["Protocolo", aut.protocolo || "—", true],
     ["Procedimento", aut.procedimento],
-    ["Código TUSS", aut.codigoProcedimento || "—", true],
+    ["Código do procedimento", aut.codigoProcedimento || "—", true],
     ["Sessões solicitadas", aut.quantidadeSolicitada, true],
     ["Sessões autorizadas", aut.quantidadeAutorizada ?? "—", true],
     ["Solicitação", formatarData(aut.dataSolicitacao), true],
@@ -185,6 +188,57 @@ export default function AutorizacaoDetalhe() {
           </div>
         </section>
       </div>
+
+      <section className="sb-card" aria-labelledby="plano-titulo">
+        <div className="sb-card__header">
+          <h3 id="plano-titulo" className="sb-card__title">
+            Plano terapêutico
+          </h3>
+          {aut.plano && <Link href={`/pacientes/${aut.pacienteId}`}>Pedidos do paciente</Link>}
+        </div>
+        <div className="sb-card__body pilha">
+          {!aut.plano ? (
+            <p className="texto-suave">
+              O paciente não tem plano terapêutico cadastrado. Envie o PDF na página do paciente ou em Importações → Documentos.
+            </p>
+          ) : (
+            <>
+              <p>
+                {aut.plano.medicoNome} · <span className="mono">{`${aut.plano.conselho} ${aut.plano.numeroConselho}/${aut.plano.ufConselho}`}</span>
+                {aut.plano.cid && (
+                  <>
+                    {" "}· CID <span className="mono">{aut.plano.cid}</span>
+                  </>
+                )}
+              </p>
+              <p className="texto-suave">
+                <span>
+                  Solicitado em <span className="mono">{formatarData(aut.plano.dataPedido)}</span>
+                  {aut.plano.validoAte && (
+                    <>
+                      {" "}· válido até <span className="mono">{formatarData(aut.plano.validoAte)}</span>
+                    </>
+                  )}
+                </span>
+              </p>
+              {(() => {
+                const porSemana = sessoesPorSemana(aut.plano.planoItens, aut.procedimento);
+                return porSemana ? (
+                  <p className="aviso aviso--neutro">
+                    Para {aut.procedimento.toLowerCase()}, o plano prevê <strong style={{ fontWeight: 500 }}>{porSemana} sessão(ões) por semana</strong>
+                    {" "}(cerca de <span className="mono">{porSemana * 4}</span> em 4 semanas). Solicitadas nesta autorização:{" "}
+                    <span className="mono">{aut.quantidadeSolicitada}</span>.
+                  </p>
+                ) : (
+                  <p className="texto-suave">O plano não tem uma linha para este procedimento.</p>
+                );
+              })()}
+              {aut.plano.planoItens && <GradePlano itens={aut.plano.planoItens} destaque={especialidadeDe(aut.procedimento)} />}
+              <ListaDocumentos documentos={aut.plano.documentos} />
+            </>
+          )}
+        </div>
+      </section>
 
       <section className="sb-card" aria-labelledby="historico-titulo">
         <div className="sb-card__header">

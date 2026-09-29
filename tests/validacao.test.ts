@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { fimDaSessao } from "@/lib/regras/atendimentos";
 import {
   esquemaAtendimento,
+  esquemaAtendimentoEdicao,
+  esquemaSituacaoAtendimento,
   esquemaAutorizacao,
   esquemaPaciente,
   esquemaUsuarioNovo,
@@ -42,6 +45,9 @@ describe("esquemaAtendimento", () => {
     expect(r.autorizacaoId).toBeNull();
     expect(r.valorCobrado).toBe(150.5);
     expect(esquemaAtendimento.safeParse({ pacienteId: UUID, procedimento: "ABA", dataAtendimento: "2026-09-27", horaInicio: "25:00" }).success).toBe(false);
+    // Só hora cheia ou meia hora.
+    expect(esquemaAtendimento.safeParse({ pacienteId: UUID, procedimento: "ABA", dataAtendimento: "2026-09-27", horaInicio: "08:15" }).success).toBe(false);
+    expect(esquemaAtendimento.safeParse({ pacienteId: UUID, dataAtendimento: "2026-09-27" }).success).toBe(false);
   });
 });
 
@@ -51,5 +57,21 @@ describe("esquemaUsuarioNovo", () => {
     expect(r.email).toBe("ana@clinica.com");
     expect(esquemaUsuarioNovo.safeParse({ nome: "Ana", email: "a@b.com", senha: "1234567", perfil: "terapeuta" }).success).toBe(false);
     expect(esquemaUsuarioNovo.safeParse({ nome: "Ana", email: "a@b.com", senha: "12345678", perfil: "root" }).success).toBe(false);
+  });
+});
+
+describe("confirmação e glosa", () => {
+  it("cancelar exige motivo", () => {
+    expect(esquemaSituacaoAtendimento.safeParse({ acao: "cancelar", motivo: " " }).success).toBe(false);
+    expect(esquemaSituacaoAtendimento.safeParse({ acao: "cancelar", motivo: "Paciente faltou" }).success).toBe(true);
+    expect(esquemaSituacaoAtendimento.safeParse({ acao: "confirmar" }).success).toBe(true);
+  });
+  it("glosado exige motivo", () => {
+    expect(esquemaAtendimentoEdicao.safeParse({ statusCobranca: "glosado", motivoGlosa: "" }).success).toBe(false);
+    expect(esquemaAtendimentoEdicao.safeParse({ statusCobranca: "glosado", motivoGlosa: "Autorização vencida" }).success).toBe(true);
+  });
+  it("sessão de 1 hora", () => {
+    expect(fimDaSessao("15:30")).toBe("16:30");
+    expect(fimDaSessao("23:30")).toBe("00:30");
   });
 });

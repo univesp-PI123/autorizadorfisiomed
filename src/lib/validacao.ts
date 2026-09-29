@@ -193,17 +193,34 @@ export const esquemaProfissional = z.object({
   convenioIds: z.array(uuid("Convênio inválido.")).max(50).optional(),
 });
 
+const codigoTuss = z.preprocess(
+  vazioParaNulo,
+  z.string().trim().regex(/^\d{8,10}$/, "Código TUSS: 8 a 10 dígitos.").nullable().optional(),
+);
+const tabela = z.preprocess(
+  vazioParaNulo,
+  z.string().trim().regex(/^\d{2}$/, "Tabela: 2 dígitos (ex.: 22).").nullable().optional(),
+);
+
 export const esquemaProcedimento = z.object({
   descricao: textoObrigatorio(200, "Descrição é obrigatória."),
-  codigoTuss: z.preprocess(
-    vazioParaNulo,
-    z.string().trim().regex(/^\d{8,10}$/, "Código TUSS: 8 a 10 dígitos.").nullable().optional(),
-  ),
-  tabelaTuss: z.preprocess(
-    vazioParaNulo,
-    z.string().trim().regex(/^\d{2}$/, "Tabela: 2 dígitos (ex.: 22).").nullable().optional(),
-  ),
+  codigoTuss,
+  tabelaTuss: tabela,
   ativo: z.boolean().optional(),
+  // Equivalente na tabela de uma operadora; código vazio desfaz a ligação.
+  equivalencia: z
+    .object({
+      convenioId: uuid("Convênio inválido."),
+      codigo: z.preprocess(
+        vazioParaNulo,
+        z.string().trim().regex(/^[\w.\-]{1,20}$/, "Código da operadora: até 20 letras ou números.").nullable().optional(),
+      ),
+      descricao: textoOpcional(300),
+      tabela,
+      codigoTuss,
+      valor: dinheiroOpcional,
+    })
+    .optional(),
 });
 
 // Chega por formulário multipart (junto com os PDFs): todos os campos em texto.
@@ -293,19 +310,27 @@ export const esquemaMudancaStatus = z.object({
 
 export const STATUS_COBRANCA = ["pendente", "faturado", "pago", "glosado", "cancelado"] as const;
 
-export const esquemaAtendimento = z.object({
-  pacienteId: uuid("Selecione um paciente."),
-  autorizacaoId: uuidOpcional("Autorização inválida."),
-  terapeutaId: uuidOpcional("Terapeuta inválido."),
-  procedimento: textoObrigatorio(200, "Procedimento é obrigatório."),
-  codigoProcedimento: textoOpcional(30),
-  dataAtendimento: data("Data do atendimento inválida."),
-  horaInicio: hora,
-  horaFim: hora,
-  valorCobrado: dinheiroOpcional,
-  evolucao: textoOpcional(5000),
-  observacoes: textoOpcional(2000),
-});
+// Registro manual (operador): procedimento da base, sessão de 1 hora começando
+// em hora cheia ou meia hora. O fim é calculado no servidor.
+export const esquemaAtendimento = z
+  .object({
+    pacienteId: uuid("Selecione um paciente."),
+    autorizacaoId: uuidOpcional("Autorização inválida."),
+    procedimentoId: uuidOpcional("Procedimento inválido."),
+    procedimento: textoOpcional(200),
+    dataAtendimento: data("Data do atendimento inválida."),
+    horaInicio: z.preprocess(
+      vazioParaNulo,
+      z
+        .string()
+        .regex(/^([01]\d|2[0-3]):(00|30)$/, "O início deve ser em hora cheia ou meia hora (ex.: 15:00, 15:30).")
+        .nullable()
+        .optional(),
+    ),
+    valorCobrado: dinheiroOpcional,
+    observacoes: textoOpcional(2000),
+  })
+  .refine((d) => d.procedimentoId || d.procedimento, { message: "Escolha o procedimento.", path: ["procedimentoId"] });
 
 // Paciente e autorização não mudam depois de registrado: isso alteraria a
 // contagem de sessões usadas.
@@ -323,7 +348,19 @@ export const esquemaAtendimentoEdicao = z
     evolucao: textoOpcional(5000),
     observacoes: textoOpcional(2000),
   })
-  .partial();
+  .partial()
+  .refine((d) => d.statusCobranca !== "glosado" || !!d.motivoGlosa, {
+    message: "Informe o motivo da glosa.",
+    path: ["motivoGlosa"],
+  });
+
+export const esquemaSituacaoAtendimento = z.discriminatedUnion("acao", [
+  z.object({ acao: z.literal("confirmar") }),
+  z.object({
+    acao: z.literal("cancelar"),
+    motivo: z.string({ required_error: "Informe o motivo do cancelamento." }).trim().min(3, "Informe o motivo do cancelamento.").max(2000),
+  }),
+]);
 
 /** Lê e valida o corpo JSON da requisição. */
 export async function lerCorpo<T extends z.ZodTypeAny>(

@@ -71,6 +71,15 @@ async function criarDemo(adminId: string) {
   const hoje = hojeISO();
   const senhaDemo = await bcrypt.hash("Demo@12345", 12);
 
+  // Procedimentos como vêm do AnClinic (a importação da agenda cria os reais).
+  for (const [codigoAnclinic, descricao] of [
+    ["4440", "PSICOLOGIA ABA"],
+    ["4415", "FONOAUDIOLOGIA ABA"],
+    ["4460", "TERAPIA OCUPACIONAL ABA"],
+  ]) {
+    await prisma.procedimento.upsert({ where: { codigoAnclinic }, update: {}, create: { codigoAnclinic, descricao } });
+  }
+
   const terapeutas: string[] = [];
   for (const [nome, email, perfil] of [
     ["Ana Recepcionista", "recepcao@demo.local", "recepcionista"],

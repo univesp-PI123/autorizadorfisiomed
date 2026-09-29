@@ -3,6 +3,7 @@ import { ErroHttp, json, naoEncontrado, rota } from "@/lib/api/http";
 import { exigirSessao } from "@/lib/auth/sessao";
 import { deDate, hojeISO, paraDate } from "@/lib/datas";
 import { prisma } from "@/lib/prisma";
+import { sincronizarAtendimentos } from "@/lib/regras/atendimentos";
 import { marcarVencidas, podeTransitar, statusAutomatico } from "@/lib/regras/autorizacao";
 import { esquemaMudancaStatus, lerCorpo } from "@/lib/validacao";
 
@@ -88,5 +89,7 @@ export const PATCH = rota<{ id: string }>(async (req, { params }) => {
     await tx.historicoStatus.createMany({ data: historico });
   });
 
+  // Autorizada: as sessões já realizadas que ela cobre viram atendimentos a confirmar.
+  if (dados.status === "autorizada") await sincronizarAtendimentos();
   return json(await prisma.autorizacao.findUnique({ where: { id } }));
 });

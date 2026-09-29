@@ -12,6 +12,8 @@ export type StatusAutorizacao =
   | "cancelada"
   | "esgotada";
 
+export type SituacaoAtendimento = "aguardando_confirmacao" | "confirmado" | "cancelado";
+
 export type StatusCobranca = "pendente" | "faturado" | "pago" | "glosado" | "cancelado";
 
 export type Referencia = { id: string; nome: string };
@@ -101,6 +103,50 @@ export type Autorizacao = {
   vinculo?: Vinculo | null;
   usuarioCriou?: Referencia | null;
   historico?: HistoricoStatus[];
+  plano?: {
+    id: string;
+    medicoNome: string;
+    conselho: string;
+    numeroConselho: string;
+    ufConselho: string;
+    cid: string | null;
+    dataPedido: string;
+    validoAte: string | null;
+    sessoesSemanais: number | null;
+    planoItens: ItemPlano[] | null;
+    documentos: DocumentoResumo[];
+  } | null;
+};
+
+export type PacientePorCpf = {
+  paciente: {
+    id: string;
+    nome: string;
+    cpf: string;
+    dataNascimento: string | null;
+    ativo: boolean;
+    cid: string | null;
+    vinculos: { convenioId: string; numeroCarteirinha: string; convenio: Referencia }[];
+  };
+  agenda: {
+    convenio: Referencia;
+    procedimento: { id: string; codigoAnclinic: string; descricao: string };
+    codigo: string | null;
+    sessoes: number;
+    ultima: string;
+    proxima: string | null;
+  }[];
+  pedido: {
+    id: string;
+    medicoNome: string;
+    numeroConselho: string;
+    ufConselho: string;
+    cid: string | null;
+    dataPedido: string;
+    validoAte: string | null;
+    sessoesSemanais: number | null;
+    planoItens: ItemPlano[] | null;
+  } | null;
 };
 
 export type Atendimento = {
@@ -117,8 +163,14 @@ export type Atendimento = {
   motivoGlosa: string | null;
   semAutorizacao: boolean;
   evolucao: string | null;
+  situacao: SituacaoAtendimento;
+  motivoCancelamento: string | null;
+  confirmadoEm: string | null;
+  agendamentoId: string | null;
   paciente?: Referencia;
   terapeuta?: Referencia | null;
+  profissional?: Referencia | null;
+  confirmadoPor?: Referencia | null;
   autorizacao?: {
     id: string;
     numeroAutorizacao: string | null;
@@ -190,15 +242,33 @@ export type Procedimento = {
   descricao: string;
   codigoTuss: string | null;
   tabelaTuss: string | null;
+  termoTuss?: string | null;
   ativo: boolean;
+  equivalencia?: Equivalencia | null;
   _count?: { agendamentos: number };
 };
+
+export type Equivalencia = {
+  id: string;
+  codigo: string;
+  descricao: string;
+  tabela: string;
+  codigoTuss: string | null;
+  valor: string | null;
+};
+
+export type ProcedimentoOperadora = Equivalencia & {
+  ativo: boolean;
+  procedimento: { id: string; codigoAnclinic: string; descricao: string } | null;
+};
+
+export type TussProcedimento = { codigo: string; termo: string };
 
 export type AvisoImportacao = { mensagem: string; quantidade: number; linhas: number[] };
 
 export type Importacao = {
   id: string;
-  tipo: "agenda" | "profissionais";
+  tipo: "agenda" | "profissionais" | "documentos" | "tabela_operadora" | "tuss";
   arquivoNome: string;
   linhas: number;
   criados: number;
@@ -214,6 +284,15 @@ export type Importacao = {
     removidas?: number;
     novos?: { pacientes: number; profissionais: number; procedimentos: number; unidades: number };
     porConvenio?: { nome: string; convenioId: string | null; convenio: string | null; sessoes: number }[];
+    // documentos
+    vinculados?: number;
+    semPaciente?: number;
+    duplicados?: number;
+    erros?: number;
+    pedidosCriados?: number;
+    arquivos?: ResultadoDocumento[];
+    // tabela da operadora / TUSS
+    equivalencias?: number;
     // profissionais
     convenio?: Referencia | null;
     credenciados?: number;
@@ -234,11 +313,12 @@ export type SessaoAgenda = {
   convenio: Referencia | null;
   convenioAnclinic: string | null;
   carteirinha: string | null;
-  procedimento: { id: string; codigoAnclinic: string; descricao: string; codigoTuss: string | null } | null;
+  procedimento: { id: string; codigoAnclinic: string; descricao: string; codigoGuia: string | null } | null;
   profissional: (Referencia & { conselho: string | null; numeroConselho: string | null }) | null;
   unidade: Referencia | null;
   statusAnclinic: string | null;
   agendamentosRestantes: number | null;
+  atendimento: { id: string; situacao: SituacaoAtendimento } | null;
   situacao: SituacaoSessao;
   pendencias: string[];
   motivo?: string;
@@ -247,6 +327,7 @@ export type SessaoAgenda = {
 export type Agenda = {
   data: string;
   total: number;
+  semUnidade: number;
   resumo: Record<SituacaoSessao, number>;
   pendencias: { pendencia: string; quantidade: number }[];
   sessoes: SessaoAgenda[];
@@ -269,5 +350,42 @@ export type PedidoMedico = {
   observacoes: string | null;
   usuario: Referencia | null;
   createdAt: string;
-  arquivos: { id: string; nomeOriginal: string; tamanho: number; createdAt: string }[];
+  sessoesSemanais: number | null;
+  planoItens: ItemPlano[] | null;
+  documentos: DocumentoResumo[];
+};
+
+export type TipoDocumento = "pedido_medico" | "plano_terapeutico" | "relatorio" | "outro";
+
+export type DocumentoResumo = {
+  id: string;
+  tipo: TipoDocumento;
+  nomeOriginal: string;
+  tamanho: number;
+  origem: "manual" | "lote";
+  createdAt: string;
+};
+
+export type Dia = "seg" | "ter" | "qua" | "qui" | "sex" | "sab";
+export type ItemPlano = { especialidade: string; dias: Partial<Record<Dia, number>>; total: number };
+
+export type PlanoLido = {
+  paciente: { nome: string | null; nascimento: string | null };
+  cid: string | null;
+  responsavel: { nome: string | null; cpf: string | null };
+  medico: { nome: string | null; crm: string | null };
+  dataSolicitacao: string | null;
+  sessoesSemanais: number | null;
+  itens: ItemPlano[];
+  metodos: string[];
+};
+
+export type ResultadoDocumento = {
+  arquivo: string;
+  status: "vinculado" | "sem_paciente" | "duplicado" | "erro";
+  tipo?: TipoDocumento;
+  paciente?: Referencia;
+  vinculoPor?: "cpf" | "carteirinha" | "nome_no_plano" | "escolhido";
+  pedido?: { id: string; criado: boolean } | null;
+  motivo?: string;
 };

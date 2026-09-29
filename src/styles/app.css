@@ -324,11 +324,20 @@ textarea.sb-input { height: auto; min-height: 72px; padding: 10px 14px; resize: 
 .sb-table td .texto-suave { display: block; }
 .lista-arquivos { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); }
 .lista-simples .lista-arquivos li { border: 0; padding: 0; }
+.lista-arquivos li { display: inline-flex; align-items: baseline; flex-wrap: wrap; gap: 6px; }
 .lista-arquivos a { display: inline-flex; align-items: center; gap: 6px; }
 .lista-arquivos svg { width: 16px; height: 16px; }
 .card-botao { width: 100%; text-align: left; font: inherit; cursor: pointer; }
 .card-botao:hover { border-color: var(--border-input); }
 .card-botao[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.abas { display: flex; gap: var(--space-1); padding: 0 var(--space-5); border-bottom: 1px solid var(--border-soft); overflow-x: auto; }
+.aba { font: 500 13px/20px var(--font-sans); color: var(--ink-secondary); background: none; border: 0; border-bottom: 2px solid transparent; padding: var(--space-2) var(--space-3); cursor: pointer; white-space: nowrap; }
+.aba:hover { color: var(--ink); }
+.aba[aria-selected="true"] { color: var(--accent-hover); border-bottom-color: var(--accent); }
+.link-botao { font: inherit; color: var(--accent-hover); background: none; border: 0; padding: 0; text-decoration: underline; cursor: pointer; }
+.quebra { word-break: break-all; }
+.grade-plano th[scope="row"] { font-weight: 400; color: var(--ink); text-align: left; background: transparent; }
+.grade-plano tr.destaque th, .grade-plano tr.destaque td { background: var(--accent-soft); }
 fieldset.sb-field { border: 0; padding: 0; margin: 0; min-width: 0; }
 .checks { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); }
 
