@@ -1,7 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useState, type ChangeEvent, type FormEvent } from "react";
 import toast from "react-hot-toast";
+import Icone from "@/components/Icone";
 import Carregando from "@/components/ui/Carregando";
 import MensagemErro from "@/components/ui/MensagemErro";
 import Modal from "@/components/ui/Modal";
@@ -106,22 +108,29 @@ export default function UnidadesPage() {
   const [form, setForm] = useState<FormUnidade | null>(null);
   const [salvando, setSalvando] = useState(false);
 
+  const [criando, setCriando] = useState(false);
   const abrir = (u: Unidade) => {
     setEditando(u);
     setForm(formDaUnidade(u));
   };
+  const abrirNova = () => {
+    setCriando(true);
+    setForm(Object.fromEntries(CAMPOS_UNIDADE.map(([c]) => [c, ""])) as FormUnidade);
+  };
   const fechar = () => {
     setEditando(null);
+    setCriando(false);
     setForm(null);
   };
 
   const aoEnviar = async (e: FormEvent) => {
     e.preventDefault();
-    if (!editando || !form) return;
+    if ((!editando && !criando) || !form) return;
     setSalvando(true);
     try {
-      await unidadeService.atualizar(editando.id, form);
-      toast.success("Unidade atualizada.");
+      if (editando) await unidadeService.atualizar(editando.id, form);
+      else await unidadeService.criar(form);
+      toast.success(editando ? "Unidade atualizada." : "Unidade criada.");
       fechar();
       unidades.recarregar();
     } catch (err) {
@@ -146,6 +155,24 @@ export default function UnidadesPage() {
           <h2 className="sb-card__title" id="titulo-unidades">
             Unidades de atendimento
           </h2>
+          <div className="ferramentas">
+            <Link href="/agenda?unidade=sem" className="sb-btn">
+              Sessões sem unidade
+            </Link>
+            {podeEditar && (
+              <button type="button" className="sb-btn sb-btn--primary" onClick={abrirNova}>
+                <Icone nome="mais" />
+                Nova unidade
+              </button>
+            )}
+          </div>
+        </div>
+        <div className="sb-card__body">
+          <p className="texto-apoio">
+            A unidade de cada sessão vem da coluna &ldquo;Unidade de Atendimento&rdquo; do AnClinic. Para atribuir ou trocar, selecione
+            as sessões na <Link href="/agenda" className="link-texto">Agenda</Link> e use &ldquo;Aplicar&rdquo;; a escolha feita no sistema não é desfeita pelas
+            próximas importações.
+          </p>
         </div>
         {unidades.carregando ? (
           <Carregando />
@@ -161,6 +188,9 @@ export default function UnidadesPage() {
                   <th scope="col">Unidade</th>
                   <th scope="col">CNES</th>
                   <th scope="col">Endereço</th>
+                  <th scope="col" className="sb-end">
+                    Sessões
+                  </th>
                   {podeEditar && (
                     <th scope="col" className="sb-end">
                       <span className="sr-only">Ações</span>
@@ -171,7 +201,7 @@ export default function UnidadesPage() {
               <tbody>
                 {(unidades.data ?? []).length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="vazio">
+                    <td colSpan={5} className="vazio">
                       As unidades aparecem aqui ao importar a primeira agenda do AnClinic.
                     </td>
                   </tr>
@@ -189,6 +219,7 @@ export default function UnidadesPage() {
                           : "—"}
                         {u.municipio && <span className="texto-suave">{`${u.municipio}/${u.uf ?? ""} · CEP ${u.cep ?? "—"}`}</span>}
                       </td>
+                      <td className="sb-mono sb-end">{u._count?.agendamentos ?? 0}</td>
                       {podeEditar && (
                         <td className="sb-end">
                           <button type="button" className="sb-btn sb-btn--sm" onClick={() => abrir(u)} aria-label={`Editar ${u.nome}`}>
@@ -206,9 +237,9 @@ export default function UnidadesPage() {
       </section>
 
       <Modal
-        aberto={!!editando}
+        aberto={!!editando || criando}
         onFechar={fechar}
-        titulo="Editar unidade"
+        titulo={editando ? "Editar unidade" : "Nova unidade"}
         tamanho="lg"
         rodape={
           <>
@@ -221,9 +252,9 @@ export default function UnidadesPage() {
           </>
         }
       >
-        {editando && form && (
+        {(editando || criando) && form && (
           <form id="form-unidade" onSubmit={aoEnviar} noValidate className="pilha">
-            <p className="texto-suave">Nome no AnClinic: {editando.nomeAnclinic}</p>
+            {editando && <p className="texto-suave">Nome no AnClinic: {editando.nomeAnclinic}</p>}
             <div className="form-grade">
               {CAMPOS_UNIDADE.map(([campo, rotulo, inteira]) => (
                 <div key={campo} className={`sb-field ${inteira ? "inteira" : ""}`}>

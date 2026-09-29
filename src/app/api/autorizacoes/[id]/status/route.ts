@@ -89,7 +89,12 @@ export const PATCH = rota<{ id: string }>(async (req, { params }) => {
     await tx.historicoStatus.createMany({ data: historico });
   });
 
-  // Autorizada: as sessões já realizadas que ela cobre viram atendimentos a confirmar.
-  if (dados.status === "autorizada") await sincronizarAtendimentos();
-  return json(await prisma.autorizacao.findUnique({ where: { id } }));
+  // Aprovada: as sessões da agenda que ela cobre vão para Atendimentos,
+  // aguardando confirmação.
+  let atendimentosGerados: number | undefined;
+  if (dados.status === "autorizada") {
+    await sincronizarAtendimentos();
+    atendimentosGerados = await prisma.atendimento.count({ where: { autorizacaoId: id } });
+  }
+  return json({ ...(await prisma.autorizacao.findUnique({ where: { id } })), atendimentosGerados });
 });

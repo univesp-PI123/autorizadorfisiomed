@@ -1,5 +1,6 @@
 import { ErroHttp, json, naoEncontrado, rota } from "@/lib/api/http";
 import { exigirSessao } from "@/lib/auth/sessao";
+import { deDate, hojeISO } from "@/lib/datas";
 import { prisma } from "@/lib/prisma";
 import { marcarVencidas } from "@/lib/regras/autorizacao";
 import { consumirSessao } from "@/lib/regras/atendimentos";
@@ -32,6 +33,9 @@ export const PATCH = rota<{ id: string }>(async (req, { params }) => {
     );
   }
 
+  if (deDate(atendimento.dataAtendimento) > hojeISO()) {
+    throw new ErroHttp(409, `A sessão é de ${deDate(atendimento.dataAtendimento).split("-").reverse().join("/")}: confirme depois que ela acontecer.`);
+  }
   if (atendimento.autorizacaoId) await marcarVencidas();
   return json(
     await prisma.$transaction(async (tx) => {

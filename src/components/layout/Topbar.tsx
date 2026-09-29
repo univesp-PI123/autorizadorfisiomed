@@ -9,7 +9,6 @@ import Icone from "@/components/Icone";
 import { useAlertas } from "@/contextos/AlertaContexto";
 import { useSessao } from "@/contextos/SessaoContexto";
 import { itemDaRota, ROTULO_PERFIL } from "@/lib/navegacao";
-import SeletorAmbiente from "./SeletorAmbiente";
 
 // Títulos das páginas de detalhe (o menu só conhece as raízes).
 function tituloDaPagina(pathname: string, rotuloRaiz: string) {
@@ -71,7 +70,6 @@ export default function Topbar() {
             {totalAlertas} vencendo
           </Link>
         )}
-        <SeletorAmbiente />
         <div className="topbar__usuario">
           <strong>{usuario.nome}</strong>
           <span>{ROTULO_PERFIL[usuario.perfil]}</span>

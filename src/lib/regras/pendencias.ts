@@ -9,7 +9,28 @@
 //
 // Função pura, para ser usada pela tela da agenda e pelo robô de envio.
 
+import { especialidadeDe } from "@/lib/documentos/especialidades";
 import { chaveNome } from "@/lib/importacao/planilha";
+
+/**
+ * A autorização cobre o procedimento da sessão? Pelo código (de/para ou TUSS)
+ * ou, nas autorizações lançadas à mão sem código, pelo nome: um contém o
+ * outro, ou os dois são da mesma especialidade (ex.: "Psicologia" e
+ * "PSICOLOGIA ABA").
+ */
+export function mesmoProcedimento(
+  aut: { codigoProcedimento: string | null; procedimento?: string },
+  sessao: { codigosAceitos: string[]; descricao?: string } | null,
+): boolean {
+  if (!sessao) return false;
+  if (aut.codigoProcedimento && sessao.codigosAceitos.includes(aut.codigoProcedimento)) return true;
+  if (!aut.procedimento || !sessao.descricao) return false;
+  const a = chaveNome(aut.procedimento);
+  const b = chaveNome(sessao.descricao);
+  if (a.includes(b) || b.includes(a)) return true;
+  const esp = especialidadeDe(sessao.descricao);
+  return !!esp && esp === especialidadeDe(aut.procedimento);
+}
 
 export type SituacaoSessao = "cancelada" | "fora" | "coberta" | "pronta" | "pendente";
 
@@ -75,14 +96,11 @@ export function analisarSessao(
   // Cobertura vale para qualquer convênio: autorização registrada no sistema
   // (automática ou manual) ou senha já lançada no AnClinic.
   const codigoGuia = s.procedimento?.codigoGuia ?? null;
-  const aceitos = s.procedimento?.codigosAceitos ?? [];
-  const nome = s.procedimento?.descricao ? chaveNome(s.procedimento.descricao) : null;
   const cobertura = ctx.autorizacoes.find(
     (a) =>
       a.convenioId === s.convenio!.id &&
       a.status === "autorizada" &&
-      ((!!a.codigoProcedimento && aceitos.includes(a.codigoProcedimento)) ||
-        (!!nome && !!a.procedimento && chaveNome(a.procedimento).includes(nome))) &&
+      mesmoProcedimento(a, s.procedimento) &&
       (!a.dataInicioVigencia || a.dataInicioVigencia <= s.data) &&
       (!a.dataFimVigencia || a.dataFimVigencia >= s.data) &&
       (a.saldo === null || a.saldo > 0),

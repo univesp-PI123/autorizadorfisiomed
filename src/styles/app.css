@@ -77,16 +77,6 @@ button, input, select, textarea { font-family: inherit; }
   position: absolute; top: 4px; right: 6px; margin: 0; padding: 0 4px; font-size: 10px; line-height: 14px;
 }
 
-/* ---------- Seletor de ambiente (tenant) ---------- */
-.ambiente { position: relative; }
-.ambiente__botao { gap: var(--space-2); }
-.ambiente__botao .sb-status { font-size: 12px; }
-.ambiente__menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 45; width: 300px; }
-.ambiente__item { width: 100%; height: auto; min-height: 48px; padding: 6px 10px; justify-content: space-between; gap: var(--space-2); border: 0; background: transparent; cursor: pointer; text-align: left; }
-.ambiente__item svg { width: 16px; height: 16px; color: var(--accent); flex-shrink: 0; }
-.ambiente__textos { display: flex; flex-direction: column; gap: 2px; }
-.ambiente__rodape { padding: var(--space-2) 10px 4px; border-top: 1px solid var(--border-soft); margin-top: 4px; }
-
 /* ---------- Painel de acessibilidade ---------- */
 .acess { position: relative; }
 .acess--flutuante { position: fixed; top: var(--space-4); right: var(--space-4); z-index: 20; }
@@ -266,8 +256,7 @@ textarea.sb-input { height: auto; min-height: 72px; padding: 10px 14px; resize: 
 [data-texto="125"] .topbar__usuario,
 [data-texto="125"] .topbar .busca,
 [data-texto="150"] .topbar__usuario,
-[data-texto="150"] .topbar .busca,
-[data-texto="150"] .ambiente__botao .mono { display: none; }
+[data-texto="150"] .topbar .busca { display: none; }
 
 /* Alto contraste: textos de apoio e bordas mais escuros, foco mais grosso. */
 :root[data-contraste] {
@@ -335,6 +324,17 @@ textarea.sb-input { height: auto; min-height: 72px; padding: 10px 14px; resize: 
 .aba:hover { color: var(--ink); }
 .aba[aria-selected="true"] { color: var(--accent-hover); border-bottom-color: var(--accent); }
 .link-botao { font: inherit; color: var(--accent-hover); background: none; border: 0; padding: 0; text-decoration: underline; cursor: pointer; }
+.busca-paciente__campo { position: relative; }
+.busca-paciente__lista { position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 60; max-height: 280px; overflow-y: auto; list-style: none; margin: 0; padding: 4px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); box-shadow: var(--shadow-popover); }
+.busca-paciente__item { display: flex; flex-direction: column; gap: 2px; padding: 6px 10px; border-radius: var(--radius-md); cursor: pointer; }
+.busca-paciente__item[aria-selected="true"] { background: var(--accent-soft); }
+.busca-paciente__item[aria-selected="true"] .texto-suave { color: var(--ink-secondary); }
+.busca-paciente__item strong, .paciente-escolhido strong { font-weight: 500; color: var(--ink); }
+.paciente-escolhido { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: 8px 12px; border: 1px solid var(--border-input); border-radius: var(--radius-md); min-height: var(--size-control); }
+.paciente-escolhido > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.barra-lote { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); padding: var(--space-3) var(--space-5); background: var(--accent-soft); border-bottom: 1px solid var(--border-soft); }
+.barra-lote .sb-input { width: auto; min-width: 220px; }
+.col-check { width: 36px; }
 .quebra { word-break: break-all; }
 .grade-plano th[scope="row"] { font-weight: 400; color: var(--ink); text-align: left; background: transparent; }
 .grade-plano tr.destaque th, .grade-plano tr.destaque td { background: var(--accent-soft); }
@@ -355,7 +355,6 @@ fieldset.sb-field { border: 0; padding: 0; margin: 0; min-width: 0; }
 @media (max-width: 640px) {
   .stats, .form-grade, .dl-grade, .acoes-rapidas { grid-template-columns: 1fr; }
   .ferramentas .sb-input { min-width: 0; max-width: 100%; flex: 1 1 160px; }
-  .ambiente__botao .mono { display: none; }
   /* Celular: a ampliação da interface não cabe; vale o zoom do aparelho
      (o painel de acessibilidade avisa). Os demais recursos continuam. */
   html[data-texto] { zoom: 1 !important; --zoom: 1 !important; }

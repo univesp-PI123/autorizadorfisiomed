@@ -103,6 +103,8 @@ export type Autorizacao = {
   vinculo?: Vinculo | null;
   usuarioCriou?: Referencia | null;
   historico?: HistoricoStatus[];
+  atendimentos?: Partial<Record<SituacaoAtendimento, number>>;
+  atendimentosGerados?: number;
   plano?: {
     id: string;
     medicoNome: string;
@@ -118,11 +120,19 @@ export type Autorizacao = {
   } | null;
 };
 
-export type PacientePorCpf = {
+export type PacienteBusca = {
+  id: string;
+  nome: string;
+  cpf: string | null;
+  dataNascimento: string | null;
+  vinculos: { numeroCarteirinha: string; convenio: Referencia }[];
+};
+
+export type DadosParaAutorizacao = {
   paciente: {
     id: string;
     nome: string;
-    cpf: string;
+    cpf: string | null;
     dataNascimento: string | null;
     ativo: boolean;
     cid: string | null;
@@ -219,6 +229,7 @@ export type Unidade = {
   municipio: string | null;
   uf: string | null;
   ativo: boolean;
+  _count?: { agendamentos: number };
 };
 
 export type Profissional = {
@@ -316,6 +327,7 @@ export type SessaoAgenda = {
   procedimento: { id: string; codigoAnclinic: string; descricao: string; codigoGuia: string | null } | null;
   profissional: (Referencia & { conselho: string | null; numeroConselho: string | null }) | null;
   unidade: Referencia | null;
+  unidadeManual: boolean;
   statusAnclinic: string | null;
   agendamentosRestantes: number | null;
   atendimento: { id: string; situacao: SituacaoAtendimento } | null;

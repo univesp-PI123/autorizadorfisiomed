@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { codigoParaGuia, codigosAceitos } from "@/lib/regras/codigoGuia";
-import { analisarSessao, type ContextoAnalise, type SessaoParaAnalise } from "@/lib/regras/pendencias";
+import { analisarSessao, mesmoProcedimento, type ContextoAnalise, type SessaoParaAnalise } from "@/lib/regras/pendencias";
 
 const AMIL = "conv-amil";
 
@@ -112,5 +112,16 @@ describe("cobertura por autorização registrada no sistema", () => {
     const s = sessao({ procedimento: { codigoGuia: null, codigosAceitos: [], descricao: "PSICOLOGIA ABA" } });
     expect(analisarSessao(s, ctx({ autorizacoes: [{ ...aut, procedimento: "Sessão de Psicologia ABA" }] })).situacao).toBe("coberta");
     expect(analisarSessao(s, ctx({ autorizacoes: [{ ...aut, procedimento: "Fonoaudiologia ABA" }] })).situacao).not.toBe("coberta");
+  });
+});
+
+describe("mesmoProcedimento", () => {
+  const sessao = { codigosAceitos: ["9010", "50000470"], descricao: "PSICOLOGIA ABA" };
+  it("pelo código", () => expect(mesmoProcedimento({ codigoProcedimento: "9010" }, sessao)).toBe(true));
+  it("pelo nome ou pela especialidade", () => {
+    expect(mesmoProcedimento({ codigoProcedimento: null, procedimento: "Psicologia" }, sessao)).toBe(true);
+    expect(mesmoProcedimento({ codigoProcedimento: null, procedimento: "Terapia ABA - psicologia" }, sessao)).toBe(true);
+    expect(mesmoProcedimento({ codigoProcedimento: null, procedimento: "Psicopedagogia" }, sessao)).toBe(false);
+    expect(mesmoProcedimento({ codigoProcedimento: "123", procedimento: "Fono" }, sessao)).toBe(false);
   });
 });

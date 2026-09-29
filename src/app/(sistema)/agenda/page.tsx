@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
+import toast from "react-hot-toast";
 import { comUrl } from "@/components/ComUrl";
 import Icone from "@/components/Icone";
 import Carregando from "@/components/ui/Carregando";
@@ -10,7 +11,8 @@ import { Badge } from "@/components/ui/StatusBadge";
 import { useSessao } from "@/contextos/SessaoContexto";
 import { formatarData } from "@/lib/analiseDados";
 import { useFetch } from "@/lib/cliente/hooks";
-import { agendaService, convenioService } from "@/lib/cliente/servicos";
+import { mensagemDeErro } from "@/lib/cliente/api";
+import { agendaService, convenioService, unidadeService } from "@/lib/cliente/servicos";
 import type { SituacaoSessao } from "@/lib/cliente/tipos";
 import { hojeISO } from "@/lib/datas";
 
@@ -47,6 +49,12 @@ function AgendaPage({ url }: { url: URLSearchParams }) {
   const [busca, setBusca] = useState("");
   // "" = todas; "sem" = sessões sem unidade de atendimento; senão, o id da unidade.
   const [unidade, setUnidade] = useState(url.get("unidade") ?? "");
+  const podeEditar = usuario.perfil === "admin" || usuario.perfil === "recepcionista";
+  const [marcadas, setMarcadas] = useState<Set<string>>(new Set());
+  const [unidadeDestino, setUnidadeDestino] = useState("");
+  const [incluirPaciente, setIncluirPaciente] = useState(true);
+  const [aplicando, setAplicando] = useState(false);
+  const todasUnidades = useFetch(unidadeService.listar);
 
   const buscar = useCallback(() => agendaService.buscar({ data, convenioId: convenioId || undefined }), [data, convenioId]);
   const agenda = useFetch(buscar);
@@ -63,6 +71,37 @@ function AgendaPage({ url }: { url: URLSearchParams }) {
             .some((v) => v?.toLowerCase().includes(termo))),
     );
   }, [agenda.data, situacao, unidade, busca]);
+  const marcar = (id: string, sim: boolean) =>
+    setMarcadas((m) => {
+      const n = new Set(m);
+      if (sim) n.add(id);
+      else n.delete(id);
+      return n;
+    });
+
+  const atribuirUnidade = async () => {
+    if (!marcadas.size) return;
+    setAplicando(true);
+    try {
+      const r = await unidadeService.atribuir({
+        ids: [...marcadas],
+        unidadeId: unidadeDestino === "remover" ? null : unidadeDestino,
+        incluirPaciente,
+      });
+      toast.success(
+        unidadeDestino === "remover"
+          ? `Unidade retirada de ${r.atualizadas} sessão(ões).`
+          : `Unidade atribuída a ${r.atualizadas} sessão(ões).`,
+      );
+      setMarcadas(new Set());
+      agenda.recarregar();
+    } catch (err) {
+      toast.error(mensagemDeErro(err, "Não foi possível atribuir a unidade."));
+    } finally {
+      setAplicando(false);
+    }
+  };
+
   const unidades = useMemo(() => {
     const m = new Map<string, string>();
     for (const s of agenda.data?.sessoes ?? []) if (s.unidade) m.set(s.unidade.id, s.unidade.nome);
@@ -81,7 +120,11 @@ function AgendaPage({ url }: { url: URLSearchParams }) {
               type="date"
               className="sb-input sb-input--sm"
               value={data}
-              onChange={(e) => e.target.value && setData(e.target.value)}
+              onChange={(e) => {
+                if (!e.target.value) return;
+                setData(e.target.value);
+                setMarcadas(new Set());
+              }}
               aria-label="Data"
             />
             <select className="sb-input sb-input--sm" value={convenioId} onChange={(e) => setConvenioId(e.target.value)} aria-label="Convênio">
@@ -199,14 +242,56 @@ function AgendaPage({ url }: { url: URLSearchParams }) {
                   </select>
                 </div>
               </div>
+              {podeEditar && marcadas.size > 0 && (
+                <div className="barra-lote" role="region" aria-label="Atribuir unidade às sessões selecionadas">
+                  <span>
+                    <span className="mono">{marcadas.size}</span> sessão(ões) selecionada(s)
+                  </span>
+                  <select
+                    className="sb-input sb-input--sm"
+                    value={unidadeDestino}
+                    onChange={(e) => setUnidadeDestino(e.target.value)}
+                    aria-label="Unidade de atendimento para as sessões selecionadas"
+                  >
+                    <option value="">Escolha a unidade…</option>
+                    {(todasUnidades.data ?? []).map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.nome}
+                      </option>
+                    ))}
+                    <option value="remover">Tirar a unidade (volta a valer a do AnClinic)</option>
+                  </select>
+                  <label className="sb-check">
+                    <input type="checkbox" checked={incluirPaciente} onChange={(e) => setIncluirPaciente(e.target.checked)} />
+                    Também as outras sessões sem unidade destes pacientes
+                  </label>
+                  <button type="button" className="sb-btn sb-btn--primary sb-btn--sm" onClick={atribuirUnidade} disabled={!unidadeDestino || aplicando}>
+                    {aplicando ? "Aplicando…" : "Aplicar"}
+                  </button>
+                  <button type="button" className="sb-btn sb-btn--sm" onClick={() => setMarcadas(new Set())}>
+                    Limpar seleção
+                  </button>
+                </div>
+              )}
               <div className="tabela-rolagem">
                 <table className="sb-table">
                   <thead>
                     <tr>
+                      {podeEditar && (
+                        <th scope="col" className="col-check">
+                          <input
+                            type="checkbox"
+                            aria-label="Selecionar todas as sessões listadas"
+                            checked={sessoes.length > 0 && sessoes.every((x) => marcadas.has(x.id))}
+                            onChange={(e) => setMarcadas(e.target.checked ? new Set(sessoes.map((x) => x.id)) : new Set())}
+                          />
+                        </th>
+                      )}
                       <th scope="col">Horário</th>
                       <th scope="col">Paciente</th>
                       <th scope="col">Procedimento</th>
                       <th scope="col">Profissional</th>
+                      <th scope="col">Unidade</th>
                       <th scope="col">Convênio</th>
                       <th scope="col">Situação</th>
                     </tr>
@@ -214,13 +299,23 @@ function AgendaPage({ url }: { url: URLSearchParams }) {
                   <tbody>
                     {sessoes.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="vazio">
+                        <td colSpan={podeEditar ? 8 : 7} className="vazio">
                           Nenhuma sessão com esses filtros.
                         </td>
                       </tr>
                     ) : (
                       sessoes.map((s) => (
                         <tr key={s.id}>
+                          {podeEditar && (
+                            <td className="col-check">
+                              <input
+                                type="checkbox"
+                                checked={marcadas.has(s.id)}
+                                onChange={(e) => marcar(s.id, e.target.checked)}
+                                aria-label={`Selecionar sessão de ${s.paciente?.nome ?? s.pacienteAnclinic ?? "sem paciente"} às ${s.horaInicio ?? "—"}`}
+                              />
+                            </td>
+                          )}
                           <td className="sb-mono" style={{ whiteSpace: "nowrap" }}>
                             {s.horaInicio ?? "—"}
                             {s.horaFim && `–${s.horaFim}`}
@@ -238,9 +333,10 @@ function AgendaPage({ url }: { url: URLSearchParams }) {
                               </span>
                             )}
                           </td>
+                          <td>{s.profissional?.nome ?? "—"}</td>
                           <td>
-                            {s.profissional?.nome ?? "—"}
-                            {s.unidade && <span className="texto-suave">{s.unidade.nome}</span>}
+                            {s.unidade ? s.unidade.nome : <Badge tom="warning">Sem unidade</Badge>}
+                            {s.unidadeManual && <span className="texto-suave">definida no sistema</span>}
                           </td>
                           <td>{s.convenio?.nome ?? <span className="texto-suave">{s.convenioAnclinic ?? "—"}</span>}</td>
                           <td>

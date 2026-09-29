@@ -10,6 +10,7 @@ import { apagarArquivo, salvarPdf, sha256 } from "@/lib/arquivos";
 import { deDate, paraDate } from "@/lib/datas";
 import { chaveNome, formatarCpf } from "@/lib/importacao/planilha";
 import { prisma } from "@/lib/prisma";
+import { validadePadrao } from "@/lib/regras/pedidoMedico";
 import { lerPlano, type PlanoTerapeutico } from "./plano";
 import { chaveCarteirinha, numerosDoNome, tipoPeloNome } from "./vinculo";
 
@@ -112,6 +113,7 @@ function dadosDoPedido(plano: PlanoTerapeutico, nomeArquivo: string) {
     ufConselho: "SP",
     cid: plano.cid,
     dataPedido: paraDate(plano.dataSolicitacao),
+    validoAte: validadePadrao(paraDate(plano.dataSolicitacao)),
     sessoesSemanais: somaItens || plano.sessoesSemanais,
     planoItens: plano.itens as unknown as Prisma.InputJsonValue,
     observacoes: `Criado a partir do plano terapêutico (${nomeArquivo.slice(0, 120)}). UF do CRM presumida: SP — confira.`,

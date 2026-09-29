@@ -11,7 +11,8 @@ import type {
   EvolucaoMes,
   Importacao,
   Paciente,
-  PacientePorCpf,
+  DadosParaAutorizacao,
+  PacienteBusca,
   Paginado,
   PedidoMedico,
   PlanoLido,
@@ -39,7 +40,8 @@ export const pacienteService = {
   listar: (params: Filtros = {}) => api.get<Paginado<Paciente>>("/pacientes", params),
   buscarPorId: (id: string) =>
     api.get<Paciente & { autorizacoes: Autorizacao[] }>(`/pacientes/${id}`),
-  porCpf: (cpf: string) => api.get<PacientePorCpf>("/pacientes/por-cpf", { cpf }),
+  busca: (q: string) => api.get<PacienteBusca[]>("/pacientes/busca", { q }),
+  paraAutorizacao: (id: string) => api.get<DadosParaAutorizacao>(`/pacientes/${id}/para-autorizacao`),
   criar: (dados: unknown) => api.post<Paciente>("/pacientes", dados),
   atualizar: (id: string, dados: unknown) => api.put<Paciente>(`/pacientes/${id}`, dados),
   desativar: (id: string) => api.patch(`/pacientes/${id}/desativar`),
@@ -108,6 +110,9 @@ export const clinicaService = {
 
 export const unidadeService = {
   listar: () => api.get<Unidade[]>("/unidades"),
+  criar: (dados: unknown) => api.post<Unidade>("/unidades", dados),
+  atribuir: (dados: { ids: string[]; unidadeId: string | null; incluirPaciente?: boolean }) =>
+    api.patch<{ atualizadas: number }>("/agendamentos/unidade", dados),
   atualizar: (id: string, dados: unknown) => api.put<Unidade>(`/unidades/${id}`, dados),
 };
 

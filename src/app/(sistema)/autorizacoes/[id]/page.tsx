@@ -56,6 +56,13 @@ export default function AutorizacaoDetalhe() {
           ? `Status alterado para ${rotuloStatus(novoStatus).toLowerCase()}.`
           : `Status alterado e, em seguida, marcado como ${rotuloStatus(atualizada.status).toLowerCase()} pelo sistema.`,
       );
+      if (atualizada.atendimentosGerados !== undefined) {
+        if (atualizada.atendimentosGerados > 0) {
+          toast.success(`${atualizada.atendimentosGerados} sessão(ões) da agenda enviadas para Atendimentos, aguardando confirmação.`);
+        } else {
+          toast("Nenhuma sessão da agenda coberta por esta autorização. Confira convênio, procedimento e vigência.", { duration: 8000 });
+        }
+      }
       fecharModal();
       recarregar();
       buscarAlertas();
@@ -188,6 +195,35 @@ export default function AutorizacaoDetalhe() {
           </div>
         </section>
       </div>
+
+      <section className="sb-card" aria-labelledby="atendimentos-aut-titulo">
+        <div className="sb-card__header">
+          <h3 id="atendimentos-aut-titulo" className="sb-card__title">
+            Atendimentos desta autorização
+          </h3>
+          <Link href={`/atendimentos?autorizacaoId=${aut.id}`}>Ver atendimentos</Link>
+        </div>
+        <div className="sb-card__body">
+          {aut.status !== "autorizada" && !Object.keys(aut.atendimentos ?? {}).length ? (
+            <p className="texto-suave">Quando a autorização for aprovada, as sessões da agenda que ela cobre vão para Atendimentos.</p>
+          ) : (
+            <dl className="dl-grade dl-grade--4">
+              {(
+                [
+                  ["aguardando_confirmacao", "Aguardando confirmação"],
+                  ["confirmado", "Confirmados"],
+                  ["cancelado", "Cancelados"],
+                ] as const
+              ).map(([k, rotulo]) => (
+                <div key={k}>
+                  <dt>{rotulo}</dt>
+                  <dd className="mono">{aut.atendimentos?.[k] ?? 0}</dd>
+                </div>
+              ))}
+            </dl>
+          )}
+        </div>
+      </section>
 
       <section className="sb-card" aria-labelledby="plano-titulo">
         <div className="sb-card__header">

@@ -2,6 +2,7 @@ import type { Prisma, StatusAutorizacao } from "@prisma/client";
 import { ErroHttp, json, paginacao, respostaPaginada, rota } from "@/lib/api/http";
 import { exigirSessao } from "@/lib/auth/sessao";
 import { hojeISO, paraDate, somarDias } from "@/lib/datas";
+import { idsPacientesPorBusca } from "@/lib/pacientes/busca";
 import { prisma } from "@/lib/prisma";
 import { marcarVencidas } from "@/lib/regras/autorizacao";
 import { esquemaAutorizacao, lerCorpo, STATUS_AUTORIZACAO } from "@/lib/validacao";
@@ -20,6 +21,13 @@ export const GET = rota(async (req) => {
     where.status = status as StatusAutorizacao;
   }
   if (sp.get("pacienteId")) where.pacienteId = sp.get("pacienteId")!;
+  // Busca única: nome, CPF ou carteirinha do paciente.
+  const busca = sp.get("busca")?.trim();
+  if (busca) {
+    const ids = await idsPacientesPorBusca(busca, { ativos: false, limite: 500 });
+    const filtro = sp.get("pacienteId");
+    where.pacienteId = { in: filtro ? ids.filter((i) => i === filtro) : ids };
+  }
   if (sp.get("convenioId")) where.convenioId = sp.get("convenioId")!;
 
   // Autorizações ativas que vencem nos próximos N dias

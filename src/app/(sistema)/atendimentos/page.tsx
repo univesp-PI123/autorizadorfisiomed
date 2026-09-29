@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useState, type ChangeEvent, type FormEvent } from "react";
 import toast from "react-hot-toast";
+import BuscaPaciente from "@/components/BuscaPaciente";
 import { comUrl, tirarNovoDaUrl } from "@/components/ComUrl";
 import Icone from "@/components/Icone";
 import Carregando from "@/components/ui/Carregando";
@@ -14,8 +15,8 @@ import { useSessao } from "@/contextos/SessaoContexto";
 import { formatarData, formatarMoeda } from "@/lib/analiseDados";
 import { mensagemDeErro } from "@/lib/cliente/api";
 import { useFetch, usePaginacao } from "@/lib/cliente/hooks";
-import { atendimentoService, autorizacaoService, pacienteService, procedimentoService } from "@/lib/cliente/servicos";
-import type { Atendimento, Autorizacao, SituacaoAtendimento } from "@/lib/cliente/tipos";
+import { atendimentoService, autorizacaoService, procedimentoService } from "@/lib/cliente/servicos";
+import type { Atendimento, Autorizacao, PacienteBusca, SituacaoAtendimento } from "@/lib/cliente/tipos";
 import { hojeISO } from "@/lib/datas";
 import { MOTIVOS_GLOSA, OUTROS } from "@/lib/glosa";
 
@@ -56,9 +57,12 @@ function AtendimentosPage({ url }: { url: URLSearchParams }) {
   const [filtroStatus, setFiltroStatus] = useState(url.get("statusCobranca") ?? "");
   const [filtroSemAut, setFiltroSemAut] = useState(url.get("semAutorizacao") ?? "");
   const [filtroSituacao, setFiltroSituacao] = useState(url.get("situacao") ?? "");
+  const filtroAutorizacao = url.get("autorizacaoId") ?? "";
+  const hoje = hojeISO();
   const [modalAberto, setModalAberto] = useState(operador && url.get("novo") === "1");
   const [form, setForm] = useState(formInicial);
   const [autsPaciente, setAutsPaciente] = useState<Autorizacao[]>([]);
+  const [paciente, setPaciente] = useState<PacienteBusca | null>(null);
   const [cobranca, setCobranca] = useState<{ atendimento: Atendimento; form: FormCobranca } | null>(null);
   const [cancelando, setCancelando] = useState<{ atendimento: Atendimento; motivo: string } | null>(null);
   const [salvando, setSalvando] = useState(false);
@@ -72,17 +76,13 @@ function AtendimentosPage({ url }: { url: URLSearchParams }) {
         statusCobranca: filtroStatus || undefined,
         semAutorizacao: filtroSemAut || undefined,
         situacao: filtroSituacao || undefined,
+        autorizacaoId: filtroAutorizacao || undefined,
       }),
-    [pagina, limite, filtroStatus, filtroSemAut, filtroSituacao],
+    [pagina, limite, filtroStatus, filtroSemAut, filtroSituacao, filtroAutorizacao],
   );
   const { data, carregando, erro, recarregar } = useFetch(buscar);
   const atendimentos = data?.data ?? [];
 
-  const buscarPacientes = useCallback(
-    () => (modalAberto ? pacienteService.listar({ limit: 200, ativo: true }) : Promise.resolve(null)),
-    [modalAberto],
-  );
-  const { data: pacientes } = useFetch(buscarPacientes);
   const buscarProcedimentos = useCallback(
     () => (modalAberto ? procedimentoService.listar() : Promise.resolve(null)),
     [modalAberto],
@@ -92,8 +92,9 @@ function AtendimentosPage({ url }: { url: URLSearchParams }) {
   const aoMudar = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
 
   // Ao escolher o paciente, carrega as autorizações vigentes dele.
-  const aoMudarPaciente = async (e: ChangeEvent<HTMLSelectElement>) => {
-    const pacienteId = e.target.value;
+  const escolherPaciente = async (p: PacienteBusca | null) => {
+    setPaciente(p);
+    const pacienteId = p?.id ?? "";
     setForm((f) => ({ ...f, pacienteId, autorizacaoId: "" }));
     setAutsPaciente([]);
     if (!pacienteId) return;
@@ -110,6 +111,7 @@ function AtendimentosPage({ url }: { url: URLSearchParams }) {
     tirarNovoDaUrl();
     setForm(formInicial());
     setAutsPaciente([]);
+    setPaciente(null);
   };
 
   const executar = async (acao: () => Promise<unknown>, sucesso: string, aoConcluir: () => void, erroPadrao: string) => {
@@ -222,6 +224,12 @@ function AtendimentosPage({ url }: { url: URLSearchParams }) {
             )}
           </h2>
           <div className="ferramentas">
+            {filtroAutorizacao && (
+              <Link href="/atendimentos" className="sb-btn sb-btn--ghost">
+                <Icone nome="fechar" />
+                Filtro por autorização
+              </Link>
+            )}
             <select
               className="sb-input sb-input--sm"
               value={filtroSituacao}
@@ -327,7 +335,9 @@ function AtendimentosPage({ url }: { url: URLSearchParams }) {
                         </td>
                         <td>{a.profissional?.nome ?? a.terapeuta?.nome ?? "—"}</td>
                         <td>
-                          <Badge tom={SITUACAO[a.situacao].tom}>{SITUACAO[a.situacao].rotulo}</Badge>
+                          <Badge tom={SITUACAO[a.situacao].tom}>
+                            {a.situacao === "aguardando_confirmacao" && a.dataAtendimento > hoje ? "Agendada" : SITUACAO[a.situacao].rotulo}
+                          </Badge>
                           {a.motivoCancelamento && <span className="texto-suave">{a.motivoCancelamento}</span>}
                         </td>
                         <td>
@@ -343,7 +353,8 @@ function AtendimentosPage({ url }: { url: URLSearchParams }) {
                                     type="button"
                                     className="sb-btn sb-btn--sm sb-btn--primary"
                                     onClick={() => confirmar(a)}
-                                    disabled={salvando}
+                                    disabled={salvando || a.dataAtendimento > hoje}
+                                    title={a.dataAtendimento > hoje ? "Confirme depois que a sessão acontecer." : undefined}
                                     aria-label={`Confirmar atendimento de ${a.paciente?.nome} em ${formatarData(a.dataAtendimento)}`}
                                   >
                                     Confirmar
@@ -402,20 +413,10 @@ function AtendimentosPage({ url }: { url: URLSearchParams }) {
       >
         <form id="form-atendimento" onSubmit={aoEnviar} noValidate>
           <div className="form-grade">
-            <div className="sb-field">
-              <label className="sb-label" htmlFor="at-paciente">
-                Paciente<span className="obrigatorio" aria-hidden="true">*</span>
-              </label>
-              <select id="at-paciente" name="pacienteId" className="sb-input" value={form.pacienteId} onChange={aoMudarPaciente} required>
-                <option value="">Selecione…</option>
-                {(pacientes?.data ?? []).map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.nome}
-                  </option>
-                ))}
-              </select>
+            <div className="inteira">
+              <BuscaPaciente id="at-paciente" obrigatorio selecionado={paciente} aoSelecionar={escolherPaciente} />
             </div>
-            <div className="sb-field">
+            <div className="sb-field inteira">
               <label className="sb-label" htmlFor="at-autorizacao">
                 Autorização
               </label>
