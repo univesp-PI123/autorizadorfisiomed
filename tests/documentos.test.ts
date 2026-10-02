@@ -82,3 +82,34 @@ describe("nomesParecidos", () => {
     expect(nomesParecidos("ANA LIMA", "Ana Clara Souza")).toBe(false);
   });
 });
+
+describe("pasta do paciente", async () => {
+  const { acharPaciente, pastaDoPaciente } = await import("@/lib/documentos/salvar");
+  const pac = (id: string, nome: string) => ({ id, nome, cpf: null, dataNascimento: null });
+  const lista = [pac("p1", "MARIA DA SILVA SANTOS"), pac("p2", "JOÃO PEDRO LIMA"), pac("p3", "Ana Clara Souza"), pac("p4", "Ana Beatriz Souza")];
+  const idx = {
+    porId: new Map(lista.map((p) => [p.id, p])),
+    porCpf: new Map(),
+    porCarteira: new Map<string, Set<string>>(),
+    porNome: new Map(lista.map((p) => [p.nome.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase(), [p]])),
+    porNascimento: new Map(),
+  };
+
+  it("escolhida a pasta de todos: a pasta do meio é o paciente; subpastas ficam de fora", () => {
+    expect(pastaDoPaciente("PACIENTES/MARIA DA SILVA SANTOS/pedido.pdf", idx)).toEqual({ pasta: "MARIA DA SILVA SANTOS" });
+    expect(pastaDoPaciente("PACIENTES/MARIA DA SILVA SANTOS/DOCUMENTOS/antigo.pdf", idx)).toHaveProperty("ignorar");
+    expect(pastaDoPaciente("pedido.pdf", idx)).toEqual({ pasta: null });
+  });
+
+  it("escolhida a pasta de um paciente: os PDFs dela valem e a subpasta fica de fora", () => {
+    expect(pastaDoPaciente("João Pedro Lima/plano.pdf", idx)).toEqual({ pasta: "João Pedro Lima" });
+    expect(pastaDoPaciente("João Pedro Lima/Documentos/plano-2025.pdf", idx)).toHaveProperty("ignorar");
+  });
+
+  it("acha o paciente pelo nome da pasta, igual ou parecido, sem ambiguidade", () => {
+    expect(acharPaciente("pedido.pdf", null, idx, "Maria da Silva Santos")).toMatchObject({ paciente: { id: "p1" }, por: "pasta" });
+    expect(acharPaciente("pedido.pdf", null, idx, "MARIA SILVA SANTOS")).toMatchObject({ paciente: { id: "p1" }, por: "pasta" });
+    expect(acharPaciente("pedido.pdf", null, idx, "ANA SOUZA").paciente).toBeUndefined();
+    expect(acharPaciente("pedido.pdf", null, idx, "CARLOS NUNES").motivo).toContain("CARLOS NUNES");
+  });
+});

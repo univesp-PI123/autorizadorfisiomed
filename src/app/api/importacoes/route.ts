@@ -9,6 +9,7 @@ import { interpretarProfissionais } from "@/lib/importacao/profissionais";
 import { interpretarTabelaOperadora, interpretarTuss } from "@/lib/importacao/tabelas";
 import { prisma } from "@/lib/prisma";
 import { sincronizarAtendimentos } from "@/lib/regras/atendimentos";
+import { reconciliarPendentes } from "@/lib/solicitacoes";
 
 const TAMANHO_MAX = 15 * 1024 * 1024;
 const PERFIS_IMPORTACAO = ["admin", "recepcionista"] as const;
@@ -65,8 +66,12 @@ export const POST = rota(async (req) => {
       const agenda = interpretarAgenda(linhas);
       if (!agenda.sessoes.length) throw new ErroHttp(422, "Nenhuma sessão encontrada na planilha.");
       const importacao = await gravarAgenda(agenda, arquivo.name, usuario.id);
+      // Pedidos ainda não enviados acompanham a agenda nova.
+      const { canceladas, ajustadas } = await reconciliarPendentes();
       await sincronizarAtendimentos();
-      return json(importacao, 201);
+      if (!canceladas && !ajustadas) return json(importacao, 201);
+      const resumo = { ...(importacao.resumo as object), pedidos: { cancelados: canceladas, ajustados: ajustadas } };
+      return json(await prisma.importacao.update({ where: { id: importacao.id }, data: { resumo } }), 201);
     }
     const convenioId = form.get("convenioId");
     if (convenioId !== null && convenioId !== "") {

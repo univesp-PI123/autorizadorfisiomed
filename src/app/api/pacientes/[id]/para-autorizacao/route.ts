@@ -5,8 +5,8 @@ import { prisma } from "@/lib/prisma";
 import { codigoParaGuia } from "@/lib/regras/codigoGuia";
 
 // O que a nova autorização precisa do paciente escolhido: as carteirinhas, os
-// procedimentos que ele tem na agenda (por convênio) e o pedido médico com o
-// plano terapêutico vigente.
+// procedimentos que ele tem na agenda (por convênio e unidade) e o pedido
+// médico com o plano terapêutico vigente.
 export const GET = rota<{ id: string }>(async (req, { params }) => {
   await exigirSessao(req, ["admin", "recepcionista", "financeiro"]);
   const { id } = await params;
@@ -27,6 +27,7 @@ export const GET = rota<{ id: string }>(async (req, { params }) => {
         data: true,
         convenioId: true,
         convenio: { select: { id: true, nome: true } },
+        unidade: { select: { id: true, nome: true } },
         procedimento: {
           select: {
             id: true, codigoAnclinic: true, descricao: true, codigoTuss: true, tabelaTuss: true,
@@ -43,10 +44,20 @@ export const GET = rota<{ id: string }>(async (req, { params }) => {
     }),
   ]);
 
-  // Procedimentos da agenda por convênio, com quantas sessões e o código da guia.
-  const grupos = new Map<string, { convenio: { id: string; nome: string }; procedimento: { id: string; codigoAnclinic: string; descricao: string }; codigo: string | null; sessoes: number; ultima: string; proxima: string | null }>();
+  // Procedimentos da agenda por convênio e unidade, com quantas sessões e o
+  // código da guia.
+  type Grupo = {
+    convenio: { id: string; nome: string };
+    procedimento: { id: string; codigoAnclinic: string; descricao: string };
+    unidade: { id: string; nome: string } | null;
+    codigo: string | null;
+    sessoes: number;
+    ultima: string;
+    proxima: string | null;
+  };
+  const grupos = new Map<string, Grupo>();
   for (const a of agendamentos) {
-    const k = `${a.convenioId}|${a.procedimento!.id}`;
+    const k = `${a.convenioId}|${a.procedimento!.id}|${a.unidade?.id ?? ""}`;
     const g = grupos.get(k);
     const d = deDate(a.data);
     if (g) {
@@ -56,6 +67,7 @@ export const GET = rota<{ id: string }>(async (req, { params }) => {
       grupos.set(k, {
         convenio: a.convenio!,
         procedimento: { id: a.procedimento!.id, codigoAnclinic: a.procedimento!.codigoAnclinic, descricao: a.procedimento!.descricao },
+        unidade: a.unidade,
         codigo: codigoParaGuia(a.procedimento!, a.convenioId)?.codigo ?? null,
         sessoes: 1,
         ultima: d,

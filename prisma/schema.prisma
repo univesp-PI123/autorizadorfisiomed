@@ -195,6 +195,7 @@ model Autorizacao {
   dataResposta         DateTime?         @db.Date
   status               StatusAutorizacao @default(pendente)
   motivoNegativa       String?
+  unidadeId            String?           @db.Uuid // unidade (CNES) para a qual se pede
   usuarioCriouId       String?           @db.Uuid
   observacoes          String?
   createdAt            DateTime          @default(now())
@@ -203,9 +204,11 @@ model Autorizacao {
   paciente     Paciente          @relation(fields: [pacienteId], references: [id])
   convenio     Convenio          @relation(fields: [convenioId], references: [id])
   vinculo      PacienteConvenio? @relation(fields: [pacienteConvenioId], references: [id])
+  unidade      Unidade?          @relation(fields: [unidadeId], references: [id], onDelete: SetNull)
   usuarioCriou Usuario?          @relation("AutorizacaoCriadaPor", fields: [usuarioCriouId], references: [id])
   atendimentos Atendimento[]
   historico    HistoricoStatus[]
+  agendamentos Agendamento[] // sessões cobertas por este pedido (lista "A solicitar")
 
   @@index([status])
   @@index([dataFimVigencia])
@@ -241,8 +244,6 @@ model Atendimento {
   procedimento       String              @db.VarChar(200)
   codigoProcedimento String?             @db.VarChar(30)
   statusCobranca     StatusCobranca      @default(pendente)
-  valorCobrado       Decimal?            @db.Decimal(10, 2)
-  valorPago          Decimal?            @db.Decimal(10, 2)
   motivoGlosa        String?
   semAutorizacao     Boolean             @default(false) // realizado sem autorização vigente
   evolucao           String? // não é mais preenchida pelo formulário
@@ -303,6 +304,7 @@ model Unidade {
   updatedAt      DateTime @updatedAt
 
   agendamentos Agendamento[]
+  autorizacoes Autorizacao[]
 
   @@map("unidades")
 }
@@ -382,11 +384,11 @@ model Agendamento {
   senhaAutorizacao      String?   @db.VarChar(40)
   senhaExecucao         String?   @db.VarChar(40)
   agendamentosRestantes Int?
-  valorFaturamento      Decimal?  @db.Decimal(10, 2)
   agenda                String?   @db.VarChar(200)
   sala                  String?   @db.VarChar(200)
   removidoEm            DateTime? // sumiu de uma importação posterior do mesmo dia
   unidadeManual         Boolean   @default(false) // unidade escolhida no sistema: a importação não troca
+  autorizacaoId         String?   @db.Uuid // pedido gerado para esta sessão
   importacaoId          String?   @db.Uuid
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
@@ -396,11 +398,13 @@ model Agendamento {
   convenio     Convenio?     @relation(fields: [convenioId], references: [id])
   procedimento Procedimento? @relation(fields: [procedimentoId], references: [id])
   unidade      Unidade?      @relation(fields: [unidadeId], references: [id])
+  autorizacao  Autorizacao?  @relation(fields: [autorizacaoId], references: [id], onDelete: SetNull)
   importacao   Importacao?   @relation(fields: [importacaoId], references: [id], onDelete: SetNull)
   atendimento  Atendimento?
 
   @@index([data])
   @@index([pacienteId])
+  @@index([autorizacaoId])
   @@map("agendamentos")
 }
 
@@ -500,7 +504,6 @@ model ProcedimentoOperadora {
   descricao      String   @db.VarChar(300)
   tabela         String   @default("22") @db.VarChar(2) // 22 TUSS, 98/00 próprias
   codigoTuss     String?  @db.VarChar(10)
-  valor          Decimal? @db.Decimal(10, 2)
   ativo          Boolean  @default(true)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt

@@ -1,10 +1,10 @@
 // Atendimentos a partir da agenda: assim que uma autorização é aprovada, as
-// sessões da agenda que ela cobre (dentro da vigência, até o saldo) viram
-// atendimentos "aguardando confirmação", com o valor do faturamento do
-// AnClinic. Depois que a sessão acontece, o operador confirma (aí ela é
-// descontada da autorização) ou cancela, com motivo.
+// sessões da agenda que ela cobre (as ligadas ao pedido ou, numa autorização
+// lançada à mão, as da vigência até o saldo) viram atendimentos "aguardando
+// confirmação". No dia da sessão, o operador confirma (aí ela é descontada da
+// autorização) ou cancela, com motivo.
 
-import { Prisma } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 import { analisarAgendamentos } from "@/lib/agenda";
 import { ErroHttp } from "@/lib/api/http";
 import { hojeISO, paraDate, somarDias } from "@/lib/datas";
@@ -81,7 +81,7 @@ export async function sincronizarAtendimentos() {
   // 1. Pendentes cuja sessão foi desmarcada ou excluída no AnClinic.
   const pendentes = await prisma.atendimento.findMany({
     where: { situacao: "aguardando_confirmacao", agendamentoId: { not: null } },
-    select: { id: true, valorCobrado: true, agendamento: { select: { statusAnclinic: true, removidoEm: true, valorFaturamento: true } } },
+    select: { id: true, agendamento: { select: { statusAnclinic: true, removidoEm: true } } },
   });
   for (const p of pendentes) {
     const ag = p.agendamento!;
@@ -94,8 +94,6 @@ export async function sincronizarAtendimentos() {
           motivoCancelamento: ag.removidoEm ? "Sessão excluída da agenda do AnClinic." : `AnClinic: ${ag.statusAnclinic}.`,
         },
       });
-    } else if (ag.valorFaturamento && !ag.valorFaturamento.equals(p.valorCobrado ?? new Prisma.Decimal(-1))) {
-      await prisma.atendimento.update({ where: { id: p.id }, data: { valorCobrado: ag.valorFaturamento } });
     }
   }
 
@@ -145,7 +143,6 @@ export async function sincronizarAtendimentos() {
       dataAtendimento: a.data,
       horaInicio: a.horaInicio,
       horaFim: a.horaFim,
-      valorCobrado: a.valorFaturamento,
       situacao: "aguardando_confirmacao",
       semAutorizacao: false,
     });

@@ -2,12 +2,14 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import Icone from "@/components/Icone";
 import { LogoMenu } from "@/components/Marca";
 import { useAlertas } from "@/contextos/AlertaContexto";
 import { useSessao } from "@/contextos/SessaoContexto";
 import { ITENS_MENU } from "@/lib/navegacao";
+
+const semInscricao = () => () => {};
 
 // Barra lateral do Sóbrio: recolhida por padrão (só ícones), botão redondo
 // para expandir e popup com as sub-opções ao passar o mouse ou focar.
@@ -17,6 +19,9 @@ export default function Rail() {
   const pathname = usePathname();
   const busca = useSearchParams().toString();
   const [aberta, setAberta] = useState(false);
+  // O contador de alertas chega depois (busca no navegador): só aparece com a
+  // barra já hidratada, para não divergir do HTML que veio do servidor.
+  const montada = useSyncExternalStore(semInscricao, () => true, () => false);
 
   const itens = ITENS_MENU.filter((i) => i.perfis.includes(usuario.perfil));
   const grupos = [...new Set(itens.map((i) => i.grupo))];
@@ -62,7 +67,7 @@ export default function Rail() {
                     >
                       <Icone nome={item.icone} />
                       <span className="sb-nav-text">{item.rotulo}</span>
-                      {item.caminho === "/autorizacoes" && totalAlertas > 0 && (
+                      {montada && item.caminho === "/autorizacoes" && totalAlertas > 0 && (
                         <span className="sb-rail__contador" aria-label={`${totalAlertas} vencendo em 7 dias`}>
                           {totalAlertas}
                         </span>

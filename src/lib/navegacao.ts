@@ -46,25 +46,13 @@ export const ITENS_MENU: ItemMenu[] = [
     icone: "autorizacoes",
     perfis: ["admin", "recepcionista", "financeiro"],
     subitens: [
+      { rotulo: "Importar agenda do dia", href: "/autorizacoes?importar=1", perfis: ["admin", "recepcionista"] },
       { rotulo: "Nova autorização", href: "/autorizacoes?novo=1" },
+      { rotulo: "A solicitar hoje", href: "/autorizacoes#a-solicitar" },
       { rotulo: "Todas", href: "/autorizacoes" },
-      { rotulo: "Pendentes", href: "/autorizacoes?status=pendente" },
-      { rotulo: "Em análise", href: "/autorizacoes?status=em_analise" },
-      { rotulo: "Vencendo em 7 dias", href: "/autorizacoes?vencendoEm=7" },
-    ],
-  },
-  {
-    caminho: "/agenda",
-    rotulo: "Agenda",
-    grupo: "Operação",
-    icone: "agenda",
-    perfis: ["admin", "recepcionista", "financeiro"],
-    subitens: [
-      { rotulo: "Importar agenda", href: "/importacoes#importar-agenda", perfis: ["admin", "recepcionista"] },
-      { rotulo: "Sessões", href: "/agenda" },
-      { rotulo: "Com pendência", href: "/agenda?situacao=pendente" },
-      { rotulo: "Prontas para solicitar", href: "/agenda?situacao=pronta" },
-      { rotulo: "Sem unidade de atendimento", href: "/agenda?unidade=sem" },
+      { rotulo: "A enviar", href: "/autorizacoes?status=pendente" },
+      { rotulo: "Aguardando resposta", href: "/autorizacoes?status=em_analise" },
+      { rotulo: "Negadas", href: "/autorizacoes?status=negada" },
     ],
   },
   {
@@ -139,7 +127,6 @@ export const ITENS_MENU: ItemMenu[] = [
     icone: "importar",
     perfis: ["admin", "recepcionista", "financeiro"],
     subitens: [
-      { rotulo: "Importar agenda", href: "/importacoes#importar-agenda", perfis: ["admin", "recepcionista"] },
       { rotulo: "Importar profissionais", href: "/importacoes#importar-profissionais", perfis: ["admin", "recepcionista"] },
       { rotulo: "Enviar documentos", href: "/importacoes#importar-documentos", perfis: ["admin", "recepcionista"] },
       { rotulo: "Histórico", href: "/importacoes#historico" },

@@ -4,7 +4,8 @@ import { hojeISO, paraDate, somarDias } from "@/lib/datas";
 import { prisma } from "@/lib/prisma";
 import { marcarVencidas } from "@/lib/regras/autorizacao";
 
-// Autorizações ativas que vencem nos próximos N dias (padrão 7).
+// Autorizações ativas que vencem nos próximos N dias (padrão 7). Os pedidos
+// gerados pela lista do dia valem só a semana: vencer é o normal, não alerta.
 export const GET = rota(async (req) => {
   await exigirSessao(req);
   await marcarVencidas();
@@ -18,6 +19,7 @@ export const GET = rota(async (req) => {
     where: {
       status: "autorizada",
       dataFimVigencia: { gte: paraDate(hoje), lte: paraDate(somarDias(hoje, dias)) },
+      agendamentos: { none: {} },
     },
     include: {
       paciente: { select: { id: true, nome: true, telefone: true } },

@@ -51,15 +51,6 @@ const CAMINHOS = {
       <path d="M8 14h3" />
     </>
   ),
-  agenda: (
-    <>
-      <rect x="3.5" y="5" width="17" height="15.5" rx="2" />
-      <path d="M8 3v4" />
-      <path d="M16 3v4" />
-      <path d="M3.5 10h17" />
-      <path d="M9 15l2 2 4-4" />
-    </>
-  ),
   importar: (
     <>
       <path d="M12 3v12" />

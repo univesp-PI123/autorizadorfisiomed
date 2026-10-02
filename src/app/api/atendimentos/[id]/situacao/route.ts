@@ -7,7 +7,8 @@ import { consumirSessao } from "@/lib/regras/atendimentos";
 import { esquemaSituacaoAtendimento, lerCorpo } from "@/lib/validacao";
 
 // O operador confirma que a sessão aconteceu (desconta da autorização) ou
-// cancela, com motivo obrigatório.
+// cancela, com motivo obrigatório. Confirmar só no dia da sessão: confirmar
+// depois leva a validações na data errada.
 export const PATCH = rota<{ id: string }>(async (req, { params }) => {
   const usuario = await exigirSessao(req, ["admin", "recepcionista"]);
   const { id } = await params;
@@ -33,8 +34,16 @@ export const PATCH = rota<{ id: string }>(async (req, { params }) => {
     );
   }
 
-  if (deDate(atendimento.dataAtendimento) > hojeISO()) {
-    throw new ErroHttp(409, `A sessão é de ${deDate(atendimento.dataAtendimento).split("-").reverse().join("/")}: confirme depois que ela acontecer.`);
+  const dia = deDate(atendimento.dataAtendimento);
+  const hoje = hojeISO();
+  if (dia !== hoje) {
+    const data = dia.split("-").reverse().join("/");
+    throw new ErroHttp(
+      409,
+      dia > hoje
+        ? `A sessão é de ${data}: confirme no dia em que ela acontecer.`
+        : `A sessão foi em ${data}: só dá para confirmar no próprio dia. Se ela não aconteceu, cancele.`,
+    );
   }
   if (atendimento.autorizacaoId) await marcarVencidas();
   return json(

@@ -1,6 +1,6 @@
-// Carrega sessões da agenda com a situação de cada uma em relação à
-// autorização (regra em regras/pendencias.ts). Usada pela tela Agenda e pela
-// geração automática dos atendimentos.
+// Carrega sessões da agenda importada do AnClinic com a situação de cada uma
+// em relação à autorização (regra em regras/pendencias.ts). Usada pela lista
+// "A solicitar" e pela geração automática dos atendimentos.
 
 import type { Prisma } from "@prisma/client";
 import { deDate } from "@/lib/datas";
@@ -19,12 +19,13 @@ const INCLUIR = {
   },
   profissional: {
     select: {
-      id: true, nome: true, conselho: true, numeroConselho: true, ufConselho: true, cbo: true,
+      id: true, nome: true, conselho: true, numeroConselho: true, ufConselho: true,
       credenciamentos: { select: { convenioId: true } },
     },
   },
   unidade: { select: { id: true, nome: true, cnes: true } },
   atendimento: { select: { id: true, situacao: true } },
+  autorizacao: { select: { id: true, status: true, motivoNegativa: true } },
 } satisfies Prisma.AgendamentoInclude;
 
 export async function analisarAgendamentos(where: Prisma.AgendamentoWhereInput) {
@@ -45,7 +46,7 @@ export async function analisarAgendamentos(where: Prisma.AgendamentoWhereInput) 
       where: { pacienteId: { in: pacienteIds }, status: "autorizada" },
       select: {
         id: true, pacienteId: true, convenioId: true, codigoProcedimento: true, procedimento: true, status: true, dataInicioVigencia: true,
-        dataFimVigencia: true, quantidadeAutorizada: true, quantidadeUtilizada: true,
+        dataFimVigencia: true, quantidadeAutorizada: true, quantidadeUtilizada: true, _count: { select: { agendamentos: true } },
       },
     }),
   ]);
@@ -76,6 +77,7 @@ export async function analisarAgendamentos(where: Prisma.AgendamentoWhereInput) 
             dataInicioVigencia: a.dataInicioVigencia && deDate(a.dataInicioVigencia),
             dataFimVigencia: a.dataFimVigencia && deDate(a.dataFimVigencia),
             saldo: a.quantidadeAutorizada === null ? null : a.quantidadeAutorizada - a.quantidadeUtilizada,
+            ligadas: a._count.agendamentos,
           })),
       };
       contextos.set(pacienteId, c);
@@ -106,6 +108,8 @@ export async function analisarAgendamentos(where: Prisma.AgendamentoWhereInput) 
           convenioIds: a.profissional.credenciamentos.map((c) => c.convenioId),
         },
         unidade: a.unidade,
+        sala: a.sala,
+        autorizacao: a.autorizacao,
       },
       contexto(a.pacienteId),
     );

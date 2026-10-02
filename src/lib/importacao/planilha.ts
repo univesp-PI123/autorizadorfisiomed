@@ -148,15 +148,6 @@ export function hora(v: Celula | undefined): string | null {
   return Number(h) < 24 && Number(m[2]) < 60 ? `${h}:${m[2]}` : null;
 }
 
-/** "R$1.234,56" → 1234.56 */
-export function dinheiro(v: Celula | undefined): number | null {
-  if (typeof v === "number") return v;
-  const s = texto(v)?.replace(/[R$\s.]/g, "").replace(",", ".");
-  if (!s) return null;
-  const n = Number(s);
-  return Number.isFinite(n) ? n : null;
-}
-
 export function inteiro(v: Celula | undefined): number | null {
   if (typeof v === "number") return Number.isInteger(v) ? v : null;
   const s = texto(v);

@@ -46,7 +46,7 @@ export default function FormLogin({
   const erroCampo = erro ? "sb-field sb-field--error" : "sb-field";
 
   return (
-    <div className="sb-auth" style={{ "--sb-auth-bg": "url(/fundo-login.webp)" } as React.CSSProperties}>
+    <div className="sb-auth">
       <BotaoAcessibilidade flutuante />
       <main className="sb-auth__center" id="conteudo">
         <div className="sb-auth__card">

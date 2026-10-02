@@ -1,4 +1,3 @@
-import { Prisma } from "@prisma/client";
 import { ErroHttp, json, naoEncontrado, rota } from "@/lib/api/http";
 import { exigirSessao } from "@/lib/auth/sessao";
 import { prisma } from "@/lib/prisma";
@@ -24,7 +23,6 @@ export const PUT = rota<{ id: string }>(async (req, { params }) => {
             descricao: equivalencia.descricao || dados.descricao,
             tabela: equivalencia.tabela ?? "22",
             codigoTuss: equivalencia.codigoTuss ?? null,
-            valor: equivalencia.valor === null || equivalencia.valor === undefined ? null : new Prisma.Decimal(equivalencia.valor),
             procedimentoId: id,
           };
           await tx.procedimentoOperadora.upsert({

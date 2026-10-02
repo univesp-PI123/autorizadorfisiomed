@@ -4,13 +4,18 @@
 //   fora       — convênio sem integração, não vinculado, ou sessão que não
 //                exige autorização (faturamento por "Assinatura")
 //   coberta    — já existe autorização vigente com saldo (ou senha no AnClinic)
+//   solicitada — já tem pedido gerado, esperando envio ou resposta
+//   negada     — o pedido desta sessão foi negado: tratar a negativa
+//   escolar    — atendimento na escola: pedir só no dia, quando o profissional
+//                confirmar que está com a criança
 //   pronta     — tem tudo o que a guia TISS exige: pode ser solicitada
 //   pendente   — falta algum dado; a lista diz qual
 //
-// Função pura, para ser usada pela tela da agenda e pelo robô de envio.
+// Função pura, usada pela lista "A solicitar" e pelo robô de envio.
 
 import { especialidadeDe } from "@/lib/documentos/especialidades";
 import { chaveNome } from "@/lib/importacao/planilha";
+import { ehAtendimentoEscolar } from "./solicitacao";
 
 /**
  * A autorização cobre o procedimento da sessão? Pelo código (de/para ou TUSS)
@@ -32,7 +37,7 @@ export function mesmoProcedimento(
   return !!esp && esp === especialidadeDe(aut.procedimento);
 }
 
-export type SituacaoSessao = "cancelada" | "fora" | "coberta" | "pronta" | "pendente";
+export type SituacaoSessao = "cancelada" | "fora" | "coberta" | "solicitada" | "negada" | "escolar" | "pronta" | "pendente";
 
 export type SessaoParaAnalise = {
   data: string; // YYYY-MM-DD
@@ -51,10 +56,12 @@ export type SessaoParaAnalise = {
     conselho: string | null;
     numeroConselho: string | null;
     ufConselho: string | null;
-    cbo: string | null;
     convenioIds: string[];
   } | null;
   unidade: { cnes: string | null } | null;
+  sala?: string | null;
+  // Pedido gerado no sistema para esta sessão (lista "A solicitar").
+  autorizacao?: { id: string; status: string; motivoNegativa?: string | null } | null;
 };
 
 export type ContextoAnalise = {
@@ -71,8 +78,14 @@ export type ContextoAnalise = {
     dataInicioVigencia: string | null;
     dataFimVigencia: string | null;
     saldo: number | null; // null = sem quantidade autorizada informada
+    // Sessões ligadas a ela (pedido gerado pela lista "A solicitar"): uma
+    // autorização assim cobre só as suas sessões, não outras da vigência.
+    ligadas?: number;
   }[];
 };
+
+const COBRE = ["autorizada", "esgotada", "vencida"];
+const EM_ANDAMENTO = ["pendente", "em_analise"];
 
 const STATUS_INATIVO = /cancel|desmarc|n[aã]o compareceu|falt|n[aã]o autorizad/i;
 
@@ -93,11 +106,21 @@ export function analisarSessao(
   if (!s.convenioAnclinic) return { situacao: "fora", pendencias: [], motivo: "Sem convênio." };
   if (!s.convenio) return { situacao: "fora", pendencias: [], motivo: "Convênio do AnClinic não vinculado a um convênio do sistema." };
 
+  const ligada = s.autorizacao ?? null;
+  if (ligada && COBRE.includes(ligada.status)) {
+    return { situacao: "coberta", pendencias: [], motivo: "Autorizada.", autorizacaoId: ligada.id };
+  }
+  if (ligada && EM_ANDAMENTO.includes(ligada.status)) {
+    const motivo = ligada.status === "pendente" ? "Pedido gerado, falta enviar à operadora." : "Enviado, aguardando a operadora.";
+    return { situacao: "solicitada", pendencias: [], motivo, autorizacaoId: ligada.id };
+  }
+
   // Cobertura vale para qualquer convênio: autorização registrada no sistema
   // (automática ou manual) ou senha já lançada no AnClinic.
   const codigoGuia = s.procedimento?.codigoGuia ?? null;
   const cobertura = ctx.autorizacoes.find(
     (a) =>
+      !a.ligadas &&
       a.convenioId === s.convenio!.id &&
       a.status === "autorizada" &&
       mesmoProcedimento(a, s.procedimento) &&
@@ -126,7 +149,6 @@ export function analisarSessao(
   if (!p) pendencias.push("Profissional não identificado");
   else {
     if (!p.conselho || !p.numeroConselho || !p.ufConselho) pendencias.push("Profissional sem conselho/número/UF");
-    if (!p.cbo) pendencias.push("Profissional sem CBO");
     if (!p.convenioIds.includes(s.convenio.id)) pendencias.push("Profissional não credenciado no convênio");
   }
   const pedido = ctx.pedidos.find(
@@ -138,5 +160,12 @@ export function analisarSessao(
   if (!pedido) pendencias.push("Sem pedido médico válido");
   else if (pedido.arquivos === 0) pendencias.push("Pedido médico sem PDF anexado");
 
+  if (ligada?.status === "negada") {
+    const motivo = ligada.motivoNegativa ? `Negada: ${ligada.motivoNegativa}` : "Negada pela operadora.";
+    return { situacao: "negada", pendencias, motivo, autorizacaoId: ligada.id };
+  }
+  if (ehAtendimentoEscolar(s.sala ?? null)) {
+    return { situacao: "escolar", pendencias, motivo: "Atendimento escolar: peça no dia, quando o profissional confirmar." };
+  }
   return pendencias.length ? { situacao: "pendente", pendencias } : { situacao: "pronta", pendencias };
 }

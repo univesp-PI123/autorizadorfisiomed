@@ -5,23 +5,12 @@ import { useCallback } from "react";
 import { GraficoBarras } from "@/components/Graficos";
 import Carregando from "@/components/ui/Carregando";
 import MensagemErro from "@/components/ui/MensagemErro";
-import { useAlertas } from "@/contextos/AlertaContexto";
 import { useSessao } from "@/contextos/SessaoContexto";
-import { diasParaVencimento, formatarData, formatarMes, formatarMoeda } from "@/lib/analiseDados";
+import { formatarData, formatarMes } from "@/lib/analiseDados";
 import { useFetch } from "@/lib/cliente/hooks";
 import { relatorioService } from "@/lib/cliente/servicos";
 
-function Indicador({
-  rotulo,
-  valor,
-  sub,
-  href,
-}: {
-  rotulo: string;
-  valor: string | number;
-  sub: string;
-  href: string;
-}) {
+function Indicador({ rotulo, valor, sub, href }: { rotulo: string; valor: number; sub: string; href: string }) {
   return (
     <Link href={href} className="card-link">
       <div className="sb-card sb-stat">
@@ -33,14 +22,15 @@ function Indicador({
   );
 }
 
+// Painel do dia: o que pedir, o que espera a operadora, as negativas para
+// tratar e os atendimentos — tudo em quantidades.
 export default function Dashboard() {
   const { usuario } = useSessao();
-  const { alertas } = useAlertas();
   const { data, carregando, erro, recarregar } = useFetch(relatorioService.dashboard);
   const buscarEvolucao = useCallback(() => relatorioService.evolucaoAtendimentos(6), []);
   const evolucao = useFetch(buscarEvolucao);
 
-  if (carregando) return <Carregando mensagem="Carregando indicadores…" />;
+  if (carregando) return <Carregando mensagem="Carregando o painel…" />;
   if (erro || !data) return <MensagemErro mensagem={erro ?? "Sem dados."} onRetry={recarregar} />;
 
   const meses = evolucao.data ?? [];
@@ -52,124 +42,135 @@ export default function Dashboard() {
   const pico = meses.reduce<(typeof meses)[number] | null>((p, m) => (!p || m.total > p.total ? m : p), null);
 
   const perfil = usuario.perfil;
+  const operador = perfil === "admin" || perfil === "recepcionista";
+  const pedeAutorizacao = perfil !== "terapeuta";
   const acoes = [
-    { rotulo: "Nova autorização", href: "/autorizacoes?novo=1", mostrar: perfil !== "terapeuta" },
-    { rotulo: "Registrar atendimento", href: "/atendimentos?novo=1", mostrar: perfil !== "financeiro" },
+    { rotulo: "Importar agenda do dia", href: "/autorizacoes?importar=1", mostrar: operador },
+    { rotulo: "Nova autorização", href: "/autorizacoes?novo=1", mostrar: pedeAutorizacao },
+    { rotulo: "Registrar atendimento", href: "/atendimentos?novo=1", mostrar: operador },
     { rotulo: "Novo paciente", href: "/pacientes?novo=1", mostrar: perfil !== "financeiro" },
-    { rotulo: "Ver pendentes", href: "/autorizacoes?status=pendente", mostrar: perfil !== "terapeuta" },
-    { rotulo: "Ver glosas", href: "/atendimentos?statusCobranca=glosado", mostrar: true },
     { rotulo: "Relatórios", href: "/relatorios", mostrar: perfil === "admin" || perfil === "financeiro" },
   ].filter((a) => a.mostrar);
+  const a = data.aSolicitar;
+  const datas = a?.datas.map((d) => d.slice(8, 10) + "/" + d.slice(5, 7)).join(" e ");
 
   return (
     <>
-      <section className="stats" aria-label="Indicadores">
+      <section className="stats" aria-label="Indicadores do dia">
+        {pedeAutorizacao && a && (
+          <Indicador
+            rotulo="A solicitar hoje"
+            valor={a.prontas + a.comPendencia}
+            sub={`${a.prontas} prontas · ${a.comPendencia} com pendência (sessões de ${datas})`}
+            href="/autorizacoes#a-solicitar"
+          />
+        )}
+        {pedeAutorizacao && (
+          <Indicador
+            rotulo="Aguardando a operadora"
+            valor={data.aEnviar + data.emAnalise}
+            sub={`${data.aEnviar} a enviar · ${data.emAnalise} em análise`}
+            href="/autorizacoes?status=em_analise"
+          />
+        )}
+        {pedeAutorizacao && (
+          <Indicador rotulo="Negadas na semana" valor={data.negadas} sub="tratar a negativa" href="/autorizacoes?status=negada" />
+        )}
         <Indicador
-          rotulo="Autorizações ativas"
-          valor={data.autorizacoesAtivas}
-          sub={`${data.totalPacientes} pacientes ativos`}
-          href="/autorizacoes?status=autorizada"
-        />
-        <Indicador
-          rotulo="Pendentes"
-          valor={data.autorizacoesPendentes}
-          sub="Aguardando resposta do convênio"
-          href="/autorizacoes?status=pendente"
-        />
-        <Indicador
-          rotulo="Vencendo em 7 dias"
-          valor={data.autorizacoesVencendo}
-          sub={data.autorizacoesVencendo > 0 ? "Requer atenção" : "Nenhuma no período"}
-          href="/autorizacoes?vencendoEm=7"
-        />
-        <Indicador
-          rotulo="Atendimentos no mês"
-          valor={data.atendimentosMes}
-          sub={`${data.semAutorizacaoMes} sem autorização`}
-          href="/atendimentos"
+          rotulo="Atendimentos hoje"
+          valor={data.atendimentosHoje.confirmados}
+          sub={`confirmados · ${data.atendimentosHoje.aguardando} aguardando confirmação`}
+          href="/atendimentos?situacao=aguardando_confirmacao"
         />
       </section>
 
       <section className="grid2">
-        <div className="sb-card">
-          <div className="sb-card__header">
-            <h2 className="sb-card__title">Autorizações vencendo</h2>
-            <Link href="/autorizacoes?vencendoEm=7">Ver todas</Link>
-          </div>
-          <div className="tabela-rolagem">
-            <table className="sb-table">
-              <thead>
-                <tr>
-                  <th scope="col">Paciente</th>
-                  <th scope="col">Convênio</th>
-                  <th scope="col">Procedimento</th>
-                  <th scope="col" className="sb-end">
-                    Sessões
-                  </th>
-                  <th scope="col" className="sb-end">
-                    Vence em
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {alertas.length === 0 ? (
+        {pedeAutorizacao ? (
+          <div className="sb-card">
+            <div className="sb-card__header">
+              <h2 className="sb-card__title">Negadas para tratar</h2>
+              <Link href="/autorizacoes?status=negada">Ver todas</Link>
+            </div>
+            <div className="tabela-rolagem">
+              <table className="sb-table">
+                <thead>
                   <tr>
-                    <td colSpan={5} className="vazio">
-                      Nenhuma autorização vence nos próximos 7 dias.
-                    </td>
+                    <th scope="col">Paciente</th>
+                    <th scope="col">Procedimento</th>
+                    <th scope="col">Motivo</th>
+                    <th scope="col" className="sb-end">
+                      Resposta
+                    </th>
                   </tr>
-                ) : (
-                  alertas.slice(0, 6).map((a) => {
-                    const dias = diasParaVencimento(a.dataFimVigencia);
-                    return (
-                      <tr key={a.id}>
+                </thead>
+                <tbody>
+                  {data.ultimasNegadas.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="vazio">
+                        Nenhuma negativa nos últimos 7 dias.
+                      </td>
+                    </tr>
+                  ) : (
+                    data.ultimasNegadas.map((n) => (
+                      <tr key={n.id}>
                         <td className="sb-strong">
-                          <Link href={`/autorizacoes/${a.id}`}>{a.paciente?.nome}</Link>
+                          <Link href={`/autorizacoes/${n.id}`}>{n.paciente.nome}</Link>
+                          <span className="texto-suave">{n.convenio.nome}</span>
                         </td>
-                        <td>{a.convenio?.nome}</td>
-                        <td>{a.procedimento}</td>
-                        <td className="sb-mono sb-end">
-                          {a.quantidadeUtilizada}/{a.quantidadeAutorizada ?? "—"}
-                        </td>
-                        <td className="sb-mono sb-end" title={formatarData(a.dataFimVigencia)}>
-                          {dias === 0 ? "hoje" : `${dias} d`}
-                        </td>
+                        <td>{n.procedimento}</td>
+                        <td>{n.motivoNegativa || "—"}</td>
+                        <td className="sb-mono sb-end">{formatarData(n.dataResposta)}</td>
                       </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="sb-card">
+            <div className="sb-card__header">
+              <h2 className="sb-card__title">Atendimentos</h2>
+            </div>
+            <div className="sb-card__body">
+              <p className="texto-apoio">Os atendimentos de hoje são confirmados pela recepção, no dia da sessão.</p>
+            </div>
+          </div>
+        )}
 
         <div className="pilha">
+          {acoes.length > 0 && (
+            <div className="sb-card">
+              <div className="sb-card__header">
+                <h2 className="sb-card__title">Ações rápidas</h2>
+              </div>
+              <div className="sb-card__body acoes-rapidas">
+                {acoes.map((x) => (
+                  <Link key={x.href} href={x.href} className="sb-btn">
+                    {x.rotulo}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="sb-card">
             <div className="sb-card__header">
-              <h2 className="sb-card__title">Ações rápidas</h2>
-            </div>
-            <div className="sb-card__body acoes-rapidas">
-              {acoes.map((a) => (
-                <Link key={a.href} href={a.href} className="sb-btn">
-                  {a.rotulo}
-                </Link>
-              ))}
-            </div>
-          </div>
-          <div className="sb-card">
-            <div className="sb-card__header">
-              <h2 className="sb-card__title">Cobrança</h2>
+              <h2 className="sb-card__title">Este mês</h2>
               <Link href="/atendimentos?statusCobranca=glosado">Ver glosas</Link>
             </div>
             <div className="sb-card__body">
               <dl className="dl-grade">
                 <div>
-                  <dt>Glosas em aberto</dt>
-                  <dd className="mono">{data.glosasAberto}</dd>
+                  <dt>Atendimentos confirmados</dt>
+                  <dd className="mono">{data.atendimentosMes}</dd>
                 </div>
                 <div>
-                  <dt>Total glosado</dt>
-                  <dd className="mono">{formatarMoeda(data.totalGlosado)}</dd>
+                  <dt>Sem autorização</dt>
+                  <dd className="mono">{data.semAutorizacaoMes}</dd>
+                </div>
+                <div>
+                  <dt>Glosados</dt>
+                  <dd className="mono">{data.glosasMes}</dd>
                 </div>
               </dl>
             </div>

@@ -2,6 +2,7 @@ import { ErroHttp, json, naoEncontrado, rota } from "@/lib/api/http";
 import { apagarArquivo, lerPdfEnviado, MAX_PDFS_POR_PEDIDO } from "@/lib/arquivos";
 import { exigirSessao } from "@/lib/auth/sessao";
 import { gravarDocumento } from "@/lib/documentos/salvar";
+import { apagarPedidosAnteriores } from "@/lib/documentos/substituir";
 import { prisma } from "@/lib/prisma";
 import { esquemaPedidoMedico } from "@/lib/validacao";
 
@@ -32,7 +33,9 @@ export const GET = rota<Params>(async (req, { params }) => {
 });
 
 // Multipart: campos do pedido + um ou mais "arquivos" (PDF). Um plano
-// terapêutico entre eles completa as sessões por semana do pedido.
+// terapêutico entre eles completa as sessões por semana do pedido. O pedido
+// novo substitui os anteriores (que saem com os PDFs), a não ser que venha
+// manterAnteriores=true — paciente com dois pedidos, um para cada terapia.
 export const POST = rota<Params>(async (req, { params }) => {
   const usuario = await exigirSessao(req, ["admin", "recepcionista"]);
   const { id: pacienteId } = await params;
@@ -42,7 +45,7 @@ export const POST = rota<Params>(async (req, { params }) => {
   } catch {
     throw new ErroHttp(400, "Envie o pedido como formulário (multipart/form-data).");
   }
-  const campos = Object.fromEntries([...form.entries()].filter(([, v]) => typeof v === "string"));
+  const { manterAnteriores, ...campos } = Object.fromEntries([...form.entries()].filter(([, v]) => typeof v === "string"));
   const dados = esquemaPedidoMedico.parse(campos);
   const arquivos = form.getAll("arquivos").filter((a): a is File => a instanceof File && a.size > 0);
   if (!arquivos.length) throw new ErroHttp(422, "Anexe o PDF do pedido médico.");
@@ -77,5 +80,12 @@ export const POST = rota<Params>(async (req, { params }) => {
     await prisma.pedidoMedico.delete({ where: { id: pedido.id } });
     throw erro;
   }
-  return json(await prisma.pedidoMedico.findUniqueOrThrow({ where: { id: pedido.id }, include: INCLUIR }), 201);
+  let anterioresApagados = 0;
+  if (manterAnteriores !== "true") {
+    const r = await prisma.$transaction((tx) => apagarPedidosAnteriores(tx, pacienteId, pedido));
+    await Promise.all(r.arquivos.map(apagarArquivo));
+    anterioresApagados = r.pedidos;
+  }
+  const criado = await prisma.pedidoMedico.findUniqueOrThrow({ where: { id: pedido.id }, include: INCLUIR });
+  return json({ ...criado, anterioresApagados }, 201);
 });

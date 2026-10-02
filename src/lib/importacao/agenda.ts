@@ -7,7 +7,6 @@ import {
   acharCabecalho,
   cpf,
   dataBR,
-  dinheiro,
   hora,
   inteiro,
   soDigitos,
@@ -30,7 +29,6 @@ const COLUNAS = [
   "Procedimento",
   "Agenda",
   "Status",
-  "Valor Faturamento",
   "Status de Faturamento",
   "Dt. Nasc. Paciente",
   "Telefone Celular",
@@ -57,7 +55,6 @@ export type SessaoAgenda = {
   agenda: string | null;
   status: string | null;
   statusFaturamento: string | null;
-  valorFaturamento: number | null;
   agendamentosRestantes: number | null;
   senhaAutorizacao: string | null;
   senhaExecucao: string | null;
@@ -159,7 +156,6 @@ export function interpretarAgenda(linhas: Linha[]): AgendaInterpretada {
       agenda: texto(col(l, "Agenda"))?.slice(0, 200) ?? null,
       status: texto(col(l, "Status"))?.slice(0, 60) ?? null,
       statusFaturamento: texto(col(l, "Status de Faturamento"))?.slice(0, 60) ?? null,
-      valorFaturamento: dinheiro(col(l, "Valor Faturamento")),
       agendamentosRestantes: inteiro(col(l, "Agendamentos Restantes")),
       senhaAutorizacao: texto(col(l, "Senha Autorização"))?.slice(0, 40) ?? null,
       senhaExecucao: texto(col(l, "Senha Execução"))?.slice(0, 40) ?? null,

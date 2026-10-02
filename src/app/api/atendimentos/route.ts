@@ -8,6 +8,7 @@ import {
   rota,
 } from "@/lib/api/http";
 import { exigirSessao } from "@/lib/auth/sessao";
+import { deDate, hojeISO } from "@/lib/datas";
 import { prisma } from "@/lib/prisma";
 import { marcarVencidas } from "@/lib/regras/autorizacao";
 import { consumirSessao, fimDaSessao, sincronizarAtendimentos } from "@/lib/regras/atendimentos";
@@ -63,10 +64,14 @@ export const GET = rota(async (req) => {
 });
 
 // Registro manual pelo operador (o terapeuta não registra mais): já entra
-// confirmado e desconta a sessão da autorização.
+// confirmado e desconta a sessão da autorização. Como a confirmação, só no dia
+// do atendimento.
 export const POST = rota(async (req) => {
   const usuario = await exigirSessao(req, ["admin", "recepcionista"]);
   const { autorizacaoId, procedimentoId, horaInicio, ...dados } = await lerCorpo(req, esquemaAtendimento);
+  if (deDate(dados.dataAtendimento) !== hojeISO()) {
+    throw new ErroHttp(422, "Registre o atendimento no dia em que ele acontece.");
+  }
 
   if (!(await prisma.paciente.findUnique({ where: { id: dados.pacienteId } }))) throw new ErroHttp(422, "Paciente não encontrado.");
   const proc = procedimentoId ? await prisma.procedimento.findUnique({ where: { id: procedimentoId } }) : null;

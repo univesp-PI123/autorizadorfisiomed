@@ -3,14 +3,13 @@
 // fica em gravarTabelas.ts.
 
 import { Avisos, type Aviso } from "./avisos";
-import { acharColunas, dinheiro, soDigitos, texto, type Linha } from "./planilha";
+import { acharColunas, soDigitos, texto, type Linha } from "./planilha";
 
 export const COLUNAS_OPERADORA = {
   codigo: ["Código Operadora", "Código da Operadora", "Cod Operadora", "Código", "Codigo"],
   descricao: ["Descrição Operadora", "Descrição da Operadora", "Descrição", "Descricao", "Procedimento"],
   codigoTuss: ["Código TUSS", "TUSS", "Cod TUSS", "Código Tabela 22"],
   tabela: ["Tabela"],
-  valor: ["Valor", "Valor (R$)", "Preço", "Valor Operadora"],
   codigoAnclinic: ["Código AnClinic", "Cod AnClinic", "AnClinic", "Procedimento AnClinic"],
 } as const;
 
@@ -20,7 +19,6 @@ export type ItemOperadora = {
   descricao: string;
   codigoTuss: string | null;
   tabela: string;
-  valor: number | null;
   codigoAnclinic: string | null;
 };
 
@@ -59,7 +57,6 @@ export function interpretarTabelaOperadora(linhas: Linha[]): { itens: ItemOperad
       descricao: descricao ?? codigo,
       codigoTuss,
       tabela,
-      valor: dinheiro(col(l, "valor")),
       codigoAnclinic: anclinic,
     });
   });
@@ -93,5 +90,5 @@ export function interpretarTuss(linhas: Linha[]): { itens: { codigo: string; ter
 
 /** Modelo em CSV da tabela da operadora (baixado pela tela de procedimentos). */
 export const MODELO_TABELA_OPERADORA =
-  "Código AnClinic;Código Operadora;Descrição Operadora;Código TUSS;Tabela;Valor\n" +
-  "4440;CODIGO-DA-OPERADORA;DESCRICAO NA TABELA DA OPERADORA;CODIGO-TUSS-8-DIGITOS;22;131,00\n";
+  "Código AnClinic;Código Operadora;Descrição Operadora;Código TUSS;Tabela\n" +
+  "4440;CODIGO-DA-OPERADORA;DESCRICAO NA TABELA DA OPERADORA;CODIGO-TUSS-8-DIGITOS;22\n";

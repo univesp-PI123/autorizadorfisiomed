@@ -5,7 +5,7 @@ import { GraficoBarras, GraficoEmpilhado, type Serie } from "@/components/Grafic
 import Icone from "@/components/Icone";
 import Carregando from "@/components/ui/Carregando";
 import MensagemErro from "@/components/ui/MensagemErro";
-import { calcularTaxaGlosa, formatarData, formatarMes, formatarMoeda } from "@/lib/analiseDados";
+import { calcularTaxaGlosa, formatarData, formatarMes } from "@/lib/analiseDados";
 import { useFetch } from "@/lib/cliente/hooks";
 import { atendimentoService, relatorioService } from "@/lib/cliente/servicos";
 import { exportarParaCSV, exportarParaJSON } from "@/lib/exportacao";
@@ -151,8 +151,7 @@ export default function RelatoriosPage() {
           </h2>
           {glosas.data && (
             <span className="texto-suave">
-              <span className="mono">{glosas.data.total}</span> atendimento(s) ·{" "}
-              <span className="mono">{formatarMoeda(glosas.data.totalGlosado)}</span>
+              <span className="mono">{glosas.data.total}</span> atendimento(s)
             </span>
           )}
         </div>
@@ -172,15 +171,12 @@ export default function RelatoriosPage() {
                   <th scope="col">Convênio</th>
                   <th scope="col">Procedimento</th>
                   <th scope="col">Motivo</th>
-                  <th scope="col" className="sb-end">
-                    Valor cobrado
-                  </th>
                 </tr>
               </thead>
               <tbody>
                 {(glosas.data?.glosas ?? []).length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="vazio">
+                    <td colSpan={5} className="vazio">
                       Nenhuma glosa em aberto.
                     </td>
                   </tr>
@@ -192,7 +188,6 @@ export default function RelatoriosPage() {
                       <td>{g.autorizacao?.convenio?.nome || "—"}</td>
                       <td>{g.procedimento}</td>
                       <td>{g.motivoGlosa || "—"}</td>
-                      <td className="sb-mono sb-end">{formatarMoeda(g.valorCobrado)}</td>
                     </tr>
                   ))
                 )}

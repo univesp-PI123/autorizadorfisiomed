@@ -37,12 +37,19 @@ export default function ResumoImportacao({ importacao: imp }: { importacao: Impo
           ["Profissionais novos", r.novos?.profissionais ?? 0],
           ["Procedimentos novos", r.novos?.procedimentos ?? 0],
           ["Unidades novas", r.novos?.unidades ?? 0],
+          ...(r.unidadePelaSala !== undefined
+            ? ([
+                ["Unidade tirada da sala", r.unidadePelaSala],
+                ["Sessões sem unidade", r.semUnidade ?? 0],
+              ] as [string, number][])
+            : []),
         ]
       : imp.tipo === "documentos"
         ? [
             ["Vinculados", r.vinculados ?? 0],
             ["Sem paciente", r.semPaciente ?? 0],
             ["Já enviados", r.duplicados ?? 0],
+            ["Ignorados (subpasta ou liminar)", r.ignorados ?? 0],
             ["Com erro", r.erros ?? 0],
             ["Pedidos criados pelo plano", r.pedidosCriados ?? 0],
           ]
@@ -78,9 +85,15 @@ export default function ResumoImportacao({ importacao: imp }: { importacao: Impo
             </>
           )}
           {" "}· <span className="mono">{r.sessoes}</span> sessões.{" "}
-          <Link href={`/agenda?data=${r.periodo.inicio}`} className="link-texto">
-            Ver situação das sessões
+          <Link href="/autorizacoes#a-solicitar" className="link-texto">
+            Ver a lista do dia
           </Link>
+        </p>
+      )}
+      {r.pedidos && (r.pedidos.cancelados > 0 || r.pedidos.ajustados > 0) && (
+        <p className="aviso aviso--neutro">
+          Pedidos ainda não enviados acompanharam a agenda: <span className="mono">{r.pedidos.cancelados}</span> cancelado(s) e{" "}
+          <span className="mono">{r.pedidos.ajustados}</span> ajustado(s) por sessões desmarcadas ou remarcadas.
         </p>
       )}
       <dl className="dl-grade dl-grade--4">

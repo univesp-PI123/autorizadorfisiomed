@@ -8,17 +8,82 @@
 :root {
   --font-sans: var(--fonte-plex-sans), "IBM Plex Sans", system-ui, sans-serif;
   --font-mono: var(--fonte-plex-mono), "IBM Plex Mono", ui-monospace, monospace;
+}
 
-  /* Séries de gráfico: paleta da marca ajustada e validada para
-     daltonismo e contraste (tema claro, sobre surface-card). */
-  --serie-1: #D4145F;
-  --serie-2: #D9701F;
-  --serie-3: #B42FB8;
+/* ---------- Paleta da Fisiomed ----------
+   As cores da logo (azul-marinho, verde, amarelo e vermelho) no lugar do rosa
+   do Sóbrio. Mesmos tokens: o destaque é o azul-marinho do "FISIO"; o fundo
+   é neutro. Textos passam de 4.5:1 sobre surface-card e surface-page. */
+:root, [data-theme="light"] {
+  --surface-page: #F4F6F9;
+  --surface-subtle: #FAFBFC;
+  --surface-card: #FFFFFF;
+  --surface-muted: #EAEFF5;
+  --border: #DFE5EC;
+  --border-soft: #EBEFF4;
+  --border-input: #7D8A9C;
+  --ink: #17202E;
+  --ink-secondary: #3F4A5C;
+  --ink-muted: #5F6B7D;
+  --accent: #183C84;
+  --accent-hover: #102C66;
+  --accent-soft: #E4EBF7;
+  --on-accent: #FFFFFF;
+  --chart-neutral: #C9D5EA;
+  --dot-muted: #13894A;
+  --neutral-bg: #EDF1F6;
+  --neutral-ink: #45505F;
+  --brand-azul: #183C84;
+  --brand-verde: #18A854;
+  --brand-amarelo: #F0D80C;
+  --brand-vermelho: #E4303C;
+  --shadow-sm: 0 1px 2px rgba(23, 32, 46, 0.08);
+  --shadow-popover: 0 8px 24px rgba(23, 32, 46, 0.10), 0 1px 2px rgba(23, 32, 46, 0.06);
+  --shadow-card-float: 0 12px 32px rgba(23, 32, 46, 0.16), 0 1px 3px rgba(23, 32, 46, 0.08);
+
+  /* Séries de gráfico: azul, amarelo-escuro e vermelho da logo, ajustados
+     para contraste de 3:1 sobre surface-card e para daltonismo. */
+  --serie-1: #183C84;
+  --serie-2: #A87C0A;
+  --serie-3: #D32F3A;
 }
 [data-theme="dark"] {
-  --serie-1: #EC4C88;
-  --serie-2: #D2782A;
-  --serie-3: #B95AD6;
+  --surface-page: #0F141C;
+  --surface-subtle: #141A24;
+  --surface-card: #19202C;
+  --surface-muted: #232C3A;
+  --border: #2C3646;
+  --border-soft: #222A37;
+  --border-input: #5D6B80;
+  --ink: #EEF2F8;
+  --ink-secondary: #C3CCDA;
+  --ink-muted: #97A3B6;
+  --accent: #8DB0F0;
+  --accent-hover: #B0C8F5;
+  --accent-soft: #1C2B47;
+  --on-accent: #0D1522;
+  --chart-neutral: #2B3A55;
+  --dot-muted: #3FAF6E;
+  --neutral-bg: #232C3A;
+  --neutral-ink: #C3CCDA;
+  --serie-1: #8DB0F0;
+  --serie-2: #D9B44A;
+  --serie-3: #F07C84;
+}
+
+/* Login: fundo nas cores da logo, sem imagem. */
+.sb-auth {
+  --sb-auth-bg:
+    radial-gradient(circle at 10% 15%, rgba(24, 168, 84, 0.45) 0, transparent 36%),
+    radial-gradient(circle at 88% 85%, rgba(240, 216, 12, 0.30) 0, transparent 32%),
+    radial-gradient(circle at 80% 10%, rgba(228, 48, 60, 0.25) 0, transparent 28%),
+    linear-gradient(135deg, #0C2252 0%, #183C84 55%, #2453AD 100%);
+}
+[data-theme="dark"] .sb-auth {
+  --sb-auth-bg:
+    radial-gradient(circle at 10% 15%, rgba(24, 168, 84, 0.25) 0, transparent 36%),
+    radial-gradient(circle at 88% 85%, rgba(240, 216, 12, 0.14) 0, transparent 32%),
+    linear-gradient(135deg, #070F22 0%, #0E224D 60%, #163677 100%);
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -260,24 +325,24 @@ textarea.sb-input { height: auto; min-height: 72px; padding: 10px 14px; resize: 
 
 /* Alto contraste: textos de apoio e bordas mais escuros, foco mais grosso. */
 :root[data-contraste] {
-  --ink-secondary: #231A1D;
-  --ink-muted: #3D3236;
-  --border: #7A6D70;
-  --border-soft: #AD8F97;
-  --border-input: #4D4145;
-  --accent: #A3124F;
-  --accent-hover: #7A0D3B;
-  --chart-neutral: #E39AB5;
+  --ink-secondary: #17202E;
+  --ink-muted: #2E3747;
+  --border: #6B7789;
+  --border-soft: #9AA6B8;
+  --border-input: #3F4A5C;
+  --accent: #102C66;
+  --accent-hover: #0A1E48;
+  --chart-neutral: #93A7CC;
 }
 :root[data-contraste][data-theme="dark"] {
-  --ink-secondary: #F6EEF0;
-  --ink-muted: #E2D6D9;
-  --border: #8A7A7F;
-  --border-soft: #6E5C61;
-  --border-input: #BFAFB4;
-  --accent: #FF9DBF;
-  --accent-hover: #FFC4D8;
-  --chart-neutral: #7A4A5C;
+  --ink-secondary: #F4F7FB;
+  --ink-muted: #DCE3EE;
+  --border: #7D8AA0;
+  --border-soft: #5D6B80;
+  --border-input: #B7C2D3;
+  --accent: #B0C8F5;
+  --accent-hover: #D3E0FA;
+  --chart-neutral: #3B4F75;
 }
 :root[data-contraste] :focus-visible { outline-width: 3px; }
 :root[data-contraste] .sb-badge { outline: 1px solid currentColor; }
@@ -332,6 +397,17 @@ textarea.sb-input { height: auto; min-height: 72px; padding: 10px 14px; resize: 
 .busca-paciente__item strong, .paciente-escolhido strong { font-weight: 500; color: var(--ink); }
 .paciente-escolhido { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: 8px 12px; border: 1px solid var(--border-input); border-radius: var(--radius-md); min-height: var(--size-control); }
 .paciente-escolhido > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+/* Lista do dia (A solicitar) */
+.lista-links { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.sessoes-lista { list-style: none; padding: 0; margin: 0 0 2px; display: flex; flex-wrap: wrap; gap: 4px; }
+.sessoes-lista li { font-size: 12px; line-height: 16px; padding: 1px 6px; border-radius: var(--radius-sm); background: var(--surface-muted); white-space: nowrap; }
+.unidade-rapida { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.unidade-rapida .sb-input { min-width: 150px; width: auto; }
+.mais-linhas { display: flex; align-items: center; justify-content: center; gap: var(--space-3); border-top: 1px solid var(--border-soft); }
+.detalhes summary { cursor: pointer; color: var(--ink-secondary); font-weight: 500; }
+.detalhes summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-sm); }
+.detalhes .lista-simples { margin-top: var(--space-2); }
+.detalhes .lista-simples li { padding: var(--space-2) 0; }
 .barra-lote { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); padding: var(--space-3) var(--space-5); background: var(--accent-soft); border-bottom: 1px solid var(--border-soft); }
 .barra-lote .sb-input { width: auto; min-width: 220px; }
 .col-check { width: 36px; }

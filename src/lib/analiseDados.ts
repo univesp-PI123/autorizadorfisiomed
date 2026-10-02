@@ -40,23 +40,6 @@ export function percentualSessoes(utilizada: number, autorizada: number | null):
   return Math.min(Math.round((utilizada / autorizada) * 100), 100);
 }
 
-/** Estimativa de receita em risco: sessões restantes × valor médio. */
-export function estimarRiscoReceita(
-  autorizacoes: { quantidadeAutorizada: number | null; quantidadeUtilizada: number }[],
-  valorMedioSessao = 150,
-): number {
-  return autorizacoes.reduce((total, aut) => {
-    const restantes = (aut.quantidadeAutorizada || 0) - (aut.quantidadeUtilizada || 0);
-    return total + Math.max(0, restantes) * valorMedioSessao;
-  }, 0);
-}
-
-export function formatarMoeda(valor: number | string | null | undefined): string {
-  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(
-    Number(valor) || 0,
-  );
-}
-
 /** "YYYY-MM-DD" (ou ISO completo) → "DD/MM/AAAA". */
 export function formatarData(data: string | null | undefined): string {
   if (!data) return "—";

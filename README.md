@@ -13,68 +13,92 @@ mesmo servidor na **AWS (EC2)**. Não usamos Neon nem Vercel.
 
 ## Funcionalidades
 
-- **Visão geral** — indicadores (autorizações ativas, pendentes, vencendo,
-  atendimentos do mês), autorizações vencendo, ações rápidas, cobrança e
-  gráfico de atendimentos por mês.
-- **Pacientes** — cadastro, edição, desativação e carteirinhas de convênio.
-- **Convênios** — cadastro de operadoras, prazos e antecedência dos alertas.
-- **Autorizações** — ciclo completo com histórico:
+- **Visão geral** — o trabalho do dia: quantas sessões há a solicitar, pedidos
+  aguardando a operadora, negativas da semana para tratar e atendimentos de
+  hoje; quantidades do mês e gráfico de atendimentos por mês.
+- **Autorizações** — a lista **A solicitar hoje**, montada da agenda do
+  AnClinic (veja abaixo), e o ciclo completo de cada pedido, com histórico:
   `pendente → em análise → autorizada/negada`, e `vencida`/`esgotada`
   aplicados automaticamente pelo sistema.
 - **Atendimentos** — gerados a partir da agenda: ao aprovar uma autorização,
-  as sessões que ela cobre (na vigência, até o saldo, inclusive as futuras)
-  viram atendimentos *aguardando confirmação*, com o valor do faturamento do
-  AnClinic; depois que a sessão acontece, o operador confirma (desconta a
-  sessão da autorização) ou cancela, com motivo. Registro manual só pelo operador, em
-  sessões de 1 hora (início em hora cheia ou meia hora). Cobrança: faturado,
-  pago ou glosado, com motivo da glosa em lista.
-- **Alertas** — autorizações vencendo em 7 dias, no topo da tela.
+  as sessões que ela cobre viram atendimentos *aguardando confirmação*; no dia
+  da sessão, a recepção confirma (desconta a sessão da autorização) ou cancela,
+  com motivo. Registro manual só pelo operador e só no dia, em sessões de 1
+  hora (início em hora cheia ou meia hora). Cobrança: faturado, pago ou
+  glosado, com motivo da glosa em lista.
+- **Sem valores em R$** — a clínica analisa por número de atendimentos (os
+  valores mudam caso a caso, como nas liminares), então o sistema só conta.
+- **Alertas** — autorizações lançadas à mão vencendo em 7 dias, no topo da
+  tela (os pedidos semanais da lista do dia não entram: vencer é o normal).
 - **Relatórios** — evolução mensal, autorizações por convênio, glosas;
   exportação CSV/JSON.
 - **Configurações** — troca da própria senha; gestão de usuários (admin).
-- **Agenda e importações** — importação da agenda do AnClinic e da lista de
-  profissionais credenciados; situação de cada sessão em relação à
-  autorização (veja abaixo).
+- **Importações** — lista de profissionais credenciados, tabelas de
+  procedimentos e documentos dos pacientes (por pasta); histórico com o
+  relatório de cada importação. A agenda do dia é importada em Autorizações.
 - **Clínica, unidades, profissionais e procedimentos** — os dados que a guia
-  TISS exige (CNES, conselho e CBO, código TUSS).
+  TISS exige (CNES, conselho, código TUSS).
 - **Pedidos médicos e plano terapêutico** — médico solicitante, CID, sessões
-  por semana e os PDFs, na página do paciente; envio em lote com vínculo
-  automático ao paciente.
+  por semana e os PDFs, na página do paciente; o pedido novo substitui o
+  anterior.
+
+A agenda em si continua no AnClinic: o sistema só a importa para saber o que
+pedir e o que confirmar.
 
 ## Integração AnClinic → Amil (em construção)
 
-Objetivo: solicitar as autorizações sozinho, na véspera (D-1), a partir da
-agenda do AnClinic, pelo webservice TISS da Amil. **Etapa atual:** importação
-e conferência dos dados. O envio à Amil entra quando ela liberar o acesso ao
-webservice.
+Objetivo: a pessoa que chega de manhã importa a agenda, o sistema pede as
+autorizações (na véspera, pelo webservice TISS da Amil) e a equipe só trata
+as negativas. **Etapa atual:** a lista do dia e os pedidos já saem do
+sistema; o envio à Amil entra quando ela liberar o acesso ao webservice — até
+lá, o pedido é feito no portal.
 
-Rotina:
+Rotina do dia, em **Autorizações**:
 
-1. **Importações → Agenda do AnClinic:** no AnClinic, exporte o *Relatório de
-   Agendamento* em Excel (um ou mais dias, todas as unidades) e envie o
-   `.xlsx`. O relatório mostra o que entrou, os convênios do AnClinic ainda não
-   ligados a um convênio do sistema e os avisos, com as linhas da planilha.
-   Importar o mesmo dia de novo atualiza; sessões que sumiram da agenda ficam
-   como excluídas.
-2. **Agenda** (abre no dia de hoje): cada sessão aparece como *com
-   pendência* (e o que falta), *pronta para solicitar*, *coberta* (autorização
-   vigente com saldo ou senha no AnClinic), *fora da integração* (outros
-   convênios, ou faturamento por "Assinatura") ou *cancelada*. "Pendências"
-   agrupa o que falta e leva à tela onde se resolve cada item; o filtro "Sem
-   unidade de atendimento" acha as sessões que precisam ser corrigidas no
-   AnClinic.
-3. **Atendimentos → Aguardando confirmação:** ao aprovar a autorização, as
-   sessões que ela cobre vão para Atendimentos (a tela da autorização mostra
-   quantas); o operador confirma cada uma depois que ela acontece, ou cancela.
-   A autorização cobre a sessão pelo código do procedimento ou, nas lançadas
-   à mão, pelo nome/especialidade (ex.: "Psicologia" cobre "PSICOLOGIA ABA").
+1. **Importar agenda do dia:** no AnClinic, exporte o *Relatório de
+   Agendamento* em Excel, de hoje e amanhã, com todas as unidades, e envie o
+   `.xlsx`. O relatório mostra o que entrou, os convênios ainda não ligados a
+   um convênio do sistema, as unidades tiradas da sala e os avisos. Importar
+   de novo atualiza; sessões que sumiram da agenda ficam como excluídas.
+2. **A solicitar hoje:** o pedido de cada sessão é feito na **véspera**, porque
+   a senha da Amil vale a semana (de segunda a sexta): na segunda, pedem-se as
+   de segunda e de terça; de terça a quinta, as do dia seguinte; na sexta,
+   nenhuma da segunda (a senha não valeria). As sessões vêm agrupadas como vão
+   virar pedidos — paciente, procedimento e unidade — em:
+   - **Prontas:** têm tudo o que a guia exige.
+   - **Com pendência:** o que falta e onde resolver; a unidade que faltar é
+     escolhida ali mesmo.
+   - **Atendimento escolar** (sala "… - ATENDIMENTO ESCOLAR"): fica fora do
+     lote; pede-se no dia, quando o profissional confirma que está com a
+     criança na escola (*Pedir agora*).
+   - **Negadas:** ver a negativa e, resolvido o motivo, *Pedir de novo*.
+   - **Já pedidas:** enviadas ou autorizadas.
+3. **Gerar pedidos:** cria os pedidos (status *pendente*) das prontas, com a
+   unidade (CNES), o código da guia, a quantidade de sessões e a vigência até a
+   sexta. Enquanto o webservice da Amil não é liberado, o pedido é feito no
+   portal e o resultado registrado no pedido (*em análise* → *autorizada*, com
+   a senha, ou *negada*, com o motivo); com o webservice, envio e resposta
+   serão automáticos. Gerar de novo não duplica; pedidos do mesmo dia ainda não
+   enviados recebem as sessões novas.
+4. **Reimportação:** pedidos ainda não enviados acompanham a agenda — sessão
+   desmarcada ou excluída sai do pedido (sem nenhuma, ele é cancelado) e sessão
+   remarcada para outra semana volta para a lista.
+5. **Atendimentos:** aprovado o pedido, as sessões dele vão para Atendimentos,
+   *aguardando confirmação*. A recepção confirma **no dia da sessão** — antes ou
+   depois não dá, para a validação não ficar com a data errada; se a sessão
+   não aconteceu, cancela com o motivo.
 
-**Unidade de atendimento:** vem da coluna "Unidade de Atendimento" do
-AnClinic. Para atribuir ou trocar, marque as sessões na **Agenda** (há o filtro
-"Sem unidade de atendimento"), escolha a unidade e clique em *Aplicar* — dá
-para incluir de uma vez as outras sessões sem unidade dos mesmos pacientes. A
-escolha feita no sistema não é desfeita pelas próximas importações. Unidades
-que não existem no AnClinic podem ser criadas em **Clínica e unidades**.
+Uma autorização lançada à mão (*Nova autorização*) cobre as sessões da
+vigência pelo código do procedimento ou pelo nome/especialidade (ex.:
+"Psicologia" cobre "PSICOLOGIA ABA"); um pedido gerado pela lista cobre só as
+sessões dele.
+
+**Unidade de atendimento:** define o CNES do pedido. Vem da coluna "Unidade de
+Atendimento" do AnClinic; em branco, do começo da sala ("SÃO MIGUEL - SALA 31"
+→ FISIOMED ABA SAO MIGUEL). Quando nem assim aparece, escolha a unidade na
+lista *A solicitar*; a escolha feita no sistema não é desfeita pelas próximas
+importações. Unidades que não existem no AnClinic podem ser criadas em
+**Clínica e unidades**.
 
 **Busca de paciente:** nas autorizações (lista e nova autorização) e no
 registro de atendimento, um campo único acha o paciente pelo nome, CPF ou
@@ -104,8 +128,8 @@ Três tabelas, na tela **Procedimentos**:
   solicitação: o da operadora, ou o TUSS quando não há equivalente.
 - **Tabela da operadora:** importada por planilha (`.xlsx` ou `.csv` com `;`)
   com as colunas `Código AnClinic` (opcional — faz o de/para), `Código
-  Operadora`, `Descrição Operadora`, `Código TUSS`, `Tabela` e `Valor`. Há um
-  modelo para baixar na tela. Reimportar atualiza pelo código da operadora;
+  Operadora`, `Descrição Operadora`, `Código TUSS` e `Tabela`. Há um modelo
+  para baixar na tela. Reimportar atualiza pelo código da operadora;
   cada operadora tem a sua tabela.
 - **TUSS (tabela 22):** a planilha publicada pela ANS (colunas `Código do
   Termo` e `Termo`), usada para mostrar o nome de cada código.
@@ -123,15 +147,27 @@ arquivo não entra duas vezes para o mesmo paciente) e o arquivo em disco, em
 `dados/arquivos` dentro do projeto; fica fora da pasta pública, os PDFs só
 abrem com login, e a pasta entra no backup (passo 9).
 
-**Envio em lote** (Importações → Documentos): selecione os PDFs ou uma pasta
-inteira. O paciente é achado:
+**Pedido novo substitui o anterior:** ao cadastrar um pedido médico (ou
+quando o plano terapêutico cria um), os pedidos mais antigos do paciente saem
+do sistema com os PDFs — o histórico fica no arquivo da clínica. No cadastro
+manual dá para marcar *Manter os pedidos anteriores*, para o paciente com dois
+pedidos valendo (um para outra terapia, por exemplo). O mesmo vale para o
+plano terapêutico de um pedido; um plano mais antigo que o pedido atual do
+paciente nem entra.
 
-1. pelo **CPF** no nome do arquivo (`123.456.789-09_pedido.pdf` ou
-   `12345678909 pedido.pdf`);
-2. senão, pelo **número da carteirinha** no nome do arquivo;
-3. no plano terapêutico, senão, pelo **nome e data de nascimento** escritos no
-   PDF (aceita nome abreviado no AnClinic: mesmo primeiro nome e dois nomes em
-   comum).
+**Envio em lote** (Importações → Documentos):
+
+- **Pasta de pacientes** — escolha a pasta que tem uma pasta por paciente,
+  com o nome dele: não é preciso renomear os arquivos. De cada paciente entram
+  só os PDFs que estão direto na pasta dele (o pedido médico e o plano
+  terapêutico mais recentes); subpastas, como a de documentos antigos, e
+  arquivos de liminar ficam de fora. Também dá para escolher a pasta de um
+  paciente só.
+- **PDFs soltos** — o paciente é achado pelo **CPF** no nome do arquivo
+  (`123.456.789-09_pedido.pdf`) ou pelo **número da carteirinha**.
+- No plano terapêutico, também pelo **nome e data de nascimento** escritos no
+  PDF (aceita nome abreviado no AnClinic: mesmo primeiro nome e dois nomes em
+  comum).
 
 O **plano terapêutico da Amil** (formulário de terapias para TGD, gerado pelo
 Word) é lido: médico prescritor, CRM, CID, data da solicitação e as sessões de
@@ -142,23 +178,26 @@ demais PDFs entram no pedido ativo mais recente; sem pedido, ficam como
 Arquivo sem paciente não é gravado: o relatório diz o motivo.
 
 O plano aparece na tela da autorização (com a linha do procedimento em
-destaque) e preenche a nova autorização: busca pelo CPF → convênio,
-procedimento e código da guia vindos da agenda, e a quantidade = sessões por
-semana do plano × 4 semanas.
+destaque) e preenche a nova autorização: convênio, procedimento, unidade e
+código da guia vindos da agenda, e a quantidade = sessões por semana do plano
+(a senha vale a semana).
 
 ## Visual (design system Sóbrio)
 
-A interface segue o design system **Sóbrio**: bordas finas em vez de sombras,
-um único rosa de destaque, status em badges discretos, números em fonte mono
-(IBM Plex Mono) e texto em IBM Plex Sans. Tem **tema claro e escuro** (botão
-na barra superior; a escolha fica salva no navegador).
+A interface segue o design system **Sóbrio** — bordas finas em vez de
+sombras, um único destaque, status em badges discretos, números em fonte mono
+(IBM Plex Mono) e texto em IBM Plex Sans — com a **paleta da Fisiomed**: o
+azul-marinho da logo como destaque, fundo neutro, e o verde, o amarelo e o
+vermelho da logo nos gráficos e no fundo do login. Tem **tema claro e escuro**
+(botão na barra superior; a escolha fica salva no navegador).
 
 - `src/styles/sobrio/` — `tokens.css` e `sobrio.css` do pacote do design
   system, **sem alterações**. Para atualizar o design system, substitua esses
   dois arquivos.
-- `src/styles/app.css` — complementos do sistema (estrutura das telas, modal,
-  formulários, gráficos), usando só os tokens do Sóbrio.
-- `public/fundo-login.webp` — imagem de fundo do login.
+- `src/styles/app.css` — a paleta da Fisiomed (sobrepõe as cores do Sóbrio,
+  nos temas claro, escuro e no alto contraste), o fundo do login em gradiente
+  e os complementos do sistema (estrutura das telas, modal, formulários,
+  gráficos).
 - **Logos** (`public/marca/`): `logo-fisiomed.png` (colorido, horizontal),
   `logo-fisiomed-branco.webp` (branco, empilhado) e `logo-simbolo.png` (só o
   "O" de quebra-cabeça, recortado do colorido). Uso:
@@ -205,7 +244,9 @@ Por isso o servidor precisa de acesso à internet na hora do build.
 | Atendimentos (ver)                  | ✅ | ✅ | ✅ | ✅ |
 | Atendimentos (cobrança/glosa)       | ✅ | ✅ |    | ✅ |
 | Relatórios                          | ✅ |    |    | ✅ |
-| Agenda, histórico de importações, cadastros da integração (ver) | ✅ | ✅ |    | ✅ |
+| Lista do dia (A solicitar): ver e gerar pedidos | ✅ | ✅ |    | ✅ |
+| Importar a agenda do dia; definir a unidade das sessões | ✅ | ✅ |    |    |
+| Histórico de importações, cadastros da integração (ver) | ✅ | ✅ |    | ✅ |
 | Importar planilhas; editar profissionais e procedimentos | ✅ | ✅ |    |    |
 | Dados da clínica e unidades (editar) | ✅ |    |    |    |
 | Pedidos médicos e documentos (ver)  | ✅ | ✅ | ✅ |    |
@@ -456,6 +497,12 @@ npm run build
 pm2 restart sga
 ```
 
+> **Atualizando para a versão da lista do dia (sem a Agenda):** o `migrate
+> deploy` liga cada sessão ao pedido gerado para ela, guarda a unidade no
+> pedido e **apaga as colunas de valores em R$** (valor cobrado e pago dos
+> atendimentos, valor do faturamento da agenda e valor da tabela da
+> operadora). Se quiser guardar esses valores, faça um backup antes (passo 9).
+
 > **Atualizando para a versão com documentos em lote e atendimentos
 > automáticos:** o `migrate deploy` cria as tabelas de documentos e de
 > procedimentos da operadora e passa os PDFs já anexados aos pedidos médicos
@@ -542,3 +589,9 @@ o schema — no servidor, o `migrate deploy` vai aplicá-la.
   existe (`PUT /api/autorizacoes/:id`).
 - Envio das solicitações à Amil pelo webservice TISS (aguardando a liberação
   do acesso), consulta do status e relatório do que foi aprovado ou negado.
+- Situação da validação na Amil (token/QR code) de cada atendimento ainda no
+  dia, se o webservice informar — para agir antes de a criança ir embora.
+- Regras de solicitação por convênio: Bradesco (pedido semanal, às quintas) e
+  São Cristóvão (carta crédito, com código próprio por paciente).
+- Coluna "Observação" do AnClinic no relatório mensal (BSC).
+- Unidades de Joinville, que estão em outro acesso do AnClinic.

@@ -24,12 +24,13 @@ export function comUrl(Tela: ComponentType<{ url: URLSearchParams }>) {
 }
 
 /**
- * Tira o "?novo=1" do endereço ao fechar um formulário aberto por link, para
- * que recarregar a página não o abra de novo.
+ * Tira o "?novo=1" (ou outro parâmetro, como "?importar=1") do endereço ao
+ * fechar um formulário aberto por link, para que recarregar a página não o
+ * abra de novo.
  */
-export function tirarNovoDaUrl() {
+export function tirarNovoDaUrl(parametro = "novo") {
   const url = new URL(window.location.href);
-  if (!url.searchParams.has("novo")) return;
-  url.searchParams.delete("novo");
+  if (!url.searchParams.has(parametro)) return;
+  url.searchParams.delete(parametro);
   window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
 }

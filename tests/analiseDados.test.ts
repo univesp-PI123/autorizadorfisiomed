@@ -4,10 +4,8 @@ import {
   calcularTaxaGlosa,
   classificarUrgencia,
   diasParaVencimento,
-  estimarRiscoReceita,
   formatarData,
   formatarMes,
-  formatarMoeda,
   percentualSessoes,
 } from "@/lib/analiseDados";
 
@@ -63,11 +61,6 @@ describe("percentualSessoes", () => {
 });
 
 describe("formatação", () => {
-  it("formata reais", () => {
-    expect(formatarMoeda(1500)).toContain("1.500");
-    expect(formatarMoeda("150.5")).toContain("150,50");
-    expect(formatarMoeda(null)).toContain("0");
-  });
   it("formata datas sem depender do fuso", () => {
     expect(formatarData("2026-01-01")).toBe("01/01/2026");
     expect(formatarData("2026-01-01T00:00:00.000Z")).toBe("01/01/2026");
@@ -78,12 +71,3 @@ describe("formatação", () => {
   });
 });
 
-describe("estimarRiscoReceita", () => {
-  it("soma sessões restantes × valor", () => {
-    const autorizacoes = [
-      { quantidadeAutorizada: 10, quantidadeUtilizada: 5 },
-      { quantidadeAutorizada: 8, quantidadeUtilizada: 8 },
-    ];
-    expect(estimarRiscoReceita(autorizacoes, 150)).toBe(750);
-  });
-});

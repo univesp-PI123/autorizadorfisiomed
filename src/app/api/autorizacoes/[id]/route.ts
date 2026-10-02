@@ -1,5 +1,5 @@
 import { Prisma } from "@prisma/client";
-import { json, naoEncontrado, rota } from "@/lib/api/http";
+import { ErroHttp, json, naoEncontrado, rota } from "@/lib/api/http";
 import { exigirSessao } from "@/lib/auth/sessao";
 import { deDate, hojeISO } from "@/lib/datas";
 import { prisma } from "@/lib/prisma";
@@ -18,7 +18,9 @@ export const GET = rota<Params>(async (req, { params }) => {
       paciente: true,
       convenio: true,
       vinculo: true,
+      unidade: { select: { id: true, nome: true, cnes: true } },
       usuarioCriou: { select: { id: true, nome: true } },
+      _count: { select: { agendamentos: true } },
       historico: {
         include: { usuario: { select: { id: true, nome: true } } },
         orderBy: { createdAt: "asc" },
@@ -38,7 +40,8 @@ export const GET = rota<Params>(async (req, { params }) => {
   });
   const porSituacao = await prisma.atendimento.groupBy({ by: ["situacao"], where: { autorizacaoId: id }, _count: true });
   const atendimentos = Object.fromEntries(porSituacao.map((g) => [g.situacao, g._count]));
-  return json({ ...autorizacao, plano, atendimentos });
+  const { _count, ...dados } = autorizacao;
+  return json({ ...dados, sessoes: _count.agendamentos, plano, atendimentos });
 });
 
 // Edita os dados descritivos. Status tem rota própria (/status).
@@ -49,6 +52,9 @@ export const PUT = rota<Params>(async (req, { params }) => {
 
   const atual = await prisma.autorizacao.findUnique({ where: { id } });
   if (!atual) naoEncontrado("Autorização");
+  if (dados.unidadeId && !(await prisma.unidade.findUnique({ where: { id: dados.unidadeId } }))) {
+    throw new ErroHttp(422, "Unidade inválida.");
+  }
 
   const fim = dados.dataFimVigencia !== undefined ? dados.dataFimVigencia : atual.dataFimVigencia;
   const novoStatus = statusAutomatico({

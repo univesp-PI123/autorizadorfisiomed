@@ -2,7 +2,8 @@
 // paciente (em lote) e liga o documento ao pedido médico.
 //
 // Plano terapêutico legível → cria (ou completa) o pedido médico com o médico
-// prescritor, CRM, CID, data e sessões por semana. Outros documentos entram no
+// prescritor, CRM, CID, data e sessões por semana; o pedido novo substitui os
+// anteriores do paciente (que saem com os PDFs). Outros documentos entram no
 // pedido ativo mais recente do paciente; sem pedido, ficam avulsos.
 
 import type { Prisma, TipoDocumento } from "@prisma/client";
@@ -12,15 +13,17 @@ import { chaveNome, formatarCpf } from "@/lib/importacao/planilha";
 import { prisma } from "@/lib/prisma";
 import { validadePadrao } from "@/lib/regras/pedidoMedico";
 import { lerPlano, type PlanoTerapeutico } from "./plano";
+import { apagarPedidosAnteriores, apagarPlanosAnteriores } from "./substituir";
 import { chaveCarteirinha, numerosDoNome, tipoPeloNome } from "./vinculo";
 
 export type ResultadoDocumento = {
   arquivo: string;
-  status: "vinculado" | "sem_paciente" | "duplicado";
+  status: "vinculado" | "sem_paciente" | "duplicado" | "ignorado";
   tipo: TipoDocumento;
   paciente?: { id: string; nome: string };
-  vinculoPor?: "cpf" | "carteirinha" | "nome_no_plano" | "escolhido";
+  vinculoPor?: "cpf" | "carteirinha" | "nome_no_plano" | "pasta" | "escolhido";
   pedido?: { id: string; criado: boolean } | null;
+  anterioresApagados?: number; // pedidos antigos substituídos pelo novo
   motivo?: string;
   documentoId?: string;
 };
@@ -63,10 +66,40 @@ export function nomesParecidos(a: string, b: string) {
   return na.filter((p) => nb.has(p)).length >= Math.min(2, na.length, nb.size);
 }
 
+/**
+ * Paciente pelo nome da pasta (envio da pasta de cada paciente): nome igual
+ * ou, sem igual, um único nome parecido (mesmo primeiro nome e ao menos dois
+ * nomes em comum).
+ */
+export function pacienteDaPasta(pasta: string, idx: IndicePacientes): { paciente?: Pac; motivo?: string } {
+  const iguais = idx.porNome.get(chaveNome(pasta)) ?? [];
+  if (iguais.length === 1) return { paciente: iguais[0] };
+  if (iguais.length > 1) return { motivo: `Há mais de um paciente chamado "${pasta}".` };
+  const parecidos = [...idx.porId.values()].filter((p) => nomesParecidos(p.nome, pasta));
+  if (parecidos.length === 1) return { paciente: parecidos[0] };
+  if (parecidos.length > 1) return { motivo: `A pasta "${pasta}" combina com mais de um paciente.` };
+  return { motivo: `Nenhum paciente com o nome da pasta "${pasta}".` };
+}
+
+/**
+ * De que pasta de paciente vem o arquivo enviado com a pasta. Escolhida a
+ * pasta de todos os pacientes, "RAIZ/PACIENTE/arquivo.pdf"; escolhida a pasta
+ * de um paciente só, "PACIENTE/arquivo.pdf" — e então "PACIENTE/SUB/arquivo"
+ * está numa subpasta. Subpastas guardam documentos antigos: ficam de fora.
+ */
+export function pastaDoPaciente(caminho: string, idx: IndicePacientes): { pasta: string | null } | { ignorar: string } {
+  const partes = caminho.split("/").filter(Boolean);
+  if (partes.length <= 1) return { pasta: null };
+  if (partes.length === 2) return { pasta: partes[0] };
+  if (partes.length === 3 && !pacienteDaPasta(partes[0], idx).paciente) return { pasta: partes[1] };
+  return { ignorar: "Em subpasta (documento antigo)." };
+}
+
 export function acharPaciente(
   nomeArquivo: string,
   plano: PlanoTerapeutico | null,
   idx: IndicePacientes,
+  pasta?: string | null,
 ): { paciente?: Pac; por?: ResultadoDocumento["vinculoPor"]; motivo?: string } {
   const { cpfs, carteirinhas } = numerosDoNome(nomeArquivo);
   for (const c of cpfs) {
@@ -77,6 +110,9 @@ export function acharPaciente(
   for (const c of carteirinhas) for (const id of idx.porCarteira.get(chaveCarteirinha(c)) ?? []) achados.add(id);
   if (achados.size === 1) return { paciente: idx.porId.get([...achados][0]), por: "carteirinha" };
   if (achados.size > 1) return { motivo: "A carteirinha do nome do arquivo pertence a mais de um paciente." };
+
+  const daPasta = pasta ? pacienteDaPasta(pasta, idx) : null;
+  if (daPasta?.paciente) return { paciente: daPasta.paciente, por: "pasta" };
 
   if (plano?.paciente.nome) {
     const mesmos = (idx.porNome.get(chaveNome(plano.paciente.nome)) ?? []).filter(
@@ -98,6 +134,7 @@ export function acharPaciente(
   const doPlano = plano?.paciente.nome ? " nem com o nome e nascimento escritos no plano" : "";
   if (cpfs.length) return { motivo: `CPF ${formatarCpf(cpfs[0])} do nome do arquivo não está cadastrado${doPlano}.` };
   if (carteirinhas.length) return { motivo: `Nenhum paciente com a carteirinha do nome do arquivo${doPlano}.` };
+  if (daPasta?.motivo) return { motivo: daPasta.motivo };
   return { motivo: `O nome do arquivo não tem CPF nem carteirinha de paciente cadastrado${doPlano}.` };
 }
 
@@ -129,6 +166,8 @@ export async function gravarDocumento({
   pacienteId,
   pedidoId,
   idx,
+  pasta,
+  plano: planoLido,
 }: {
   nomeArquivo: string;
   conteudo: Buffer;
@@ -138,8 +177,10 @@ export async function gravarDocumento({
   pacienteId?: string; // já escolhido (cadastro manual)
   pedidoId?: string; // ligar a este pedido (cadastro manual)
   idx?: IndicePacientes;
+  pasta?: string | null; // nome da pasta do paciente (envio de pasta)
+  plano?: PlanoTerapeutico | null; // já lido (o envio em lote lê antes, para ordenar)
 }): Promise<ResultadoDocumento> {
-  const plano = await lerPlano(conteudo);
+  const plano = planoLido !== undefined ? planoLido : await lerPlano(conteudo);
   const tipo: TipoDocumento = plano ? "plano_terapeutico" : (tipoPeloNome(nomeArquivo) ?? tipoPadrao);
   const base = { arquivo: nomeArquivo, tipo };
 
@@ -148,13 +189,31 @@ export async function gravarDocumento({
   if (pacienteId) {
     paciente = (await prisma.paciente.findUnique({ where: { id: pacienteId }, select: { id: true, nome: true, cpf: true, dataNascimento: true } })) ?? undefined;
   } else {
-    const r = acharPaciente(nomeArquivo, plano, idx ?? (await indicePacientes()));
+    const r = acharPaciente(nomeArquivo, plano, idx ?? (await indicePacientes()), pasta);
     if (!r.paciente) return { ...base, status: "sem_paciente", motivo: r.motivo };
     paciente = r.paciente;
     por = r.por;
   }
   if (!paciente) return { ...base, status: "sem_paciente", motivo: "Paciente não encontrado." };
   const pacienteRef = { id: paciente.id, nome: paciente.nome };
+
+  // Plano mais antigo que o pedido atual do paciente não volta para o sistema.
+  const doPlano = plano && !pedidoId ? dadosDoPedido(plano, nomeArquivo) : null;
+  if (doPlano) {
+    const maisNovo = await prisma.pedidoMedico.findFirst({
+      where: { pacienteId: paciente.id, dataPedido: { gt: doPlano.dataPedido } },
+      select: { dataPedido: true },
+    });
+    if (maisNovo) {
+      return {
+        ...base,
+        status: "ignorado",
+        paciente: pacienteRef,
+        vinculoPor: por,
+        motivo: `O paciente já tem pedido mais novo (${deDate(maisNovo.dataPedido).split("-").reverse().join("/")}); este plano fica só no arquivo da clínica.`,
+      };
+    }
+  }
 
   const hash = sha256(conteudo);
   const repetido = await prisma.documento.findUnique({ where: { pacienteId_sha256: { pacienteId: paciente.id, sha256: hash } } });
@@ -168,16 +227,18 @@ export async function gravarDocumento({
   }
 
   const salvo = await salvarPdf(conteudo);
+  const apagar: string[] = []; // PDFs substituídos, apagados do disco depois do commit
   try {
-    return await prisma.$transaction(async (tx) => {
+    const resultado = await prisma.$transaction(async (tx) => {
       let pedido: ResultadoDocumento["pedido"] = null;
-      const doPlano = plano ? dadosDoPedido(plano, nomeArquivo) : null;
+      let anterioresApagados = 0;
       if (pedidoId) {
         pedido = { id: pedidoId, criado: false };
-        if (doPlano) {
+        const doPlanoManual = plano ? dadosDoPedido(plano, nomeArquivo) : null;
+        if (doPlanoManual) {
           await tx.pedidoMedico.updateMany({
             where: { id: pedidoId, sessoesSemanais: null },
-            data: { sessoesSemanais: doPlano.sessoesSemanais, planoItens: doPlano.planoItens },
+            data: { sessoesSemanais: doPlanoManual.sessoesSemanais, planoItens: doPlanoManual.planoItens },
           });
         }
       } else if (doPlano) {
@@ -193,6 +254,9 @@ export async function gravarDocumento({
         } else {
           const criado = await tx.pedidoMedico.create({ data: { ...doPlano, pacienteId: paciente!.id, usuarioId } });
           pedido = { id: criado.id, criado: true };
+          const r = await apagarPedidosAnteriores(tx, paciente!.id, criado);
+          anterioresApagados = r.pedidos;
+          apagar.push(...r.arquivos);
         }
         if (plano?.cid) {
           await tx.paciente.updateMany({ where: { id: paciente!.id, cid: null }, data: { cid: plano.cid } });
@@ -217,8 +281,19 @@ export async function gravarDocumento({
           usuarioId,
         },
       });
-      return { ...base, status: "vinculado" as const, paciente: pacienteRef, vinculoPor: por, pedido, documentoId: doc.id };
+      if (tipo === "plano_terapeutico" && pedido) apagar.push(...(await apagarPlanosAnteriores(tx, pedido.id, doc.id)));
+      return {
+        ...base,
+        status: "vinculado" as const,
+        paciente: pacienteRef,
+        vinculoPor: por,
+        pedido,
+        ...(anterioresApagados && { anterioresApagados }),
+        documentoId: doc.id,
+      };
     });
+    await Promise.all(apagar.map(apagarArquivo));
+    return resultado;
   } catch (erro) {
     await apagarArquivo(salvo.caminho);
     throw erro;

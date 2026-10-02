@@ -32,16 +32,6 @@ const inteiro = (min: number, mensagem: string) =>
 const inteiroOpcional = (min: number, mensagem: string) =>
   z.preprocess(vazioParaNulo, inteiro(min, mensagem).nullable().optional());
 
-const dinheiroOpcional = z.preprocess(
-  vazioParaNulo,
-  z.coerce
-    .number({ invalid_type_error: "Valor inválido." })
-    .min(0, "Valor inválido.")
-    .max(99_999_999.99, "Valor alto demais.")
-    .nullable()
-    .optional(),
-);
-
 const email = z.string().trim().toLowerCase().email("E-mail inválido.").max(255);
 const emailOpcional = z.preprocess(vazioParaNulo, email.nullable().optional());
 const uuid = (mensagem: string) => z.string().uuid(mensagem);
@@ -219,7 +209,6 @@ export const esquemaProcedimento = z.object({
       descricao: textoOpcional(300),
       tabela,
       codigoTuss,
-      valor: dinheiroOpcional,
     })
     .optional(),
 });
@@ -271,10 +260,18 @@ const camposAutorizacao = z.object({
   dataSolicitacao: dataOpcional("Data de solicitação inválida."),
   dataInicioVigencia: dataOpcional("Data de início de vigência inválida."),
   dataFimVigencia: dataOpcional("Data de fim de vigência inválida."),
+  unidadeId: uuidOpcional("Unidade inválida."),
   observacoes: textoOpcional(2000),
 });
 
 export const esquemaAutorizacao = camposAutorizacao.refine(vigenciaValida, erroVigencia);
+
+// Lista "A solicitar": gera os pedidos das sessões prontas do dia, ou só das
+// sessões escolhidas (atendimento escolar, pedido negado).
+export const esquemaGerarSolicitacoes = z.object({
+  dia: z.string().refine(ehDataISO, "Data inválida.").optional(),
+  agendamentoIds: z.array(uuid("Sessão inválida.")).min(1, "Escolha as sessões.").max(1000).optional(),
+});
 
 // Na edição não se troca paciente/convênio nem status (status tem rota própria).
 export const esquemaAutorizacaoEdicao = camposAutorizacao
@@ -330,7 +327,6 @@ export const esquemaAtendimento = z
         .nullable()
         .optional(),
     ),
-    valorCobrado: dinheiroOpcional,
     observacoes: textoOpcional(2000),
   })
   .refine((d) => d.procedimentoId || d.procedimento, { message: "Escolha o procedimento.", path: ["procedimentoId"] });
@@ -345,8 +341,6 @@ export const esquemaAtendimentoEdicao = z
     horaInicio: hora,
     horaFim: hora,
     statusCobranca: z.enum(STATUS_COBRANCA, { message: "Status de cobrança inválido." }),
-    valorCobrado: dinheiroOpcional,
-    valorPago: dinheiroOpcional,
     motivoGlosa: textoOpcional(2000),
     evolucao: textoOpcional(5000),
     observacoes: textoOpcional(2000),

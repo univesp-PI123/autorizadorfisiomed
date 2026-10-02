@@ -1,6 +1,5 @@
 import { api } from "./api";
 import type {
-  Agenda,
   Atendimento,
   Autorizacao,
   AutorizacoesPorConvenio,
@@ -10,6 +9,7 @@ import type {
   Dashboard,
   EvolucaoMes,
   Importacao,
+  ListaDoDia,
   Paciente,
   DadosParaAutorizacao,
   PacienteBusca,
@@ -61,6 +61,9 @@ export const autorizacaoService = {
   criar: (dados: unknown) => api.post<Autorizacao>("/autorizacoes", dados),
   atualizarStatus: (id: string, dados: unknown) =>
     api.patch<Autorizacao>(`/autorizacoes/${id}/status`, dados),
+  aSolicitar: (dia?: string) => api.get<ListaDoDia>("/autorizacoes/a-solicitar", { dia }),
+  gerar: (dados: { dia?: string; agendamentoIds?: string[] }) =>
+    api.post<{ criadas: number; atualizadas: number; sessoes: number }>("/autorizacoes/a-solicitar", dados),
   alertasVencimento: (dias = 7) =>
     api.get<{ total: number; autorizacoes: Autorizacao[] }>("/autorizacoes/alertas/vencimento", {
       dias,
@@ -91,10 +94,6 @@ export const usuarioService = {
   atualizar: (id: string, dados: unknown) => api.put<Usuario>(`/usuarios/${id}`, dados),
   alterarSenha: (dados: { senhaAtual: string; novaSenha: string }) =>
     api.patch("/usuarios/me/senha", dados),
-};
-
-export const agendaService = {
-  buscar: (params: Filtros = {}) => api.get<Agenda>("/agenda", params),
 };
 
 export const importacaoService = {
@@ -131,7 +130,8 @@ export const procedimentoService = {
 export const pedidoMedicoService = {
   listar: (pacienteId: string) =>
     api.get<{ pedidos: PedidoMedico[]; avulsos: DocumentoResumo[] }>(`/pacientes/${pacienteId}/pedidos`),
-  criar: (pacienteId: string, form: FormData) => api.post<PedidoMedico>(`/pacientes/${pacienteId}/pedidos`, form),
+  criar: (pacienteId: string, form: FormData) =>
+    api.post<PedidoMedico & { anterioresApagados: number }>(`/pacientes/${pacienteId}/pedidos`, form),
   alterarAtivo: (id: string, ativo: boolean) => api.patch<PedidoMedico>(`/pedidos/${id}`, { ativo }),
   lerPlano: (form: FormData) => api.post<PlanoLido>("/documentos/ler-plano", form),
 };

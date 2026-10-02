@@ -6,6 +6,7 @@ import toast from "react-hot-toast";
 import BuscaPaciente from "@/components/BuscaPaciente";
 import { comUrl, tirarNovoDaUrl } from "@/components/ComUrl";
 import Icone from "@/components/Icone";
+import ListaDoDia from "@/components/ListaDoDia";
 import Carregando from "@/components/ui/Carregando";
 import MensagemErro from "@/components/ui/MensagemErro";
 import Modal from "@/components/ui/Modal";
@@ -15,12 +16,10 @@ import { useSessao } from "@/contextos/SessaoContexto";
 import { diasParaVencimento, formatarData } from "@/lib/analiseDados";
 import { mensagemDeErro } from "@/lib/cliente/api";
 import { useFetch, usePaginacao } from "@/lib/cliente/hooks";
-import { autorizacaoService, convenioService, pacienteService } from "@/lib/cliente/servicos";
+import { autorizacaoService, convenioService, pacienteService, unidadeService } from "@/lib/cliente/servicos";
 import type { DadosParaAutorizacao, PacienteBusca } from "@/lib/cliente/tipos";
 import { hojeISO } from "@/lib/datas";
 import { sessoesPorSemana } from "@/lib/documentos/especialidades";
-
-const SEMANAS_POR_PEDIDO = 4; // quantidade sugerida: sessões do plano por semana × 4 semanas
 
 const STATUS = ["pendente", "em_analise", "autorizada", "negada", "vencida", "cancelada", "esgotada"];
 
@@ -33,6 +32,7 @@ const formInicial = () => ({
   dataSolicitacao: hojeISO(),
   dataInicioVigencia: "",
   dataFimVigencia: "",
+  unidadeId: "",
   observacoes: "",
 });
 
@@ -65,12 +65,14 @@ function AutorizacoesPage({ url }: { url: URLSearchParams }) {
   const { data, carregando, erro, recarregar } = useFetch(buscar);
   const autorizacoes = data?.data ?? [];
 
-  // Lista do formulário: só carrega quando o modal abre.
+  // Listas do formulário: só carregam quando o modal abre.
   const buscarConvenios = useCallback(
     () => (modalAberto ? convenioService.listar({ ativo: true }) : Promise.resolve(null)),
     [modalAberto],
   );
   const { data: convenios } = useFetch(buscarConvenios);
+  const buscarUnidades = useCallback(() => (modalAberto ? unidadeService.listar() : Promise.resolve(null)), [modalAberto]);
+  const { data: unidades } = useFetch(buscarUnidades);
 
   const aoMudar = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
     setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
@@ -83,8 +85,8 @@ function AutorizacoesPage({ url }: { url: URLSearchParams }) {
     setAchado(null);
   };
 
-  // Escolhe o procedimento da agenda: preenche nome, código da guia e a
-  // quantidade pelo plano terapêutico.
+  // Escolhe o procedimento da agenda: preenche nome, código da guia, unidade
+  // e a quantidade da semana pelo plano terapêutico (a senha vale a semana).
   const aplicarSessao = (r: DadosParaAutorizacao, i: number) => {
     const a = r.agenda[i];
     if (!a) return;
@@ -94,7 +96,8 @@ function AutorizacoesPage({ url }: { url: URLSearchParams }) {
       convenioId: a.convenio.id,
       procedimento: a.procedimento.descricao,
       codigoProcedimento: a.codigo ?? "",
-      quantidadeSolicitada: porSemana ? String(porSemana * SEMANAS_POR_PEDIDO) : f.quantidadeSolicitada,
+      unidadeId: a.unidade?.id ?? f.unidadeId,
+      quantidadeSolicitada: porSemana ? String(porSemana) : f.quantidadeSolicitada,
     }));
   };
 
@@ -153,9 +156,11 @@ function AutorizacoesPage({ url }: { url: URLSearchParams }) {
 
   return (
     <>
-      <section className="sb-card">
+      <ListaDoDia aoGerar={recarregar} importarAoAbrir={url.get("importar") === "1"} />
+
+      <section className="sb-card" aria-labelledby="titulo-autorizacoes">
         <div className="sb-card__header">
-          <h2 className="sb-card__title">
+          <h2 className="sb-card__title" id="titulo-autorizacoes">
             Autorizações{" "}
             {data && (
               <span className="texto-suave mono" style={{ fontWeight: 400 }}>
@@ -276,7 +281,10 @@ function AutorizacoesPage({ url }: { url: URLSearchParams }) {
                             <Link href={`/autorizacoes/${a.id}`}>{a.paciente?.nome}</Link>
                           </td>
                           <td>{a.convenio?.nome}</td>
-                          <td>{a.procedimento}</td>
+                          <td>
+                            {a.procedimento}
+                            {a.unidade && <span className="texto-suave">{a.unidade.nome}</span>}
+                          </td>
                           <td className="sb-mono">{a.numeroAutorizacao || "—"}</td>
                           <td>
                             <StatusBadge status={a.status} />
@@ -350,8 +358,9 @@ function AutorizacoesPage({ url }: { url: URLSearchParams }) {
                 </label>
                 <select id="aut-sessao" className="sb-input" defaultValue="0" onChange={(e) => aplicarSessao(achado, Number(e.target.value))} aria-describedby="aut-sessao-ajuda">
                   {achado.agenda.map((a, i) => (
-                    <option key={`${a.convenio.id}-${a.procedimento.id}`} value={i}>
-                      {a.procedimento.descricao} · {a.convenio.nome} · {a.sessoes} sessão(ões) na agenda
+                    <option key={`${a.convenio.id}-${a.procedimento.id}-${a.unidade?.id ?? ""}`} value={i}>
+                      {a.procedimento.descricao} · {a.convenio.nome}
+                      {a.unidade ? ` · ${a.unidade.nome}` : ""} · {a.sessoes} sessão(ões) na agenda
                     </option>
                   ))}
                 </select>
@@ -360,7 +369,7 @@ function AutorizacoesPage({ url }: { url: URLSearchParams }) {
                     const escolhido = achado.agenda.find((a) => a.procedimento.descricao === form.procedimento);
                     const porSemana = escolhido ? sessoesPorSemana(achado.pedido?.planoItens, escolhido.procedimento.descricao) : null;
                     return porSemana
-                      ? `Plano terapêutico: ${porSemana} por semana × ${SEMANAS_POR_PEDIDO} semanas = ${porSemana * SEMANAS_POR_PEDIDO} sessões.`
+                      ? `Plano terapêutico: ${porSemana} sessão(ões) por semana.`
                       : achado.pedido
                         ? "O plano terapêutico não tem esta especialidade: informe a quantidade."
                         : "Paciente sem plano terapêutico: informe a quantidade.";
@@ -370,6 +379,22 @@ function AutorizacoesPage({ url }: { url: URLSearchParams }) {
             )}
             {campo("procedimento", "Procedimento", { required: true, placeholder: "Sessão de ABA" })}
             {campo("codigoProcedimento", "Código do procedimento (guia)")}
+            <div className="sb-field">
+              <label className="sb-label" htmlFor="aut-unidadeId">
+                Unidade de atendimento
+              </label>
+              <select id="aut-unidadeId" name="unidadeId" className="sb-input" value={form.unidadeId} onChange={aoMudar} aria-describedby="aut-unidade-ajuda">
+                <option value="">Selecione…</option>
+                {(unidades ?? []).map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.nome}
+                  </option>
+                ))}
+              </select>
+              <span id="aut-unidade-ajuda" className="sb-help">
+                Define o CNES do pedido.
+              </span>
+            </div>
             {campo("quantidadeSolicitada", "Sessões solicitadas", { required: true, type: "number", min: 1 })}
             {campo("dataSolicitacao", "Data da solicitação", { type: "date" })}
             {campo("dataInicioVigencia", "Início da vigência", { type: "date" })}

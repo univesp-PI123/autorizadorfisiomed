@@ -30,10 +30,12 @@ export const GET = rota(async (req) => {
   }
   if (sp.get("convenioId")) where.convenioId = sp.get("convenioId")!;
 
-  // Autorizações ativas que vencem nos próximos N dias
+  // Autorizações ativas que vencem nos próximos N dias (sem os pedidos da
+  // lista do dia, que valem só a semana)
   if (Number.isInteger(vencendoEm) && vencendoEm > 0) {
     const hoje = hojeISO();
     where.status = "autorizada";
+    where.agendamentos = { none: {} };
     where.dataFimVigencia = {
       gte: paraDate(hoje),
       lte: paraDate(somarDias(hoje, Math.min(vencendoEm, 365))),
@@ -47,6 +49,7 @@ export const GET = rota(async (req) => {
       include: {
         paciente: { select: { id: true, nome: true, cpf: true } },
         convenio: { select: { id: true, nome: true } },
+        unidade: { select: { id: true, nome: true, cnes: true } },
         usuarioCriou: { select: { id: true, nome: true } },
       },
       orderBy: [{ dataSolicitacao: "desc" }, { createdAt: "desc" }],
@@ -67,6 +70,9 @@ export const POST = rota(async (req) => {
   ]);
   if (!paciente || !paciente.ativo) throw new ErroHttp(422, "Paciente inexistente ou inativo.");
   if (!convenio || !convenio.ativo) throw new ErroHttp(422, "Convênio inexistente ou inativo.");
+  if (dados.unidadeId && !(await prisma.unidade.findUnique({ where: { id: dados.unidadeId } }))) {
+    throw new ErroHttp(422, "Unidade inválida.");
+  }
 
   // Se o paciente tem carteirinha desse convênio, a autorização fica ligada a ela.
   const vinculo = await prisma.pacienteConvenio.findUnique({

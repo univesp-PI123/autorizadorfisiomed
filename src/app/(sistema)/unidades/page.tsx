@@ -156,9 +156,6 @@ export default function UnidadesPage() {
             Unidades de atendimento
           </h2>
           <div className="ferramentas">
-            <Link href="/agenda?unidade=sem" className="sb-btn">
-              Sessões sem unidade
-            </Link>
             {podeEditar && (
               <button type="button" className="sb-btn sb-btn--primary" onClick={abrirNova}>
                 <Icone nome="mais" />
@@ -169,9 +166,12 @@ export default function UnidadesPage() {
         </div>
         <div className="sb-card__body">
           <p className="texto-apoio">
-            A unidade de cada sessão vem da coluna &ldquo;Unidade de Atendimento&rdquo; do AnClinic. Para atribuir ou trocar, selecione
-            as sessões na <Link href="/agenda" className="link-texto">Agenda</Link> e use &ldquo;Aplicar&rdquo;; a escolha feita no sistema não é desfeita pelas
-            próximas importações.
+            A unidade de cada sessão vem da coluna &ldquo;Unidade de Atendimento&rdquo; do AnClinic; em branco, do começo da sala
+            (&ldquo;SÃO MIGUEL - SALA 31&rdquo;). Ela define o CNES do pedido. Quando faltar, escolha a unidade na lista{" "}
+            <Link href="/autorizacoes#a-solicitar" className="link-texto">
+              A solicitar
+            </Link>
+            ; a escolha feita no sistema não é desfeita pelas próximas importações.
           </p>
         </div>
         {unidades.carregando ? (

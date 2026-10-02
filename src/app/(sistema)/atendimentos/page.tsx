@@ -12,7 +12,7 @@ import Modal from "@/components/ui/Modal";
 import Paginacao from "@/components/ui/Paginacao";
 import StatusBadge, { Badge, rotuloStatus } from "@/components/ui/StatusBadge";
 import { useSessao } from "@/contextos/SessaoContexto";
-import { formatarData, formatarMoeda } from "@/lib/analiseDados";
+import { formatarData } from "@/lib/analiseDados";
 import { mensagemDeErro } from "@/lib/cliente/api";
 import { useFetch, usePaginacao } from "@/lib/cliente/hooks";
 import { atendimentoService, autorizacaoService, procedimentoService } from "@/lib/cliente/servicos";
@@ -44,10 +44,9 @@ const formInicial = () => ({
   procedimentoId: "",
   dataAtendimento: hojeISO(),
   horaInicio: "",
-  valorCobrado: "",
 });
 
-type FormCobranca = { statusCobranca: string; valorCobrado: string; valorPago: string; motivoGlosa: string; outroMotivo: string };
+type FormCobranca = { statusCobranca: string; motivoGlosa: string; outroMotivo: string };
 
 function AtendimentosPage({ url }: { url: URLSearchParams }) {
   const { usuario } = useSessao();
@@ -138,6 +137,15 @@ function AtendimentosPage({ url }: { url: URLSearchParams }) {
     );
   };
 
+  // Confirmar só no dia da sessão (antes, ela não aconteceu; depois, a
+  // validação na operadora ficaria com a data errada).
+  const motivoSemConfirmar = (a: Atendimento) =>
+    a.dataAtendimento > hoje
+      ? `Confirme no dia da sessão (${formatarData(a.dataAtendimento)}).`
+      : a.dataAtendimento < hoje
+        ? "Só dava para confirmar no dia. Se a sessão não aconteceu, cancele."
+        : undefined;
+
   const confirmar = (a: Atendimento) =>
     executar(() => atendimentoService.confirmar(a.id), "Atendimento confirmado.", () => {}, "Não foi possível confirmar.");
 
@@ -163,8 +171,6 @@ function AtendimentosPage({ url }: { url: URLSearchParams }) {
       atendimento: a,
       form: {
         statusCobranca: a.statusCobranca,
-        valorCobrado: a.valorCobrado ?? "",
-        valorPago: a.valorPago ?? "",
         motivoGlosa: !motivo ? "" : conhecido ? motivo : OUTROS,
         outroMotivo: conhecido ? "" : motivo,
       },
@@ -302,9 +308,6 @@ function AtendimentosPage({ url }: { url: URLSearchParams }) {
                     <th scope="col">Profissional</th>
                     <th scope="col">Situação</th>
                     <th scope="col">Cobrança</th>
-                    <th scope="col" className="sb-end">
-                      Valor
-                    </th>
                     {podeCobrar && (
                       <th scope="col" className="sb-end">
                         <span className="sr-only">Ações</span>
@@ -315,7 +318,7 @@ function AtendimentosPage({ url }: { url: URLSearchParams }) {
                 <tbody>
                   {atendimentos.length === 0 ? (
                     <tr>
-                      <td colSpan={podeCobrar ? 8 : 7} className="vazio">
+                      <td colSpan={podeCobrar ? 7 : 6} className="vazio">
                         Nenhum atendimento encontrado.
                       </td>
                     </tr>
@@ -336,14 +339,19 @@ function AtendimentosPage({ url }: { url: URLSearchParams }) {
                         <td>{a.profissional?.nome ?? a.terapeuta?.nome ?? "—"}</td>
                         <td>
                           <Badge tom={SITUACAO[a.situacao].tom}>
-                            {a.situacao === "aguardando_confirmacao" && a.dataAtendimento > hoje ? "Agendada" : SITUACAO[a.situacao].rotulo}
+                            {a.situacao !== "aguardando_confirmacao"
+                              ? SITUACAO[a.situacao].rotulo
+                              : a.dataAtendimento > hoje
+                                ? "Agendada"
+                                : a.dataAtendimento < hoje
+                                  ? "Não confirmado no dia"
+                                  : SITUACAO[a.situacao].rotulo}
                           </Badge>
                           {a.motivoCancelamento && <span className="texto-suave">{a.motivoCancelamento}</span>}
                         </td>
                         <td>
                           <StatusBadge status={a.statusCobranca} />
                         </td>
-                        <td className="sb-mono sb-end">{a.valorCobrado ? formatarMoeda(a.valorCobrado) : "—"}</td>
                         {podeCobrar && (
                           <td className="sb-end">
                             {a.situacao === "aguardando_confirmacao" ? (
@@ -353,8 +361,8 @@ function AtendimentosPage({ url }: { url: URLSearchParams }) {
                                     type="button"
                                     className="sb-btn sb-btn--sm sb-btn--primary"
                                     onClick={() => confirmar(a)}
-                                    disabled={salvando || a.dataAtendimento > hoje}
-                                    title={a.dataAtendimento > hoje ? "Confirme depois que a sessão acontecer." : undefined}
+                                    disabled={salvando || a.dataAtendimento !== hoje}
+                                    title={motivoSemConfirmar(a)}
                                     aria-label={`Confirmar atendimento de ${a.paciente?.nome} em ${formatarData(a.dataAtendimento)}`}
                                   >
                                     Confirmar
@@ -453,9 +461,12 @@ function AtendimentosPage({ url }: { url: URLSearchParams }) {
             </div>
             <div className="sb-field">
               <label className="sb-label" htmlFor="at-data">
-                Data<span className="obrigatorio" aria-hidden="true">*</span>
+                Data
               </label>
-              <input id="at-data" name="dataAtendimento" type="date" className="sb-input" value={form.dataAtendimento} onChange={aoMudar} required />
+              <input id="at-data" className="sb-input mono" value={`${formatarData(form.dataAtendimento)} (hoje)`} readOnly aria-describedby="at-data-ajuda" />
+              <span id="at-data-ajuda" className="sb-help">
+                O atendimento é registrado no dia em que acontece.
+              </span>
             </div>
             <div className="sb-field">
               <label className="sb-label" htmlFor="at-inicio">
@@ -472,12 +483,6 @@ function AtendimentosPage({ url }: { url: URLSearchParams }) {
               <span id="at-inicio-ajuda" className="sb-help">
                 {form.horaInicio ? `Sessão de 1 hora: termina às ${maisUmaHora(form.horaInicio)}.` : "Sessão de 1 hora."}
               </span>
-            </div>
-            <div className="sb-field">
-              <label className="sb-label" htmlFor="at-valor">
-                Valor cobrado (R$)
-              </label>
-              <input id="at-valor" name="valorCobrado" type="number" min="0" step="0.01" className="sb-input" placeholder="0,00" value={form.valorCobrado} onChange={aoMudar} />
             </div>
           </div>
         </form>
@@ -558,18 +563,6 @@ function AtendimentosPage({ url }: { url: URLSearchParams }) {
                     </option>
                   ))}
                 </select>
-              </div>
-              <div className="sb-field">
-                <label className="sb-label" htmlFor="cob-cobrado">
-                  Valor cobrado (R$)
-                </label>
-                <input id="cob-cobrado" type="number" min="0" step="0.01" className="sb-input" value={cobranca.form.valorCobrado} onChange={(e) => mudarCobranca("valorCobrado", e.target.value)} />
-              </div>
-              <div className="sb-field">
-                <label className="sb-label" htmlFor="cob-pago">
-                  Valor pago (R$)
-                </label>
-                <input id="cob-pago" type="number" min="0" step="0.01" className="sb-input" value={cobranca.form.valorPago} onChange={(e) => mudarCobranca("valorPago", e.target.value)} />
               </div>
               {cobranca.form.statusCobranca === "glosado" && (
                 <div className="sb-field inteira">

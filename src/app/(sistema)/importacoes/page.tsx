@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRef, useState, type FormEvent } from "react";
 import toast from "react-hot-toast";
 import EnvioDocumentos from "@/components/EnvioDocumentos";
@@ -29,7 +30,7 @@ function FormImportacao({
   children,
   aoImportar,
 }: {
-  tipo: "agenda" | "profissionais";
+  tipo: "profissionais";
   titulo: string;
   children?: React.ReactNode;
   aoImportar: (i: Importacao) => void;
@@ -108,13 +109,25 @@ export default function ImportacoesPage() {
     <>
       {podeImportar && (
         <section className="grid-meio">
-          <FormImportacao tipo="agenda" titulo="Agenda do AnClinic" aoImportar={aoImportar}>
-            <p className="texto-apoio">
-              No AnClinic, exporte o <strong style={{ fontWeight: 500 }}>Relatório de Agendamento</strong> em Excel, de um ou
-              mais dias, com todas as unidades. Importar o mesmo dia de novo atualiza as sessões; as que sumiram da agenda
-              são marcadas como excluídas.
-            </p>
-          </FormImportacao>
+          <section className="sb-card" aria-labelledby="titulo-agenda">
+            <div className="sb-card__header">
+              <h2 className="sb-card__title" id="titulo-agenda">
+                Agenda do AnClinic
+              </h2>
+            </div>
+            <div className="sb-card__body pilha">
+              <p className="texto-apoio">
+                A agenda do dia é importada em Autorizações, na lista &ldquo;A solicitar&rdquo;: lá aparecem na hora as sessões a
+                pedir, o que falta em cada uma e o botão para gerar os pedidos.
+              </p>
+              <div>
+                <Link href="/autorizacoes?importar=1" className="sb-btn sb-btn--primary">
+                  <Icone nome="importar" />
+                  Importar agenda do dia
+                </Link>
+              </div>
+            </div>
+          </section>
           <FormImportacao tipo="profissionais" titulo="Profissionais credenciados" aoImportar={aoImportar}>
             <p className="texto-apoio">
               Planilha com Nome, CPF, Conselho, Número no conselho, UF e Especialidades. Com um convênio escolhido, ela vira a

@@ -15,7 +15,7 @@ const sessao = (p: Partial<SessaoParaAnalise> = {}): SessaoParaAnalise => ({
   pacienteId: "pac-1",
   convenio: { id: AMIL, integracao: "tiss_amil", codigoPrestador: "12493066" },
   procedimento: { codigoGuia: "50000470", codigosAceitos: ["50000470"] },
-  profissional: { conselho: "CRP", numeroConselho: "123", ufConselho: "SP", cbo: "251510", convenioIds: [AMIL] },
+  profissional: { conselho: "CRP", numeroConselho: "123", ufConselho: "SP", convenioIds: [AMIL] },
   unidade: { cnes: "4160088" },
   ...p,
 });
@@ -56,7 +56,7 @@ describe("analisarSessao", () => {
     const r = analisarSessao(
       sessao({
         procedimento: { codigoGuia: null, codigosAceitos: [] },
-        profissional: { conselho: null, numeroConselho: null, ufConselho: null, cbo: null, convenioIds: [] },
+        profissional: { conselho: null, numeroConselho: null, ufConselho: null, convenioIds: [] },
         unidade: { cnes: null },
       }),
       ctx({ pedidos: [], clinicaCadastrada: false }),
@@ -67,7 +67,6 @@ describe("analisarSessao", () => {
       "Unidade sem CNES",
       "Procedimento sem código para a operadora",
       "Profissional sem conselho/número/UF",
-      "Profissional sem CBO",
       "Profissional não credenciado no convênio",
       "Sem pedido médico válido",
     ]);
@@ -82,6 +81,36 @@ describe("analisarSessao", () => {
       .toEqual(["Sem pedido médico válido"]);
     expect(analisarSessao(sessao(), ctx({ pedidos: [{ convenioId: AMIL, dataPedido: "2026-09-01", validoAte: null, arquivos: 0 }] })).pendencias)
       .toEqual(["Pedido médico sem PDF anexado"]);
+  });
+});
+
+describe("pedido gerado pela lista do dia", () => {
+  it("pendente ou em análise: já solicitada; autorizada: coberta", () => {
+    expect(analisarSessao(sessao({ autorizacao: { id: "a1", status: "pendente" } }), ctx())).toMatchObject({ situacao: "solicitada", autorizacaoId: "a1" });
+    expect(analisarSessao(sessao({ autorizacao: { id: "a1", status: "em_analise" } }), ctx()).situacao).toBe("solicitada");
+    expect(analisarSessao(sessao({ autorizacao: { id: "a1", status: "autorizada" } }), ctx())).toMatchObject({ situacao: "coberta", autorizacaoId: "a1" });
+  });
+
+  it("negada vai para tratar, com o motivo; cancelada volta a ficar pronta", () => {
+    const r = analisarSessao(sessao({ autorizacao: { id: "a1", status: "negada", motivoNegativa: "Carteirinha inativa" } }), ctx());
+    expect(r).toMatchObject({ situacao: "negada", motivo: "Negada: Carteirinha inativa", pendencias: [] });
+    expect(analisarSessao(sessao({ autorizacao: { id: "a1", status: "cancelada" } }), ctx()).situacao).toBe("pronta");
+  });
+
+  it("autorização de outras sessões não cobre esta, mesmo na vigência", () => {
+    const aut = { id: "a2", convenioId: AMIL, codigoProcedimento: "50000470", status: "autorizada", dataInicioVigencia: "2026-09-28", dataFimVigencia: "2026-10-02", saldo: 2 };
+    expect(analisarSessao(sessao(), ctx({ autorizacoes: [{ ...aut, ligadas: 2 }] })).situacao).toBe("pronta");
+    expect(analisarSessao(sessao(), ctx({ autorizacoes: [{ ...aut, ligadas: 0 }] })).situacao).toBe("coberta");
+  });
+
+  it("atendimento escolar fica fora do pedido em lote", () => {
+    const r = analisarSessao(sessao({ sala: "SÃO MIGUEL - ATENDIMENTO ESCOLAR" }), ctx());
+    expect(r.situacao).toBe("escolar");
+    expect(r.pendencias).toEqual([]);
+  });
+
+  it("profissional sem CBO não é mais pendência", () => {
+    expect(analisarSessao(sessao(), ctx()).situacao).toBe("pronta");
   });
 });
 

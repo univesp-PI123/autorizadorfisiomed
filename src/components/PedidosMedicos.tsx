@@ -78,6 +78,7 @@ export default function PedidosMedicos({
   const [outros, setOutros] = useState<File[]>([]);
   const [lendo, setLendo] = useState(false);
   const [salvando, setSalvando] = useState(false);
+  const [manterAnteriores, setManterAnteriores] = useState(false);
   const hoje = hojeISO();
   const pedidos = data?.pedidos ?? [];
   const avulsos = data?.avulsos ?? [];
@@ -90,6 +91,7 @@ export default function PedidosMedicos({
     setForm(FORM_VAZIO());
     setPlano(null);
     setOutros([]);
+    setManterAnteriores(false);
   };
 
   // Ao escolher o plano terapêutico, lê o PDF e preenche médico, CRM, CID e data.
@@ -127,10 +129,13 @@ export default function PedidosMedicos({
     const fd = new FormData();
     for (const [k, v] of Object.entries(form)) fd.set(k, v);
     for (const a of arquivos) fd.append("arquivos", a);
+    if (manterAnteriores) fd.set("manterAnteriores", "true");
     setSalvando(true);
     try {
-      await pedidoMedicoService.criar(pacienteId, fd);
-      toast.success("Pedido médico cadastrado.");
+      const r = await pedidoMedicoService.criar(pacienteId, fd);
+      toast.success(
+        r.anterioresApagados ? `Pedido médico cadastrado; ${r.anterioresApagados} pedido(s) anterior(es) substituído(s).` : "Pedido médico cadastrado.",
+      );
       fechar();
       recarregar();
     } catch (err) {
@@ -370,6 +375,18 @@ export default function PedidosMedicos({
                 Até 5 PDFs no total, 10 MB cada.
               </span>
             </div>
+            {pedidos.length > 0 && (
+              <div className="sb-field inteira">
+                <label className="sb-check">
+                  <input type="checkbox" checked={manterAnteriores} onChange={(e) => setManterAnteriores(e.target.checked)} aria-describedby="ped-manter-ajuda" />
+                  Manter os pedidos anteriores
+                </label>
+                <span id="ped-manter-ajuda" className="sb-help">
+                  Sem marcar, este pedido substitui os anteriores e os PDFs deles saem do sistema (o histórico fica no arquivo da
+                  clínica). Marque só quando o paciente tiver dois pedidos valendo, como um para outra terapia.
+                </span>
+              </div>
+            )}
           </div>
         </form>
       </Modal>

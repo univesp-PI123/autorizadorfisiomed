@@ -7,6 +7,7 @@
 import type { Prisma } from "@prisma/client";
 import { paraDate } from "@/lib/datas";
 import { prisma } from "@/lib/prisma";
+import { unidadePelaSala } from "@/lib/regras/solicitacao";
 import type { AgendaInterpretada, SessaoAgenda } from "./agenda";
 import { Avisos } from "./avisos";
 import { chaveNome, formatarCpf } from "./planilha";
@@ -20,6 +21,9 @@ export type ResumoAgenda = {
   sessoes: number;
   removidas: number;
   novos: { pacientes: number; profissionais: number; procedimentos: number; unidades: number };
+  unidadePelaSala?: number; // sessões sem unidade no AnClinic que a receberam pela sala
+  semUnidade?: number;
+  pedidos?: { cancelados: number; ajustados: number }; // pedidos não enviados acertados pela agenda nova
   porConvenio: { nome: string; convenioId: string | null; convenio: string | null; sessoes: number }[];
   avisos: { mensagem: string; quantidade: number; linhas: number[] }[];
 };
@@ -49,15 +53,19 @@ export async function gravarAgenda(
     const novos = { pacientes: 0, profissionais: 0, procedimentos: 0, unidades: 0 };
 
     // Unidades e procedimentos: cria os que ainda não existem.
-    const unidades = new Map(
-      (await tx.unidade.findMany({ select: { id: true, nomeAnclinic: true } })).map((u) => [chaveNome(u.nomeAnclinic), u.id]),
-    );
+    const listaUnidades = await tx.unidade.findMany({ select: { id: true, nome: true, nomeAnclinic: true } });
+    const unidades = new Map(listaUnidades.map((u) => [chaveNome(u.nomeAnclinic), u.id]));
     for (const nome of new Set(sessoes.map((s) => s.unidade).filter((u): u is string => !!u))) {
       if (unidades.has(chaveNome(nome))) continue;
-      const u = await tx.unidade.create({ data: { nome, nomeAnclinic: nome } });
+      const u = await tx.unidade.create({ data: { nome, nomeAnclinic: nome }, select: { id: true, nome: true, nomeAnclinic: true } });
       unidades.set(chaveNome(nome), u.id);
+      listaUnidades.push(u);
       novos.unidades++;
     }
+    // Sem a coluna "Unidade de Atendimento", a sala costuma dizer a unidade
+    // ("SÃO MIGUEL - SALA 31").
+    const unidadeDa = (s: SessaoAgenda) =>
+      s.unidade ? { id: unidades.get(chaveNome(s.unidade)) ?? null, pelaSala: false } : { id: unidadePelaSala(s.sala, listaUnidades), pelaSala: true };
 
     const procedimentos = new Map(
       (await tx.procedimento.findMany({ select: { id: true, codigoAnclinic: true } })).map((p) => [p.codigoAnclinic, p.id]),
@@ -198,6 +206,8 @@ export async function gravarAgenda(
     const porConvenio = new Map<string, { nome: string; convenioId: string | null; convenio: string | null; sessoes: number }>();
     let criados = 0;
     let atualizados = 0;
+    let pelaSala = 0;
+    let semUnidade = 0;
 
     for (const s of sessoes) {
       const conv = s.convenio ? convenios.get(chaveNome(s.convenio)) : undefined;
@@ -208,6 +218,10 @@ export async function gravarAgenda(
         porConvenio.set(s.convenio, g);
       }
 
+      const unidade = unidadeDa(s);
+      const manual = existentes.get(s.idAnclinic)?.unidadeManual;
+      if (!manual && unidade.id && unidade.pelaSala) pelaSala++;
+      if (!manual && !unidade.id && s.paciente && s.convenio) semUnidade++;
       const dados = {
         data: paraDate(s.data),
         horaInicio: s.horaInicio,
@@ -216,7 +230,7 @@ export async function gravarAgenda(
         profissionalId: await resolverProfissional(s),
         convenioId,
         procedimentoId: s.procedimento ? procedimentos.get(s.procedimento.codigo) ?? null : null,
-        unidadeId: s.unidade ? unidades.get(chaveNome(s.unidade)) ?? null : null,
+        unidadeId: unidade.id,
         pacienteAnclinic: s.paciente?.nome.slice(0, 200) ?? null,
         convenioAnclinic: s.convenio?.slice(0, 200) ?? null,
         carteirinha: s.carteirinha,
@@ -225,18 +239,17 @@ export async function gravarAgenda(
         senhaAutorizacao: s.senhaAutorizacao,
         senhaExecucao: s.senhaExecucao,
         agendamentosRestantes: s.agendamentosRestantes,
-        valorFaturamento: s.valorFaturamento,
         agenda: s.agenda,
         sala: s.sala,
         removidoEm: null,
         importacaoId: importacao.id,
       };
       // Unidade escolhida no sistema não é trocada pela do AnClinic.
-      const { unidadeId, ...semUnidade } = dados;
+      const { unidadeId, ...dadosSemUnidade } = dados;
       await tx.agendamento.upsert({
         where: { idAnclinic: s.idAnclinic },
         create: { idAnclinic: s.idAnclinic, ...dados },
-        update: existentes.get(s.idAnclinic)?.unidadeManual ? semUnidade : { ...semUnidade, unidadeId },
+        update: manual ? dadosSemUnidade : { ...dadosSemUnidade, unidadeId },
       });
       if (existentes.has(s.idAnclinic)) atualizados++;
       else criados++;
@@ -263,6 +276,8 @@ export async function gravarAgenda(
       sessoes: sessoes.length,
       removidas,
       novos,
+      unidadePelaSala: pelaSala,
+      semUnidade,
       porConvenio: [...porConvenio.values()].sort((a, b) => b.sessoes - a.sessoes),
       avisos: avisos.lista(),
     };
