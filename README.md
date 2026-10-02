@@ -356,8 +356,8 @@ Por padrão, o PostgreSQL do Debian só aceita conexões da própria máquina
 
 ```bash
 cd ~
-git clone https://github.com/thiagobelina/autorizadorfisiomed.git
-cd autorizadorfisiomed
+git clone https://github.com/thiagobelina/autorizamais.git
+cd autorizamais
 
 cp .env.example .env
 nano .env
@@ -477,7 +477,7 @@ Os PDFs dos pedidos médicos não estão no banco: inclua a pasta deles no backu
 (outra linha no `crontab -e`):
 
 ```
-30 3 * * * tar -czf ~/backups/arquivos-$(date +\%F).tar.gz -C ~/autorizadorfisiomed dados && find ~/backups -name 'arquivos-*.tar.gz' -mtime +14 -delete
+30 3 * * * tar -czf ~/backups/arquivos-$(date +\%F).tar.gz -C ~/autorizamais dados && find ~/backups -name 'arquivos-*.tar.gz' -mtime +14 -delete
 ```
 
 Esses arquivos ficam no mesmo disco da máquina — se ela for perdida, os
@@ -488,8 +488,22 @@ Para restaurar: `gunzip -c ARQUIVO.sql.gz | psql "postgresql://sga:SENHA_FORTE@l
 
 ### Atualizar o servidor depois de um `git push`
 
+> **Repositório renomeado para `autorizamais`:** num servidor já instalado,
+> aponte o git para o endereço novo e, se quiser, renomeie a pasta (o PM2
+> precisa ser recriado a partir da pasta nova):
+>
+> ```bash
+> cd ~/autorizadorfisiomed
+> git remote set-url origin https://github.com/thiagobelina/autorizamais.git
+> # opcional: renomear a pasta
+> pm2 delete sga && cd ~ && mv autorizadorfisiomed autorizamais && cd autorizamais
+> pm2 start npm --name sga -- start && pm2 save
+> ```
+>
+> Se `ARQUIVOS_DIR` no `.env` tiver o caminho antigo, corrija-o também.
+
 ```bash
-cd ~/autorizadorfisiomed
+cd ~/autorizamais
 git pull
 npm ci
 npx prisma migrate deploy
@@ -524,7 +538,7 @@ Se o servidor foi instalado com a versão anterior (Fase 1, só a página
 inicial), a atualização é a de cima, **mais um passo: criar o administrador**:
 
 ```bash
-cd ~/autorizadorfisiomed
+cd ~/autorizamais
 git pull
 npm ci
 npx prisma migrate deploy   # troca as tabelas da Fase 1 pelas do sistema
