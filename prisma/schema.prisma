@@ -240,9 +240,7 @@ model Atendimento {
   horaFim            String?             @db.VarChar(5)
   procedimento       String              @db.VarChar(200)
   codigoProcedimento String?             @db.VarChar(30)
-  statusCobranca     StatusCobranca      @default(pendente)
-  valorCobrado       Decimal?            @db.Decimal(10, 2)
-  valorPago          Decimal?            @db.Decimal(10, 2)
+  statusCobranca     StatusCobranca      @default(pendente) 
   motivoGlosa        String?
   semAutorizacao     Boolean             @default(false) // realizado sem autorização vigente
   evolucao           String? // não é mais preenchida pelo formulário
@@ -382,7 +380,6 @@ model Agendamento {
   senhaAutorizacao      String?   @db.VarChar(40)
   senhaExecucao         String?   @db.VarChar(40)
   agendamentosRestantes Int?
-  valorFaturamento      Decimal?  @db.Decimal(10, 2)
   agenda                String?   @db.VarChar(200)
   sala                  String?   @db.VarChar(200)
   removidoEm            DateTime? // sumiu de uma importação posterior do mesmo dia
@@ -499,8 +496,7 @@ model ProcedimentoOperadora {
   codigo         String   @db.VarChar(20)
   descricao      String   @db.VarChar(300)
   tabela         String   @default("22") @db.VarChar(2) // 22 TUSS, 98/00 próprias
-  codigoTuss     String?  @db.VarChar(10)
-  valor          Decimal? @db.Decimal(10, 2)
+  codigoTuss     String?  @db.VarChar(10)  
   ativo          Boolean  @default(true)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt

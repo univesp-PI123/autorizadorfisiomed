@@ -12,7 +12,7 @@ export const GET = rota(async (req) => {
     include: {
       _count: { select: { agendamentos: true } },
       equivalencias: convenioId
-        ? { where: { convenioId }, select: { id: true, codigo: true, descricao: true, tabela: true, codigoTuss: true, valor: true } }
+        ? { where: { convenioId }, select: { id: true, codigo: true, descricao: true, tabela: true, codigoTuss: true} }
         : false,
     },
   });

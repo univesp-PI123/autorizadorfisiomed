@@ -10,7 +10,6 @@ import Modal from "@/components/ui/Modal";
 import Paginacao from "@/components/ui/Paginacao";
 import { Badge } from "@/components/ui/StatusBadge";
 import { useSessao } from "@/contextos/SessaoContexto";
-import { formatarMoeda } from "@/lib/analiseDados";
 import { mensagemDeErro } from "@/lib/cliente/api";
 import { useFetch, usePaginacao } from "@/lib/cliente/hooks";
 import { convenioService, importacaoService, procedimentoService } from "@/lib/cliente/servicos";
@@ -19,7 +18,7 @@ import { MODELO_TABELA_OPERADORA } from "@/lib/importacao/tabelas";
 
 type Aba = "equivalencias" | "operadora" | "tuss";
 
-const FORM_VAZIO = { descricao: "", codigoTuss: "", tabelaTuss: "22", ativo: true, eqCodigo: "", eqDescricao: "", eqTabela: "22", eqCodigoTuss: "", eqValor: "" };
+const FORM_VAZIO = { descricao: "", codigoTuss: "", tabelaTuss: "22", ativo: true, eqCodigo: "", eqDescricao: "", eqTabela: "22", eqCodigoTuss: "" };
 
 function baixarModelo() {
   const blob = new Blob(["﻿" + MODELO_TABELA_OPERADORA], { type: "text/csv;charset=utf-8" });
@@ -135,7 +134,6 @@ export default function ProcedimentosPage() {
       eqDescricao: e?.descricao ?? "",
       eqTabela: e?.tabela ?? "22",
       eqCodigoTuss: e?.codigoTuss ?? "",
-      eqValor: e?.valor ?? "",
     });
   };
 
@@ -166,7 +164,6 @@ export default function ProcedimentosPage() {
             descricao: form.eqDescricao,
             tabela: form.eqTabela,
             codigoTuss: form.eqCodigoTuss || form.codigoTuss,
-            valor: form.eqValor,
           },
         }),
       });
@@ -309,7 +306,6 @@ export default function ProcedimentosPage() {
                               {p.equivalencia ? (
                                 <>
                                   <span className="mono">{p.equivalencia.codigo}</span> {p.equivalencia.descricao}
-                                  {p.equivalencia.valor && <span className="texto-suave mono">{formatarMoeda(p.equivalencia.valor)}</span>}
                                 </>
                               ) : (
                                 <span className="texto-suave">—</span>
@@ -353,9 +349,6 @@ export default function ProcedimentosPage() {
                   <th scope="col">Descrição</th>
                   <th scope="col">TUSS</th>
                   <th scope="col">Tabela</th>
-                  <th scope="col" className="sb-end">
-                    Valor
-                  </th>
                   <th scope="col">AnClinic</th>
                 </tr>
               }
@@ -365,7 +358,6 @@ export default function ProcedimentosPage() {
                   <td>{o.descricao}</td>
                   <td className="sb-mono">{o.codigoTuss ?? "—"}</td>
                   <td className="sb-mono">{o.tabela}</td>
-                  <td className="sb-mono sb-end">{o.valor ? formatarMoeda(o.valor) : "—"}</td>
                   <td>{o.procedimento ? `${o.procedimento.codigoAnclinic} ${o.procedimento.descricao}` : "—"}</td>
                 </tr>
               )}
@@ -445,7 +437,6 @@ export default function ProcedimentosPage() {
               <h3 className="subtitulo">Na tabela da {convenio.nome}</h3>
               <div className="form-grade">
                 {campoForm("eqCodigo", "Código na operadora", { "aria-describedby": "proc-eq-ajuda" })}
-                {campoForm("eqValor", "Valor (R$)", { type: "number", min: 0, step: "0.01" })}
                 <div className="inteira">{campoForm("eqDescricao", "Descrição na operadora")}</div>
                 <span id="proc-eq-ajuda" className="sb-help inteira">
                   Deixe o código em branco para desfazer a equivalência. Sem ela, a guia usa o código TUSS.
@@ -514,7 +505,7 @@ export default function ProcedimentosPage() {
                 <>
                   Colunas: <span className="mono">Código AnClinic</span> (opcional, faz o de/para),{" "}
                   <span className="mono">Código Operadora</span>, <span className="mono">Descrição Operadora</span>,{" "}
-                  <span className="mono">Código TUSS</span>, <span className="mono">Tabela</span> e <span className="mono">Valor</span>.
+                  <span className="mono">Código TUSS</span>, <span className="mono">Tabela</span>.
                   Reimportar atualiza pelo código da operadora.{" "}
                   <button type="button" className="link-botao" onClick={baixarModelo}>
                     Baixar modelo (.csv)

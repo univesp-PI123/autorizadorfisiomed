@@ -6,8 +6,7 @@ import { Avisos, type Aviso } from "./avisos";
 import {
   acharCabecalho,
   cpf,
-  dataBR,
-  dinheiro,
+  dataBR, 
   hora,
   inteiro,
   soDigitos,
@@ -29,8 +28,7 @@ const COLUNAS = [
   "Cartão",
   "Procedimento",
   "Agenda",
-  "Status",
-  "Valor Faturamento",
+  "Status", 
   "Status de Faturamento",
   "Dt. Nasc. Paciente",
   "Telefone Celular",
@@ -56,8 +54,7 @@ export type SessaoAgenda = {
   procedimento: { codigo: string; descricao: string } | null;
   agenda: string | null;
   status: string | null;
-  statusFaturamento: string | null;
-  valorFaturamento: number | null;
+  statusFaturamento: string | null;  
   agendamentosRestantes: number | null;
   senhaAutorizacao: string | null;
   senhaExecucao: string | null;
@@ -158,8 +155,7 @@ export function interpretarAgenda(linhas: Linha[]): AgendaInterpretada {
       procedimento: separarProcedimento(texto(col(l, "Procedimento"))),
       agenda: texto(col(l, "Agenda"))?.slice(0, 200) ?? null,
       status: texto(col(l, "Status"))?.slice(0, 60) ?? null,
-      statusFaturamento: texto(col(l, "Status de Faturamento"))?.slice(0, 60) ?? null,
-      valorFaturamento: dinheiro(col(l, "Valor Faturamento")),
+      statusFaturamento: texto(col(l, "Status de Faturamento"))?.slice(0, 60) ?? null,     
       agendamentosRestantes: inteiro(col(l, "Agendamentos Restantes")),
       senhaAutorizacao: texto(col(l, "Senha Autorização"))?.slice(0, 40) ?? null,
       senhaExecucao: texto(col(l, "Senha Execução"))?.slice(0, 40) ?? null,

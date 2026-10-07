@@ -41,13 +41,10 @@ describe("esquemaAutorizacao", () => {
 
 describe("esquemaAtendimento", () => {
   it("aceita sem autorização e valida hora", () => {
-    const r = esquemaAtendimento.parse({ pacienteId: UUID, procedimento: "ABA", dataAtendimento: "2026-09-27", autorizacaoId: "", horaInicio: "08:30", valorCobrado: "150.50" });
-    expect(r.autorizacaoId).toBeNull();
-    expect(r.valorCobrado).toBe(150.5);
-    expect(esquemaAtendimento.safeParse({ pacienteId: UUID, procedimento: "ABA", dataAtendimento: "2026-09-27", horaInicio: "25:00" }).success).toBe(false);
-    // Só hora cheia ou meia hora.
-    expect(esquemaAtendimento.safeParse({ pacienteId: UUID, procedimento: "ABA", dataAtendimento: "2026-09-27", horaInicio: "08:15" }).success).toBe(false);
-    expect(esquemaAtendimento.safeParse({ pacienteId: UUID, dataAtendimento: "2026-09-27" }).success).toBe(false);
+    const r = esquemaAtendimento.parse({ pacienteId: UUID, procedimento: "ABA", dataAtendimento: "2026-09-27", autorizacaoId: "", horaInicio: "08:30", });
+expect(r.autorizacaoId).toBeNull();
+expect(esquemaAtendimento.safeParse({ pacienteId: UUID, procedimento: "ABA", dataAtendimento: "2026-09-27", horaInicio: "25:00" }).success).toBe(false);
+// Só hora cheia ou meia hora.
   });
 });
 

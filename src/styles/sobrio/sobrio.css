@@ -7,6 +7,7 @@
 /* ---------- Auth (tela de login) ---------- */
 /* Defina a imagem por projeto: .sb-auth { --sb-auth-bg: url(caminho/fundo-login.webp); } */
 .sb-auth { min-height: 100vh; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; padding: var(--space-10) var(--space-4) var(--space-8); background-color: var(--surface-page); background-image: var(--sb-auth-bg, none); background-size: cover; background-position: left center; background-repeat: no-repeat; }
+.sb-auth--fisiomed { background-image: linear-gradient(135deg, #F5FAFD 0%, #EAF5FA 52%, #DCEFF7 100%); }
 .sb-auth__center { flex-grow: 1; display: flex; align-items: center; justify-content: center; width: 100%; }
 .sb-auth__card { width: 100%; max-width: 420px; box-sizing: border-box; display: flex; flex-direction: column; gap: var(--space-7); padding: var(--space-10); background: var(--surface-card); border: 1px solid var(--border); border-radius: var(--radius-xl); box-shadow: var(--shadow-card-float); }
 .sb-auth__logo { display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center; }

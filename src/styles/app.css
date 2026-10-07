@@ -11,14 +11,14 @@
 
   /* Séries de gráfico: paleta da marca ajustada e validada para
      daltonismo e contraste (tema claro, sobre surface-card). */
-  --serie-1: #D4145F;
-  --serie-2: #D9701F;
-  --serie-3: #B42FB8;
+  --serie-1: #177BB5;
+  --serie-2: #4F9BC1;
+  --serie-3: #75B8D2;
 }
 [data-theme="dark"] {
-  --serie-1: #EC4C88;
-  --serie-2: #D2782A;
-  --serie-3: #B95AD6;
+  --serie-1: #53B3E3;
+  --serie-2: #76B8D5;
+  --serie-3: #9ACFE5;
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -235,6 +235,7 @@ textarea.sb-input { height: auto; min-height: 72px; padding: 10px 14px; resize: 
 /* ---------- Logos ---------- */
 .logo-login { display: flex; justify-content: center; margin: 0; }
 .logo-login img { height: auto; max-width: 240px; }
+.logo-login .logo--claro { filter: brightness(0) saturate(100%) invert(38%) sepia(35%) saturate(1285%) hue-rotate(158deg) brightness(91%) contrast(92%); }
 .logo-login .logo--escuro { display: none; max-width: 120px; }
 [data-theme="dark"] .logo-login .logo--claro { display: none; }
 [data-theme="dark"] .logo-login .logo--escuro { display: block; }
@@ -242,10 +243,13 @@ textarea.sb-input { height: auto; min-height: 72px; padding: 10px 14px; resize: 
 /* Menu recolhido: só o símbolo. Expandido: logo inteiro (branco no escuro). */
 .logo-menu { display: flex; align-items: center; }
 .logo-menu img { display: block; }
+.logo-menu__simbolo { filter: brightness(0) saturate(100%) invert(38%) sepia(35%) saturate(1285%) hue-rotate(158deg) brightness(91%) contrast(92%); }
 .logo-menu__inteiro { display: none !important; height: 36px; width: auto; }
+.logo-menu__inteiro { filter: brightness(0) saturate(100%) invert(38%) sepia(35%) saturate(1285%) hue-rotate(158deg) brightness(91%) contrast(92%); }
 .sb-rail--open .logo-menu__simbolo { display: none; }
 .sb-rail--open .logo-menu__inteiro { display: block !important; }
 [data-theme="dark"] .logo-menu__inteiro { filter: brightness(0) invert(1); }
+[data-theme="dark"] .logo-menu__simbolo { filter: brightness(0) invert(1); }
 
 /* ---------- Acessibilidade (preferências do usuário) ---------- */
 /* Texto ampliado: a interface inteira usa "zoom" (os tamanhos do Sóbrio são
@@ -260,24 +264,24 @@ textarea.sb-input { height: auto; min-height: 72px; padding: 10px 14px; resize: 
 
 /* Alto contraste: textos de apoio e bordas mais escuros, foco mais grosso. */
 :root[data-contraste] {
-  --ink-secondary: #231A1D;
-  --ink-muted: #3D3236;
-  --border: #7A6D70;
-  --border-soft: #AD8F97;
-  --border-input: #4D4145;
-  --accent: #A3124F;
-  --accent-hover: #7A0D3B;
-  --chart-neutral: #E39AB5;
+  --ink-secondary: #173042;
+  --ink-muted: #3F5A69;
+  --border: #6F8794;
+  --border-soft: #9AB0BB;
+  --border-input: #3F5A69;
+  --accent: #0F5F8F;
+  --accent-hover: #0A496E;
+  --chart-neutral: #9CC7DA;
 }
 :root[data-contraste][data-theme="dark"] {
-  --ink-secondary: #F6EEF0;
-  --ink-muted: #E2D6D9;
-  --border: #8A7A7F;
-  --border-soft: #6E5C61;
-  --border-input: #BFAFB4;
-  --accent: #FF9DBF;
-  --accent-hover: #FFC4D8;
-  --chart-neutral: #7A4A5C;
+  --ink-secondary: #EEF7FB;
+  --ink-muted: #D7E7EE;
+  --border: #7895A3;
+  --border-soft: #668392;
+  --border-input: #AFC8D3;
+  --accent: #8AD0F0;
+  --accent-hover: #B5E3F6;
+  --chart-neutral: #477387;
 }
 :root[data-contraste] :focus-visible { outline-width: 3px; }
 :root[data-contraste] .sb-badge { outline: 1px solid currentColor; }

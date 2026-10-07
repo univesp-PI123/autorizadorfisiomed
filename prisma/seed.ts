@@ -184,8 +184,7 @@ async function criarDemo(adminId: string) {
           terapeutaId: terapeutas[0],
           procedimento: "Sessão de ABA",
           // Do dia anterior para trás, sempre dentro da vigência.
-          dataAtendimento: paraDate(somarDias(hoje, -(k + 1))),
-          valorCobrado: 150,
+          dataAtendimento: paraDate(somarDias(hoje, -(k + 1))),          
           statusCobranca: k === 0 ? "glosado" : "faturado",
           motivoGlosa: k === 0 ? "Exemplo de glosa." : null,
         },
@@ -198,7 +197,6 @@ async function criarDemo(adminId: string) {
         pacienteId: pacientes[2].paciente.id,
         procedimento: "Avaliação",
         dataAtendimento: paraDate(somarMeses(hoje, -m)),
-        valorCobrado: 200,
         semAutorizacao: true,
       },
     });
