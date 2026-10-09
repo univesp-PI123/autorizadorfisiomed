@@ -1,4 +1,3 @@
-import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { Avisos } from "./avisos";
 import type { interpretarTabelaOperadora, interpretarTuss } from "./tabelas";
@@ -59,8 +58,7 @@ export async function gravarTabelaOperadora(
       const dados = {
         descricao: it.descricao,
         tabela: it.tabela,
-        codigoTuss: it.codigoTuss,
-        valor: it.valor === null ? null : new Prisma.Decimal(it.valor),
+        codigoTuss: it.codigoTuss,        
         ativo: true,
         ...(procedimentoId !== undefined && { procedimentoId }),
       };

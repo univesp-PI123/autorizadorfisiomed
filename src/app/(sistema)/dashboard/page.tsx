@@ -7,7 +7,7 @@ import Carregando from "@/components/ui/Carregando";
 import MensagemErro from "@/components/ui/MensagemErro";
 import { useAlertas } from "@/contextos/AlertaContexto";
 import { useSessao } from "@/contextos/SessaoContexto";
-import { diasParaVencimento, formatarData, formatarMes, formatarMoeda } from "@/lib/analiseDados";
+import { diasParaVencimento, formatarData, formatarMes} from "@/lib/analiseDados";
 import { useFetch } from "@/lib/cliente/hooks";
 import { relatorioService } from "@/lib/cliente/servicos";
 
@@ -57,7 +57,6 @@ export default function Dashboard() {
     { rotulo: "Registrar atendimento", href: "/atendimentos?novo=1", mostrar: perfil !== "financeiro" },
     { rotulo: "Novo paciente", href: "/pacientes?novo=1", mostrar: perfil !== "financeiro" },
     { rotulo: "Ver pendentes", href: "/autorizacoes?status=pendente", mostrar: perfil !== "terapeuta" },
-    { rotulo: "Ver glosas", href: "/atendimentos?statusCobranca=glosado", mostrar: true },
     { rotulo: "Relatórios", href: "/relatorios", mostrar: perfil === "admin" || perfil === "financeiro" },
   ].filter((a) => a.mostrar);
 
@@ -118,20 +117,26 @@ export default function Dashboard() {
                       Nenhuma autorização vence nos próximos 7 dias.
                     </td>
                   </tr>
-                ) : (
+                               ) : (
                   alertas.slice(0, 6).map((a) => {
                     const dias = diasParaVencimento(a.dataFimVigencia);
+
                     return (
                       <tr key={a.id}>
                         <td className="sb-strong">
-                          <Link href={`/autorizacoes/${a.id}`}>{a.paciente?.nome}</Link>
+                          <Link href={`/autorizacoes/${a.id}`}>
+                            {a.paciente?.nome}
+                          </Link>
                         </td>
                         <td>{a.convenio?.nome}</td>
                         <td>{a.procedimento}</td>
                         <td className="sb-mono sb-end">
                           {a.quantidadeUtilizada}/{a.quantidadeAutorizada ?? "—"}
                         </td>
-                        <td className="sb-mono sb-end" title={formatarData(a.dataFimVigencia)}>
+                        <td
+                          className="sb-mono sb-end"
+                          title={formatarData(a.dataFimVigencia)}
+                        >
                           {dias === 0 ? "hoje" : `${dias} d`}
                         </td>
                       </tr>
@@ -143,59 +148,68 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="pilha">
+                <div className="pilha">
           <div className="sb-card">
             <div className="sb-card__header">
               <h2 className="sb-card__title">Ações rápidas</h2>
             </div>
+
             <div className="sb-card__body acoes-rapidas">
               {acoes.map((a) => (
-                <Link key={a.href} href={a.href} className="sb-btn">
+                <Link
+                  key={a.href}
+                  href={a.href}
+                  className="sb-btn"
+                >
                   {a.rotulo}
                 </Link>
               ))}
             </div>
           </div>
-          <div className="sb-card">
-            <div className="sb-card__header">
-              <h2 className="sb-card__title">Cobrança</h2>
-              <Link href="/atendimentos?statusCobranca=glosado">Ver glosas</Link>
-            </div>
-            <div className="sb-card__body">
-              <dl className="dl-grade">
-                <div>
-                  <dt>Glosas em aberto</dt>
-                  <dd className="mono">{data.glosasAberto}</dd>
-                </div>
-                <div>
-                  <dt>Total glosado</dt>
-                  <dd className="mono">{formatarMoeda(data.totalGlosado)}</dd>
-                </div>
-              </dl>
-            </div>
-          </div>
-        </div>
-      </section>
 
-      <section className="sb-card" aria-labelledby="titulo-volume">
-        <div className="sb-card__header">
-          <h2 className="sb-card__title" id="titulo-volume">
-            Atendimentos por mês
-          </h2>
-          <span className="caption" style={{ color: "var(--ink-muted)" }}>
-            Últimos 6 meses{pico && pico.total > 0 ? ` · pico em ${formatarMes(pico.mes)}` : ""}
-          </span>
-        </div>
-        <div className="sb-card__body">
-          {evolucao.carregando ? (
-            <Carregando />
-          ) : evolucao.erro ? (
-            <MensagemErro mensagem={evolucao.erro} onRetry={evolucao.recarregar} />
-          ) : (
-            <GraficoBarras pontos={pontos} titulo="Atendimentos por mês" unidade="atendimentos" />
-          )}
+          <section
+            className="sb-card"
+            aria-labelledby="titulo-volume"
+          >
+            <div className="sb-card__header">
+              <h2
+                className="sb-card__title"
+                id="titulo-volume"
+              >
+                Atendimentos por mês
+              </h2>
+
+              <span
+                className="caption"
+                style={{ color: "var(--ink-muted)" }}
+              >
+                Últimos 6 meses
+                {pico && pico.total > 0
+                  ? ` · pico em ${formatarMes(pico.mes)}`
+                  : ""}
+              </span>
+            </div>
+
+            <div className="sb-card__body">
+              {evolucao.carregando ? (
+                <Carregando />
+              ) : evolucao.erro ? (
+                <MensagemErro
+                  mensagem={evolucao.erro}
+                  onRetry={evolucao.recarregar}
+                />
+              ) : (
+                <GraficoBarras
+                  pontos={pontos}
+                  titulo="Atendimentos por mês"
+                  unidade="atendimentos"
+                />
+              )}
+            </div>
+          </section>
         </div>
       </section>
     </>
   );
+
 }

@@ -168,8 +168,6 @@ export type Atendimento = {
   horaFim: string | null;
   procedimento: string;
   statusCobranca: StatusCobranca;
-  valorCobrado: string | null;
-  valorPago: string | null;
   motivoGlosa: string | null;
   semAutorizacao: boolean;
   evolucao: string | null;
@@ -209,7 +207,7 @@ export type EvolucaoMes = { mes: string; total: number; semAutorizacao: number; 
 
 export type AutorizacoesPorConvenio = { status: StatusAutorizacao; total: number; convenio: Referencia };
 
-export type ResumoGlosas = { total: number; totalGlosado: number; glosas: Atendimento[] };
+export type ResumoGlosas = { total: number; glosas: Atendimento[] };
 
 // --- Integração AnClinic / TISS ---------------------------------------
 
@@ -265,7 +263,6 @@ export type Equivalencia = {
   descricao: string;
   tabela: string;
   codigoTuss: string | null;
-  valor: string | null;
 };
 
 export type ProcedimentoOperadora = Equivalencia & {

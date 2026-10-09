@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { interpretarAgenda, separarProcedimento } from "@/lib/importacao/agenda";
-import { chaveNome, cpf, dataBR, dinheiro, hora, type Linha } from "@/lib/importacao/planilha";
+import { chaveNome, cpf, dataBR, hora, type Linha } from "@/lib/importacao/planilha";
 import { interpretarProfissionais } from "@/lib/importacao/profissionais";
 import { cboSugerido } from "@/lib/tiss/dominios";
 
@@ -8,7 +8,7 @@ import { cboSugerido } from "@/lib/tiss/dominios";
 const CABECALHO = [
   "ID Agendamento", "Data", "Hora Início", "Hora Fim", "Paciente", "CPF Paciente", "CNS Paciente",
   "Profissional", "CPF Profissional", "CNS Profissional", "Convênio", "Cartão", "Procedimento", "Agenda",
-  "Status", "Valor Faturamento", "Valor Repasse", "Status de Faturamento", "Evolução", "Dt. Nasc. Paciente",
+  "Status", "Status de Faturamento", "Evolução", "Dt. Nasc. Paciente",
   "Telefone Celular", "Telefone Residencial", "Observação", "Agendamentos Restantes", "Senha Autorização",
   "Senha Execução", "Qtd. Notificações", "Unidade de Atendimento", "Sala",
 ];
@@ -18,8 +18,7 @@ function linhaAgenda(p: Partial<Record<string, string | number | null>>): Linha 
     "ID Agendamento": 1001, Data: "28/09/2026", "Hora Início": "07:00", "Hora Fim": "08:00",
     Paciente: "PACIENTE TESTE", "CPF Paciente": "52998224725", Profissional: "TERAPEUTA TESTE",
     "CPF Profissional": "11144477735", Convênio: "Amil Assitencia Medica Internacional S.a.", Cartão: "074929371",
-    Procedimento: "4440 - PSICOLOGIA ABA", Status: "Marcado Nao Confirmado", "Valor Faturamento": "R$131,00",
-    "Status de Faturamento": "Autorização", "Dt. Nasc. Paciente": "26/01/2019", "Agendamentos Restantes": 32,
+    Procedimento: "4440 - PSICOLOGIA ABA", Status: "Marcado Nao Confirmado","Status de Faturamento": "Autorização", "Dt. Nasc. Paciente": "26/01/2019", "Agendamentos Restantes": 32,
     "Unidade de Atendimento": "FISIOMED ABA SAO MIGUEL",
   };
   const v = { ...base, ...p };
@@ -27,13 +26,10 @@ function linhaAgenda(p: Partial<Record<string, string | number | null>>): Linha 
 }
 
 describe("conversões da planilha", () => {
-  it("converte data, hora e dinheiro", () => {
+  it("converte data e hora", () => {
     expect(dataBR("28/09/2026")).toBe("2026-09-28");
     expect(dataBR("31/02/2026")).toBeNull();
-    expect(hora("7:05")).toBe("07:05");
-    expect(dinheiro("R$1.234,56")).toBe(1234.56);
-    expect(dinheiro("R$0,00")).toBe(0);
-  });
+    expect(hora("7:05")).toBe("07:05");      });
   it("recupera zeros à esquerda do CPF e valida os dígitos", () => {
     expect(cpf(1144477735)).toBeNull(); // 01144477735 não é válido
     expect(cpf("111.444.777-35")).toBe("11144477735");
@@ -58,8 +54,7 @@ describe("interpretarAgenda", () => {
     const s = r.sessoes[0];
     expect(s.linha).toBe(3);
     expect(s.paciente).toEqual({ nome: "PACIENTE TESTE", cpf: "52998224725", nascimento: "2019-01-26", telefone: null });
-    expect(s.procedimento?.codigo).toBe("4440");
-    expect(s.valorFaturamento).toBe(131);
+    expect(s.procedimento?.codigo).toBe("4440");  
     expect(s.agendamentosRestantes).toBe(32);
   });
 

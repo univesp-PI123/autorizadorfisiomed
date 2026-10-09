@@ -1,8 +1,7 @@
-// Atendimentos a partir da agenda: assim que uma autorização é aprovada, as
 // sessões da agenda que ela cobre (dentro da vigência, até o saldo) viram
-// atendimentos "aguardando confirmação", com o valor do faturamento do
-// AnClinic. Depois que a sessão acontece, o operador confirma (aí ela é
-// descontada da autorização) ou cancela, com motivo.
+// atendimentos "aguardando confirmação". Depois que a sessão acontece,
+// o operador confirma (aí ela é descontada da autorização) ou cancela,
+// com motivo.
 
 import { Prisma } from "@prisma/client";
 import { analisarAgendamentos } from "@/lib/agenda";
@@ -81,7 +80,7 @@ export async function sincronizarAtendimentos() {
   // 1. Pendentes cuja sessão foi desmarcada ou excluída no AnClinic.
   const pendentes = await prisma.atendimento.findMany({
     where: { situacao: "aguardando_confirmacao", agendamentoId: { not: null } },
-    select: { id: true, valorCobrado: true, agendamento: { select: { statusAnclinic: true, removidoEm: true, valorFaturamento: true } } },
+    select: { id: true, agendamento: { select: { statusAnclinic: true, removidoEm: true } } },
   });
   for (const p of pendentes) {
     const ag = p.agendamento!;
@@ -93,9 +92,7 @@ export async function sincronizarAtendimentos() {
           statusCobranca: "cancelado",
           motivoCancelamento: ag.removidoEm ? "Sessão excluída da agenda do AnClinic." : `AnClinic: ${ag.statusAnclinic}.`,
         },
-      });
-    } else if (ag.valorFaturamento && !ag.valorFaturamento.equals(p.valorCobrado ?? new Prisma.Decimal(-1))) {
-      await prisma.atendimento.update({ where: { id: p.id }, data: { valorCobrado: ag.valorFaturamento } });
+      });  
     }
   }
 
@@ -144,8 +141,7 @@ export async function sincronizarAtendimentos() {
       codigoProcedimento: codigo?.codigo ?? null,
       dataAtendimento: a.data,
       horaInicio: a.horaInicio,
-      horaFim: a.horaFim,
-      valorCobrado: a.valorFaturamento,
+      horaFim: a.horaFim,      
       situacao: "aguardando_confirmacao",
       semAutorizacao: false,
     });

@@ -18,7 +18,6 @@ export const GET = rota(async (req) => {
     atendimentosMes,
     glosasAberto,
     semAutorizacaoMes,
-    somaGlosado,
   ] = await prisma.$transaction([
     prisma.paciente.count({ where: { ativo: true } }),
     prisma.autorizacao.count({ where: { status: "autorizada" } }),
@@ -35,10 +34,6 @@ export const GET = rota(async (req) => {
     prisma.atendimento.count({
       where: { semAutorizacao: true, dataAtendimento: { gte: inicioMes }, situacao: "confirmado" },
     }),
-    prisma.atendimento.aggregate({
-      where: { statusCobranca: "glosado" },
-      _sum: { valorCobrado: true },
-    }),
   ]);
 
   return json({
@@ -49,6 +44,5 @@ export const GET = rota(async (req) => {
     atendimentosMes,
     glosasAberto,
     semAutorizacaoMes,
-    totalGlosado: Number(somaGlosado._sum.valorCobrado ?? 0),
   });
 });

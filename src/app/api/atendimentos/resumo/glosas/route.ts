@@ -10,21 +10,17 @@ export const GET = rota(async (req) => {
   const periodo = filtroPeriodo(sp.get("dataInicio"), sp.get("dataFim"));
   if (periodo) where.dataAtendimento = periodo;
 
-  const [glosas, soma] = await Promise.all([
-    prisma.atendimento.findMany({
-      where,
-      include: {
-        paciente: { select: { id: true, nome: true } },
-        autorizacao: { include: { convenio: { select: { id: true, nome: true } } } },
-      },
-      orderBy: { dataAtendimento: "desc" },
-    }),
-    prisma.atendimento.aggregate({ where, _sum: { valorCobrado: true } }),
-  ]);
+  const glosas = await prisma.atendimento.findMany({
+    where,
+    include: {
+      paciente: { select: { id: true, nome: true } },
+      autorizacao: { include: { convenio: { select: { id: true, nome: true } } } },
+    },
+    orderBy: { dataAtendimento: "desc" },
+  });
 
   return json({
     total: glosas.length,
-    totalGlosado: Number(soma._sum.valorCobrado ?? 0),
     glosas,
   });
 });

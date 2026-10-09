@@ -9,8 +9,8 @@ import { LogoLogin } from "@/components/Marca";
 import { mensagemDeErro } from "@/lib/cliente/api";
 import { authService } from "@/lib/cliente/servicos";
 
-// Tela de login do Sóbrio (componente Auth): imagem da marca ao fundo, cartão
-// centralizado e rodapé só com copyright e versão.
+// Tela de login da Fisiomed ABA: identidade institucional, cartão centralizado
+// e rodapé só com copyright e versão.
 export default function FormLogin({
   sessaoExpirou,
   versao,
@@ -46,7 +46,7 @@ export default function FormLogin({
   const erroCampo = erro ? "sb-field sb-field--error" : "sb-field";
 
   return (
-    <div className="sb-auth" style={{ "--sb-auth-bg": "url(/fundo-login.webp)" } as React.CSSProperties}>
+    <div className="sb-auth sb-auth--fisiomed">
       <BotaoAcessibilidade flutuante />
       <main className="sb-auth__center" id="conteudo">
         <div className="sb-auth__card">

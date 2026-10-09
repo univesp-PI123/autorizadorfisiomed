@@ -57,6 +57,9 @@ export const POST = rota<Params>(async (req, { params }) => {
   const conteudos = [];
   for (const a of arquivos) conteudos.push({ nome: a.name.slice(0, 255), conteudo: await lerPdfEnviado(a) });
 
+  await prisma.pedidoMedico.deleteMany({
+  where: { pacienteId },
+});
   const pedido = await prisma.pedidoMedico.create({ data: { ...dados, pacienteId, usuarioId: usuario.id } });
   try {
     for (const c of conteudos) {

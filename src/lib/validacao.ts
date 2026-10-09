@@ -32,16 +32,6 @@ const inteiro = (min: number, mensagem: string) =>
 const inteiroOpcional = (min: number, mensagem: string) =>
   z.preprocess(vazioParaNulo, inteiro(min, mensagem).nullable().optional());
 
-const dinheiroOpcional = z.preprocess(
-  vazioParaNulo,
-  z.coerce
-    .number({ invalid_type_error: "Valor inválido." })
-    .min(0, "Valor inválido.")
-    .max(99_999_999.99, "Valor alto demais.")
-    .nullable()
-    .optional(),
-);
-
 const email = z.string().trim().toLowerCase().email("E-mail inválido.").max(255);
 const emailOpcional = z.preprocess(vazioParaNulo, email.nullable().optional());
 const uuid = (mensagem: string) => z.string().uuid(mensagem);
@@ -219,7 +209,7 @@ export const esquemaProcedimento = z.object({
       descricao: textoOpcional(300),
       tabela,
       codigoTuss,
-      valor: dinheiroOpcional,
+  
     })
     .optional(),
 });
@@ -329,8 +319,7 @@ export const esquemaAtendimento = z
         .regex(/^([01]\d|2[0-3]):(00|30)$/, "O início deve ser em hora cheia ou meia hora (ex.: 15:00, 15:30).")
         .nullable()
         .optional(),
-    ),
-    valorCobrado: dinheiroOpcional,
+    ),    
     observacoes: textoOpcional(2000),
   })
   .refine((d) => d.procedimentoId || d.procedimento, { message: "Escolha o procedimento.", path: ["procedimentoId"] });
@@ -344,9 +333,7 @@ export const esquemaAtendimentoEdicao = z
     dataAtendimento: data("Data do atendimento inválida."),
     horaInicio: hora,
     horaFim: hora,
-    statusCobranca: z.enum(STATUS_COBRANCA, { message: "Status de cobrança inválido." }),
-    valorCobrado: dinheiroOpcional,
-    valorPago: dinheiroOpcional,
+    statusCobranca: z.enum(STATUS_COBRANCA, { message: "Status de cobrança inválido." }),   
     motivoGlosa: textoOpcional(2000),
     evolucao: textoOpcional(5000),
     observacoes: textoOpcional(2000),
