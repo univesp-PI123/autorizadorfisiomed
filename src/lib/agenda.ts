@@ -5,12 +5,12 @@
 import type { Prisma } from "@prisma/client";
 import { deDate } from "@/lib/datas";
 import { prisma } from "@/lib/prisma";
-import { codigoParaGuia, codigosAceitos } from "@/lib/regras/codigoGuia";
+import { codigoParaGuia, codigosAceitos, codigoTuss, type ProcedimentoComCodigos } from "@/lib/regras/codigoGuia";
 import { analisarSessao, type ContextoAnalise } from "@/lib/regras/pendencias";
 
 const INCLUIR = {
   paciente: { select: { id: true, nome: true } },
-  convenio: { select: { id: true, nome: true, integracao: true, codigoPrestador: true } },
+  convenio: { select: { id: true, nome: true, integracao: true, codigoPrestador: true, codigoAns: true } },
   procedimento: {
     select: {
       id: true, codigoAnclinic: true, descricao: true, codigoTuss: true, tabelaTuss: true,
@@ -27,6 +27,14 @@ const INCLUIR = {
   atendimento: { select: { id: true, situacao: true } },
 } satisfies Prisma.AgendamentoInclude;
 
+// A Amil só aceita a TUSS (tabela 22); as demais operadoras recebem o código
+// do de/para.
+function codigoNaGuia(proc: ProcedimentoComCodigos, convenio: { id: string; integracao: string } | null) {
+  if (convenio?.integracao !== "tiss_amil") return codigoParaGuia(proc, convenio?.id ?? null);
+  const codigo = codigoTuss(proc, convenio.id);
+  return codigo ? { codigo, tabela: "22", origem: "tuss" as const } : null;
+}
+
 export async function analisarAgendamentos(where: Prisma.AgendamentoWhereInput) {
   const agendamentos = await prisma.agendamento.findMany({
     where,
@@ -39,7 +47,10 @@ export async function analisarAgendamentos(where: Prisma.AgendamentoWhereInput) 
     prisma.clinica.findFirst({ select: { id: true } }),
     prisma.pedidoMedico.findMany({
       where: { pacienteId: { in: pacienteIds }, ativo: true },
-      select: { pacienteId: true, convenioId: true, dataPedido: true, validoAte: true, _count: { select: { documentos: true } } },
+      select: {
+        id: true, pacienteId: true, convenioId: true, dataPedido: true, validoAte: true, cbo: true, cid: true, indicacaoClinica: true,
+        _count: { select: { documentos: true } },
+      },
     }),
     prisma.autorizacao.findMany({
       where: { pacienteId: { in: pacienteIds }, status: "autorizada" },
@@ -60,10 +71,13 @@ export async function analisarAgendamentos(where: Prisma.AgendamentoWhereInput) 
         pedidos: pedidos
           .filter((p) => p.pacienteId === pacienteId)
           .map((p) => ({
+            id: p.id,
             convenioId: p.convenioId,
             dataPedido: deDate(p.dataPedido),
             validoAte: p.validoAte && deDate(p.validoAte),
             arquivos: p._count.documentos,
+            cbo: p.cbo,
+            indicacao: !!(p.indicacaoClinica?.trim() || p.cid?.trim()),
           })),
         autorizacoes: autorizacoes
           .filter((a) => a.pacienteId === pacienteId)
@@ -84,7 +98,7 @@ export async function analisarAgendamentos(where: Prisma.AgendamentoWhereInput) 
   };
 
   return agendamentos.map((a) => {
-    const codigo = a.procedimento ? codigoParaGuia(a.procedimento, a.convenioId) : null;
+    const codigo = a.procedimento ? codigoNaGuia(a.procedimento, a.convenio) : null;
     const analise = analisarSessao(
       {
         data: deDate(a.data),

@@ -94,6 +94,7 @@ model Usuario {
   historicoStatus         HistoricoStatus[]
   importacoes             Importacao[]
   pedidosMedicos          PedidoMedico[]
+  guiasTiss               GuiaTiss[]
 
   @@map("usuarios")
 }
@@ -120,6 +121,7 @@ model Paciente {
   agendamentos   Agendamento[]
   pedidosMedicos PedidoMedico[]
   Documento      Documento[]
+  guiasTiss      GuiaTiss[]
 
   @@index([nome])
   @@map("pacientes")
@@ -152,6 +154,7 @@ model Convenio {
   credenciados   ProfissionalConvenio[]
   pedidosMedicos PedidoMedico[]
   tabela         ProcedimentoOperadora[]
+  guiasTiss      GuiaTiss[]
 
   @@map("convenios")
 }
@@ -240,7 +243,7 @@ model Atendimento {
   horaFim            String?             @db.VarChar(5)
   procedimento       String              @db.VarChar(200)
   codigoProcedimento String?             @db.VarChar(30)
-  statusCobranca     StatusCobranca      @default(pendente) 
+  statusCobranca     StatusCobranca      @default(pendente)
   motivoGlosa        String?
   semAutorizacao     Boolean             @default(false) // realizado sem autorização vigente
   evolucao           String? // não é mais preenchida pelo formulário
@@ -448,6 +451,7 @@ model PedidoMedico {
   convenio   Convenio?   @relation(fields: [convenioId], references: [id])
   usuario    Usuario?    @relation(fields: [usuarioId], references: [id])
   documentos Documento[]
+  guiasTiss  GuiaTiss[]
 
   @@index([pacienteId])
   @@map("pedidos_medicos")
@@ -496,7 +500,7 @@ model ProcedimentoOperadora {
   codigo         String   @db.VarChar(20)
   descricao      String   @db.VarChar(300)
   tabela         String   @default("22") @db.VarChar(2) // 22 TUSS, 98/00 próprias
-  codigoTuss     String?  @db.VarChar(10)  
+  codigoTuss     String?  @db.VarChar(10)
   ativo          Boolean  @default(true)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -507,4 +511,32 @@ model ProcedimentoOperadora {
   @@unique([convenioId, codigo])
   @@unique([convenioId, procedimentoId]) // um equivalente por procedimento em cada operadora
   @@map("procedimentos_operadora")
+}
+
+// Guia TISS montada pelo sistema a partir das sessões prontas da agenda. Por
+// enquanto só o XML, para baixar e conferir; o envio à operadora (protocolo,
+// resposta) entra junto com o webservice.
+model GuiaTiss {
+  id                 String   @id @default(uuid()) @db.Uuid
+  numero             Int      @unique @default(autoincrement()) // nº da guia no prestador
+  convenioId         String   @db.Uuid
+  pacienteId         String   @db.Uuid
+  pedidoId           String?  @db.Uuid
+  agendamentoIds     String[] @db.Uuid // sessões da agenda cobertas pelo pedido
+  codigoProcedimento String   @db.VarChar(10)
+  quantidade         Int
+  versaoTiss         String   @db.VarChar(8)
+  xml                String // como vai para a operadora (ISO-8859-1)
+  hash               String   @db.VarChar(32)
+  usuarioId          String?  @db.Uuid
+  createdAt          DateTime @default(now())
+
+  convenio Convenio      @relation(fields: [convenioId], references: [id])
+  paciente Paciente      @relation(fields: [pacienteId], references: [id])
+  pedido   PedidoMedico? @relation(fields: [pedidoId], references: [id], onDelete: SetNull)
+  usuario  Usuario?      @relation(fields: [usuarioId], references: [id])
+
+  @@index([pacienteId])
+  @@index([createdAt])
+  @@map("guias_tiss")
 }

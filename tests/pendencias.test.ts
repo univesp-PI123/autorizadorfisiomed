@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { codigoParaGuia, codigosAceitos } from "@/lib/regras/codigoGuia";
-import { analisarSessao, mesmoProcedimento, type ContextoAnalise, type SessaoParaAnalise } from "@/lib/regras/pendencias";
+import { codigoParaGuia, codigosAceitos, codigoTuss } from "@/lib/regras/codigoGuia";
+import { analisarSessao, mesmoProcedimento, pedidoDaSessao, type ContextoAnalise, type SessaoParaAnalise } from "@/lib/regras/pendencias";
 
 const AMIL = "conv-amil";
+
+const PEDIDO = { convenioId: null, dataPedido: "2026-09-01", validoAte: "2026-12-01", arquivos: 2, cbo: "225124", indicacao: true };
 
 const sessao = (p: Partial<SessaoParaAnalise> = {}): SessaoParaAnalise => ({
   data: "2026-09-28",
@@ -13,7 +15,7 @@ const sessao = (p: Partial<SessaoParaAnalise> = {}): SessaoParaAnalise => ({
   carteirinha: "074929371",
   convenioAnclinic: "Amil",
   pacienteId: "pac-1",
-  convenio: { id: AMIL, integracao: "tiss_amil", codigoPrestador: "12493066" },
+  convenio: { id: AMIL, integracao: "tiss_amil", codigoPrestador: "12493066", codigoAns: "326305" },
   procedimento: { codigoGuia: "50000470", codigosAceitos: ["50000470"] },
   profissional: { conselho: "CRP", numeroConselho: "123", ufConselho: "SP", cbo: "251510", convenioIds: [AMIL] },
   unidade: { cnes: "4160088" },
@@ -22,7 +24,7 @@ const sessao = (p: Partial<SessaoParaAnalise> = {}): SessaoParaAnalise => ({
 
 const ctx = (p: Partial<ContextoAnalise> = {}): ContextoAnalise => ({
   clinicaCadastrada: true,
-  pedidos: [{ convenioId: null, dataPedido: "2026-09-01", validoAte: "2026-12-01", arquivos: 2 }],
+  pedidos: [PEDIDO],
   autorizacoes: [],
   ...p,
 });
@@ -78,10 +80,29 @@ describe("analisarSessao", () => {
   });
 
   it("pedido médico vencido ou sem PDF", () => {
-    expect(analisarSessao(sessao(), ctx({ pedidos: [{ convenioId: null, dataPedido: "2026-01-01", validoAte: "2026-06-30", arquivos: 2 }] })).pendencias)
+    expect(analisarSessao(sessao(), ctx({ pedidos: [{ ...PEDIDO, dataPedido: "2026-01-01", validoAte: "2026-06-30" }] })).pendencias)
       .toEqual(["Sem pedido médico válido"]);
-    expect(analisarSessao(sessao(), ctx({ pedidos: [{ convenioId: AMIL, dataPedido: "2026-09-01", validoAte: null, arquivos: 0 }] })).pendencias)
+    expect(analisarSessao(sessao(), ctx({ pedidos: [{ ...PEDIDO, convenioId: AMIL, validoAte: null, arquivos: 0 }] })).pendencias)
       .toEqual(["Pedido médico sem PDF anexado"]);
+  });
+
+  it("pedido médico sem os dados que a guia exige do médico", () => {
+    expect(analisarSessao(sessao(), ctx({ pedidos: [{ ...PEDIDO, cbo: null, indicacao: false }] })).pendencias).toEqual([
+      "Pedido médico sem CBO do médico",
+      "Pedido médico sem indicação clínica nem CID",
+    ]);
+  });
+
+  it("convênio sem registro ANS", () => {
+    expect(analisarSessao(sessao({ convenio: { id: AMIL, integracao: "tiss_amil", codigoPrestador: "1", codigoAns: null } }), ctx()).pendencias)
+      .toEqual(["Convênio sem registro ANS"]);
+  });
+
+  it("vale o pedido mais recente entre os vigentes", () => {
+    const antigo = { ...PEDIDO, id: "antigo", dataPedido: "2026-03-01" };
+    const novo = { ...PEDIDO, id: "novo", dataPedido: "2026-09-01" };
+    expect(pedidoDaSessao([antigo, novo], AMIL, "2026-09-28")?.id).toBe("novo");
+    expect(pedidoDaSessao([antigo, novo], AMIL, "2026-08-01")?.id).toBe("antigo");
   });
 });
 
@@ -98,6 +119,11 @@ describe("codigoParaGuia", () => {
   it("sem de/para, usa o TUSS do procedimento", () => {
     expect(codigoParaGuia(proc, "outro")).toEqual({ codigo: "50000470", tabela: "22", origem: "tuss" });
     expect(codigoParaGuia({ codigoTuss: null, tabelaTuss: null }, "amil")).toBeNull();
+  });
+  it("código TUSS para a Amil, que só aceita a tabela 22", () => {
+    expect(codigoTuss(proc, "amil")).toBe("50000470");
+    expect(codigoTuss({ ...proc, equivalencias: [{ convenioId: "amil", codigo: "50000560", tabela: "22", codigoTuss: null }] }, "amil")).toBe("50000560");
+    expect(codigoTuss({ codigoTuss: null, tabelaTuss: null, equivalencias: [{ convenioId: "amil", codigo: "9001", tabela: "98", codigoTuss: null }] }, "amil")).toBeNull();
   });
 });
 

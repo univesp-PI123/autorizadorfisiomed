@@ -44,9 +44,10 @@ mesmo servidor na **AWS (EC2)**. Não usamos Neon nem Vercel.
 ## Integração AnClinic → Amil (em construção)
 
 Objetivo: solicitar as autorizações sozinho, na véspera (D-1), a partir da
-agenda do AnClinic, pelo webservice TISS da Amil. **Etapa atual:** importação
-e conferência dos dados. O envio à Amil entra quando ela liberar o acesso ao
-webservice.
+agenda do AnClinic, pelo webservice TISS da Amil (padrão TISS 4.03.00).
+**Etapa atual:** importação, conferência dos dados e geração do XML das guias
+de solicitação. O envio à Amil entra quando ela liberar o acesso ao
+webservice (por ora, só o ambiente de homologação).
 
 Rotina:
 
@@ -63,7 +64,16 @@ Rotina:
    agrupa o que falta e leva à tela onde se resolve cada item; o filtro "Sem
    unidade de atendimento" acha as sessões que precisam ser corrigidas no
    AnClinic.
-3. **Atendimentos → Aguardando confirmação:** ao aprovar a autorização, as
+3. **Agenda → Gerar XML:** *Gerar XML das prontas* (ou das sessões
+   selecionadas) monta a guia de solicitação de SP/SADT de cada paciente: as
+   sessões do mesmo paciente, procedimento, pedido médico e unidade viram uma
+   guia só, com a quantidade de sessões. O médico solicitante (conselho, UF,
+   CBO, indicação clínica/CID) vem do pedido médico; o procedimento vai pelo
+   código TUSS (tabela 22), o único que a Amil aceita. Cada XML é validado
+   contra os schemas oficiais da ANS (`src/lib/tiss/schemas/v4_03_00`) antes
+   de ser gravado, e fica para baixar e conferir (ISO-8859-1, com o hash MD5
+   do padrão). A sessão mostra o número da última guia gerada.
+4. **Atendimentos → Aguardando confirmação:** ao aprovar a autorização, as
    sessões que ela cobre vão para Atendimentos (a tela da autorização mostra
    quantas); o operador confirma cada uma depois que ela acontece, ou cancela.
    A autorização cobre a sessão pelo código do procedimento ou, nas lançadas
@@ -83,7 +93,7 @@ número da carteirinha.
 Preparação (uma vez):
 
 - **Convênios → Amil:** "Solicitação de autorização" = Webservice TISS Amil,
-  código do prestador e, em "Nomes na agenda do AnClinic", o nome exato da
+  código do prestador, código ANS da operadora (6 dígitos; vai na guia) e, em "Nomes na agenda do AnClinic", o nome exato da
   coluna Convênio (ex.: `Amil Assitencia Medica Internacional S.a.`).
 - **Importações → Profissionais credenciados:** planilha com Nome, CPF,
   Conselho, Número no conselho, UF e Especialidades, escolhendo o convênio. O

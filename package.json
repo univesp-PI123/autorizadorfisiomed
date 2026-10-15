@@ -29,6 +29,7 @@
     "react-hot-toast": "^2.6.1",
     "read-excel-file": "^9.3.10",
     "unpdf": "^1.8.1",
+    "xmllint-wasm": "^5.3.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {

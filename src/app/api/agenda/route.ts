@@ -2,6 +2,7 @@ import { ErroHttp, json, rota } from "@/lib/api/http";
 import { analisarAgendamentos } from "@/lib/agenda";
 import { exigirSessao } from "@/lib/auth/sessao";
 import { deDate, ehDataISO, hojeISO, paraDate } from "@/lib/datas";
+import { prisma } from "@/lib/prisma";
 import type { SituacaoSessao } from "@/lib/regras/pendencias";
 
 const SITUACOES: SituacaoSessao[] = ["pendente", "pronta", "coberta", "fora", "cancelada"];
@@ -16,7 +17,17 @@ export const GET = rota(async (req) => {
   const convenioId = sp.get("convenioId") || undefined;
   const situacao = sp.get("situacao") as SituacaoSessao | null;
 
-  const analisadas = (await analisarAgendamentos({ data: paraDate(data), ...(convenioId && { convenioId }) })).map(
+  const sessoes = await analisarAgendamentos({ data: paraDate(data), ...(convenioId && { convenioId }) });
+  // Última guia TISS gerada com cada sessão.
+  const guias = await prisma.guiaTiss.findMany({
+    where: { agendamentoIds: { hasSome: sessoes.map((s) => s.agendamento.id) } },
+    select: { id: true, numero: true, agendamentoIds: true },
+    orderBy: { numero: "desc" },
+  });
+  const guiaDaSessao = new Map<string, { id: string; numero: number }>();
+  for (const g of guias) for (const id of g.agendamentoIds) if (!guiaDaSessao.has(id)) guiaDaSessao.set(id, { id: g.id, numero: g.numero });
+
+  const analisadas = sessoes.map(
     ({ agendamento: a, codigo, ...analise }) => ({
       id: a.id,
       idAnclinic: a.idAnclinic,
@@ -48,6 +59,7 @@ export const GET = rota(async (req) => {
       situacao: analise.situacao,
       pendencias: analise.pendencias,
       motivo: analise.motivo,
+      guia: guiaDaSessao.get(a.id) ?? null,
     }),
   );
 
