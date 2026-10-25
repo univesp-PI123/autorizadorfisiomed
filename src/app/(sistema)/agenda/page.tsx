@@ -246,7 +246,7 @@ function AgendaPage({ url }: { url: URLSearchParams }) {
                           <th scope="col">Guia</th>
                           <th scope="col">Paciente</th>
                           <th scope="col">Procedimento</th>
-                          <th scope="col" className="sb-end">Sessões</th>
+                          <th scope="col" className="sb-end">Sessão</th>
                           <th scope="col" className="sb-end">Arquivo</th>
                         </tr>
                       </thead>
@@ -259,7 +259,7 @@ function AgendaPage({ url }: { url: URLSearchParams }) {
                               {g.procedimento}
                               <span className="texto-suave mono">TUSS {g.codigo}</span>
                             </td>
-                            <td className="sb-mono sb-end">{g.quantidade}</td>
+                            <td className="sb-mono sb-end">{g.sessao}</td>
                             <td className="sb-end">
                               <a href={guiaTissService.urlXml(g.id)} download>
                                 Baixar XML

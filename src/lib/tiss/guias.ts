@@ -1,9 +1,8 @@
 // Geração das guias de solicitação (SP/SADT) a partir das sessões da agenda.
 //
-// Só entram sessões "prontas" (regras/pendencias.ts). As sessões do mesmo
-// paciente, convênio, procedimento, pedido médico e unidade viram uma guia só,
-// com a quantidade de sessões. Cada guia é validada contra o schema da ANS
-// antes de ser gravada.
+// Só entram sessões "prontas" (regras/pendencias.ts). Cada sessão vira uma
+// guia, com quantidade 1 (orientação da Fisiomed). Cada guia é validada contra
+// o schema da ANS antes de ser gravada.
 
 import { analisarAgendamentos } from "@/lib/agenda";
 import { deDate } from "@/lib/datas";
@@ -18,7 +17,8 @@ export type GuiaGerada = {
   paciente: string;
   procedimento: string;
   codigo: string;
-  quantidade: number;
+  /** Data (dd/mm) e hora da sessão. */
+  sessao: string;
 };
 export type GuiaComErro = { paciente: string; procedimento: string; erros: string[] };
 export type SessaoRecusada = { agendamentoId: string; paciente: string; motivo: string };
@@ -67,31 +67,19 @@ export async function gerarGuias(agendamentoIds: string[], usuarioId: string) {
     indicacao: !!(p.indicacaoClinica?.trim() || p.cid?.trim()),
   }));
 
-  // Agrupa as sessões que cabem numa guia só.
-  const grupos = new Map<string, { sessoes: typeof prontas; pedido: (typeof pedidosAnalise)[number] }>();
+  const guias: GuiaGerada[] = [];
+  const erros: GuiaComErro[] = [];
   for (const s of prontas) {
     const a = s.agendamento;
     const doPaciente = pedidosAnalise.filter((p) => p.pacienteId === a.pacienteId);
     const pedido = pedidoDaSessao(doPaciente, a.convenio!.id, deDate(a.data))!;
-    const chave = [a.pacienteId, a.convenio!.id, s.codigo!.codigo, pedido.id, a.unidade!.cnes, a.carteirinha].join("|");
-    const g = grupos.get(chave);
-    if (g) g.sessoes.push(s);
-    else grupos.set(chave, { sessoes: [s], pedido });
-  }
-
-  const guias: GuiaGerada[] = [];
-  const erros: GuiaComErro[] = [];
-  for (const { sessoes: doGrupo, pedido } of grupos.values()) {
-    const a = doGrupo[0].agendamento;
-    const codigo = doGrupo[0].codigo!.codigo;
+    const codigo = s.codigo!.codigo;
     const descricao = termoTuss.get(codigo) ?? a.procedimento!.descricao;
     const paciente = a.paciente?.nome ?? a.pacienteAnclinic ?? "—";
 
     const [{ numero }] = await prisma.$queryRaw<{ numero: number }[]>`
       SELECT nextval(pg_get_serial_sequence('guias_tiss', 'numero'))::int AS numero`;
-    const datas = doGrupo
-      .map((s) => `${ddmm(deDate(s.agendamento.data))}${s.agendamento.horaInicio ? ` ${s.agendamento.horaInicio}` : ""}`)
-      .join(", ");
+    const sessao = `${ddmm(deDate(a.data))}${a.horaInicio ? ` ${a.horaInicio}` : ""}`;
     const r = montarSolicitacaoSpSadt({
       numeroGuiaPrestador: String(numero),
       sequencialTransacao: String(numero),
@@ -108,9 +96,9 @@ export async function gerarGuias(agendamentoIds: string[], usuarioId: string) {
       },
       dataSolicitacao: pedido.dataPedido,
       indicacaoClinica: indicacaoDoPedido(pedido.indicacaoClinica, pedido.cid),
-      procedimentos: [{ tabela: "22", codigo, descricao, quantidade: doGrupo.length }],
+      procedimentos: [{ tabela: "22", codigo, descricao, quantidade: 1 }],
       cnes: a.unidade!.cnes,
-      observacao: `Sessões: ${datas}`,
+      observacao: `Sessão: ${sessao}`,
     });
     if (!r.ok) {
       erros.push({ paciente, procedimento: descricao, erros: r.erros });
@@ -127,16 +115,16 @@ export async function gerarGuias(agendamentoIds: string[], usuarioId: string) {
         convenioId: a.convenio!.id,
         pacienteId: a.pacienteId!,
         pedidoId: pedido.id,
-        agendamentoIds: doGrupo.map((s) => s.agendamento.id),
+        agendamentoIds: [a.id],
         codigoProcedimento: codigo,
-        quantidade: doGrupo.length,
+        quantidade: 1,
         versaoTiss: VERSAO_TISS,
         xml: r.xml,
         hash: r.hash,
         usuarioId,
       },
     });
-    guias.push({ id: guia.id, numero, paciente, procedimento: descricao, codigo, quantidade: doGrupo.length });
+    guias.push({ id: guia.id, numero, paciente, procedimento: descricao, codigo, sessao });
   }
 
   return { guias, erros, recusadas };

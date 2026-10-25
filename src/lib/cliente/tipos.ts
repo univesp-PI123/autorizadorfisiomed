@@ -344,7 +344,7 @@ export type Agenda = {
 };
 
 export type ResultadoGuias = {
-  guias: { id: string; numero: number; paciente: string; procedimento: string; codigo: string; quantidade: number }[];
+  guias: { id: string; numero: number; paciente: string; procedimento: string; codigo: string; sessao: string }[];
   erros: { paciente: string; procedimento: string; erros: string[] }[];
   recusadas: { agendamentoId: string; paciente: string; motivo: string }[];
 };

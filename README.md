@@ -65,11 +65,10 @@ Rotina:
    unidade de atendimento" acha as sessões que precisam ser corrigidas no
    AnClinic.
 3. **Agenda → Gerar XML:** *Gerar XML das prontas* (ou das sessões
-   selecionadas) monta a guia de solicitação de SP/SADT de cada paciente: as
-   sessões do mesmo paciente, procedimento, pedido médico e unidade viram uma
-   guia só, com a quantidade de sessões. O médico solicitante (conselho, UF,
+   selecionadas) monta as guias de solicitação de SP/SADT: uma guia por
+   sessão, com quantidade 1. O médico solicitante (conselho, UF,
    CBO, indicação clínica/CID) vem do pedido médico; o procedimento vai pelo
-   código TUSS (tabela 22), o único que a Amil aceita. Cada XML é validado
+   código TUSS (tabela 22), o padrão pedido pela Amil. Cada XML é validado
    contra os schemas oficiais da ANS (`src/lib/tiss/schemas/v4_03_00`) antes
    de ser gravado, e fica para baixar e conferir (ISO-8859-1, com o hash MD5
    do padrão). A sessão mostra o número da última guia gerada.
