@@ -9,6 +9,7 @@ import type {
   Convenio,
   DocumentoResumo,
   Dashboard,
+  GuiaEnviada,
   EvolucaoMes,
   Importacao,
   Paciente,
@@ -100,6 +101,7 @@ export const agendaService = {
 
 export const guiaTissService = {
   gerar: (agendamentoIds: string[]) => api.post<ResultadoGuias>("/tiss/guias", { agendamentoIds }),
+  enviar: (id: string) => api.post<GuiaEnviada>(`/tiss/guias/${id}/enviar`),
   urlXml: (id: string) => `/api/tiss/guias/${id}/xml`,
 };
 

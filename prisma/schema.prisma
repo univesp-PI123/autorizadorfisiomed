@@ -531,6 +531,16 @@ model GuiaTiss {
   usuarioId          String?  @db.Uuid
   createdAt          DateTime @default(now())
 
+  // Envio ao webservice da operadora (solicitacaoProcedimento) e a resposta.
+  enviadaEm           DateTime?
+  statusOperadora     String?   @db.VarChar(1) // tabela TISS dm_statusSolicitacao: 1 autorizado, 2 em análise, 3 negado…
+  numeroGuiaOperadora String?   @db.VarChar(20)
+  senhaOperadora      String?   @db.VarChar(20)
+  validadeSenha       DateTime? @db.Date
+  glosas              String[] // "código - descrição" das negativas e mensagens de erro
+  erroEnvio           String? // falha de comunicação ou tissFault
+  respostaXml         String?
+
   convenio Convenio      @relation(fields: [convenioId], references: [id])
   paciente Paciente      @relation(fields: [pacienteId], references: [id])
   pedido   PedidoMedico? @relation(fields: [pedidoId], references: [id], onDelete: SetNull)

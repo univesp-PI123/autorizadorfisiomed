@@ -79,3 +79,35 @@ export function mensagemTiss(raiz: string, campos: No[], codificacao: "UTF-8" | 
     `<ans:${raiz} xmlns:ans="${NAMESPACE_TISS}">\n${corpo}\n</ans:${raiz}>\n`;
   return { xml, hash };
 }
+
+const desescapar = (t: string) =>
+  t.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, "&");
+
+/**
+ * Hash recalculado a partir de uma mensagem já serializada por mensagemTiss
+ * (cada campo simples numa linha <ans:tag>conteúdo</ans:tag>).
+ */
+export function hashDoXml(xml: string): string {
+  const texto = [...xml.matchAll(/<ans:([\w-]+)>([^<]*)<\/ans:\1>/g)]
+    .filter(([, tag]) => tag !== "hash")
+    .map(([, , conteudo]) => desescapar(conteudo))
+    .join("");
+  return createHash("md5").update(Buffer.from(texto, "latin1")).digest("hex");
+}
+
+/**
+ * Inclui o login e a senha do prestador no cabeçalho (depois de "Padrao",
+ * onde o schema prevê) e recalcula o hash. Usado só na hora do envio: o XML
+ * gravado e o baixado não levam a senha.
+ */
+export function comLoginSenha(xml: string, login: string, senha: string): string {
+  if (!xml.includes("</ans:Padrao>")) throw new Error("Mensagem TISS sem cabeçalho.");
+  const recuo = xml.match(/\n(\s*)<ans:Padrao>/)?.[1] ?? "    ";
+  const bloco =
+    `\n${recuo}<ans:loginSenhaPrestador>\n` +
+    `${recuo}  <ans:loginPrestador>${escapar(login)}</ans:loginPrestador>\n` +
+    `${recuo}  <ans:senhaPrestador>${escapar(senha)}</ans:senhaPrestador>\n` +
+    `${recuo}</ans:loginSenhaPrestador>`;
+  const comLogin = xml.replace(/<\/ans:Padrao>/, `</ans:Padrao>${bloco}`);
+  return comLogin.replace(/<ans:hash>[^<]*<\/ans:hash>/, `<ans:hash>${hashDoXml(comLogin)}</ans:hash>`);
+}

@@ -1,13 +1,15 @@
 // Geração das guias de solicitação (SP/SADT) a partir das sessões da agenda.
 //
-// Só entram sessões "prontas" (regras/pendencias.ts). Cada sessão vira uma
-// guia, com quantidade 1 (orientação da Fisiomed). Cada guia é validada contra
+// Só entram sessões "prontas" (regras/pendencias.ts) que ainda não têm guia
+// autorizada ou em andamento na operadora. Cada sessão vira uma guia, com
+// quantidade 1 (orientação da Fisiomed). Cada guia é validada contra
 // o schema da ANS antes de ser gravada.
 
 import { analisarAgendamentos } from "@/lib/agenda";
 import { deDate } from "@/lib/datas";
 import { prisma } from "@/lib/prisma";
 import { pedidoDaSessao } from "@/lib/regras/pendencias";
+import { STATUS_EM_ANDAMENTO, STATUS_SOLICITACAO } from "@/lib/tiss/dominios";
 import { montarSolicitacaoSpSadt, VERSAO_TISS } from "@/lib/tiss/solicitacao";
 import { validarMensagemTiss } from "@/lib/tiss/validarXsd";
 
@@ -34,15 +36,27 @@ function indicacaoDoPedido(indicacao: string | null, cid: string | null): string
 }
 
 export async function gerarGuias(agendamentoIds: string[], usuarioId: string) {
-  const sessoes = await analisarAgendamentos({ id: { in: agendamentoIds } });
+  const [sessoes, jaPedidas] = await Promise.all([
+    analisarAgendamentos({ id: { in: agendamentoIds } }),
+    prisma.guiaTiss.findMany({
+      where: { agendamentoIds: { hasSome: agendamentoIds }, statusOperadora: { in: [...STATUS_EM_ANDAMENTO] } },
+      select: { numero: true, statusOperadora: true, agendamentoIds: true },
+    }),
+  ]);
+  const guiaEmAndamento = new Map(jaPedidas.flatMap((g) => g.agendamentoIds.map((id) => [id, g] as const)));
 
   const recusadas: SessaoRecusada[] = [];
   const prontas = sessoes.filter((s) => {
-    if (s.situacao === "pronta") return true;
+    const motivo = (() => {
+      if (s.situacao !== "pronta") return s.pendencias.length ? s.pendencias.join("; ") : (s.motivo ?? s.situacao);
+      const g = guiaEmAndamento.get(s.agendamento.id);
+      return g ? `Guia ${g.numero} já está ${STATUS_SOLICITACAO[g.statusOperadora!].toLowerCase()} na operadora` : null;
+    })();
+    if (!motivo) return true;
     recusadas.push({
       agendamentoId: s.agendamento.id,
       paciente: s.agendamento.paciente?.nome ?? s.agendamento.pacienteAnclinic ?? "—",
-      motivo: s.pendencias.length ? s.pendencias.join("; ") : (s.motivo ?? s.situacao),
+      motivo,
     });
     return false;
   });

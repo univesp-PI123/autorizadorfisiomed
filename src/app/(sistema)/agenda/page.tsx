@@ -56,6 +56,7 @@ function AgendaPage({ url }: { url: URLSearchParams }) {
   const [aplicando, setAplicando] = useState(false);
   const [gerando, setGerando] = useState(false);
   const [resultadoGuias, setResultadoGuias] = useState<ResultadoGuias | null>(null);
+  const [enviando, setEnviando] = useState<string | null>(null);
   const todasUnidades = useFetch(unidadeService.listar);
 
   const buscar = useCallback(() => agendaService.buscar({ data, convenioId: convenioId || undefined }), [data, convenioId]);
@@ -104,8 +105,8 @@ function AgendaPage({ url }: { url: URLSearchParams }) {
     }
   };
 
-  // Monta as guias de solicitação (XML TISS) das sessões prontas; o envio à
-  // operadora vem depois — por ora o XML fica para baixar e conferir.
+  // Monta as guias de solicitação (XML TISS) das sessões prontas; cada guia é
+  // enviada depois, pelo botão da sessão.
   const gerarGuias = async (ids: string[]) => {
     if (!ids.length) return;
     setGerando(true);
@@ -120,6 +121,23 @@ function AgendaPage({ url }: { url: URLSearchParams }) {
       toast.error(mensagemDeErro(err, "Não foi possível gerar as guias."));
     } finally {
       setGerando(false);
+    }
+  };
+  // Envia uma guia ao webservice da Amil; a resposta fica gravada na guia.
+  const enviarGuia = async (id: string) => {
+    setEnviando(id);
+    try {
+      const r = await guiaTissService.enviar(id);
+      const detalhe = r.erroEnvio ?? (r.glosas.length ? r.glosas.join("; ") : r.senhaOperadora && `senha ${r.senhaOperadora}`);
+      const texto = detalhe ? `${r.situacao}: ${detalhe}` : r.situacao;
+      if (r.statusOperadora === "1" || r.statusOperadora === "7") toast.success(texto);
+      else if (r.erroEnvio || r.statusOperadora === "3" || !r.statusOperadora) toast.error(texto);
+      else toast(texto);
+      agenda.recarregar();
+    } catch (err) {
+      toast.error(mensagemDeErro(err, "Não foi possível enviar a guia."));
+    } finally {
+      setEnviando(null);
     }
   };
   const prontas = sessoes.filter((s) => s.situacao === "pronta");
@@ -236,7 +254,8 @@ function AgendaPage({ url }: { url: URLSearchParams }) {
                   </div>
                 </div>
                 <p className="texto-suave">
-                  XML de solicitação de SP/SADT (TISS 4.03.00), validado pelo schema da ANS. Ainda não foi enviado à operadora.
+                  XML de solicitação de SP/SADT (TISS 4.03.00), validado pelo schema da ANS. Para enviar à Amil, use{" "}
+                  <strong>Enviar à Amil</strong> em cada sessão da lista.
                 </p>
                 {resultadoGuias.guias.length > 0 && (
                   <div className="tabela-rolagem">
@@ -472,7 +491,33 @@ function AgendaPage({ url }: { url: URLSearchParams }) {
                                 <a href={guiaTissService.urlXml(s.guia.id)} download>
                                   XML
                                 </a>
+                                {s.guia.enviada && ` · ${s.guia.situacao}`}
+                                {s.guia.senha && (
+                                  <>
+                                    {" "}· senha <span className="mono">{s.guia.senha}</span>
+                                    {s.guia.validadeSenha && ` até ${formatarData(s.guia.validadeSenha)}`}
+                                  </>
+                                )}
                               </span>
+                            )}
+                            {s.guia && (s.guia.glosas.length > 0 || s.guia.erro) && (
+                              <ul className="pendencias" style={{ marginTop: 4 }}>
+                                {s.guia.erro && <li>{s.guia.erro}</li>}
+                                {s.guia.glosas.map((g) => (
+                                  <li key={g}>Glosa {g}</li>
+                                ))}
+                              </ul>
+                            )}
+                            {s.guia?.podeEnviar && podeEditar && (
+                              <button
+                                type="button"
+                                className="sb-btn sb-btn--sm"
+                                style={{ marginTop: 4 }}
+                                disabled={enviando !== null}
+                                onClick={() => enviarGuia(s.guia!.id)}
+                              >
+                                {enviando === s.guia.id ? "Enviando…" : s.guia.enviada ? "Reenviar à Amil" : "Enviar à Amil"}
+                              </button>
                             )}
                           </td>
                         </tr>
