@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { lerRespostaSolicitacao } from "@/lib/tiss/resposta";
+import { montarPedidoElegibilidade } from "@/lib/tiss/elegibilidade";
+import { lerRespostaElegibilidade, lerRespostaSolicitacao } from "@/lib/tiss/resposta";
 import { montarSolicitacaoSpSadt, type DadosSolicitacaoSpSadt } from "@/lib/tiss/solicitacao";
 import { validarMensagemTiss } from "@/lib/tiss/validarXsd";
 import { configAmil, envelopeSoap } from "@/lib/tiss/webservice";
@@ -52,8 +53,8 @@ describe("envelope e configuração", () => {
   });
 
   it("aponta o que falta no .env e calcula o MD5 da senha", () => {
-    expect(configAmil({})).toEqual({ ok: false, faltando: ["TISS_AMIL_URL_SOLICITACAO", "TISS_AMIL_LOGIN", "TISS_AMIL_SENHA"] });
-    const c = configAmil({ TISS_AMIL_URL_SOLICITACAO: "https://exemplo/soap", TISS_AMIL_LOGIN: " 123 ", TISS_AMIL_SENHA: "123456" });
+    expect(configAmil({})).toEqual({ ok: false, faltando: ["TISS_AMIL_URL", "TISS_AMIL_LOGIN", "TISS_AMIL_SENHA"] });
+    const c = configAmil({ TISS_AMIL_URL: "https://exemplo/soap", TISS_AMIL_LOGIN: " 123 ", TISS_AMIL_SENHA: "123456" });
     expect(c).toEqual({ ok: true, config: { url: "https://exemplo/soap", login: "123", senhaMd5: "e10adc3949ba59abbe56e057f20f883e" } });
   });
 });
@@ -123,5 +124,59 @@ describe("lerRespostaSolicitacao", () => {
 
   it("resposta que não é TISS", () => {
     expect(lerRespostaSolicitacao("<html>Bad gateway</html>").tipo).toBe("falha");
+  });
+});
+
+describe("elegibilidade", () => {
+  const pedido = (p = {}) =>
+    montarPedidoElegibilidade({
+      sequencialTransacao: "761234567890",
+      agora: new Date("2026-10-25T17:00:00Z"),
+      registroAns: "326305",
+      codigoPrestador: "12493066",
+      carteirinha: "074.929.371",
+      ...p,
+    });
+
+  it("monta o pedido válido pelo schema da ANS, com login", async () => {
+    const r = pedido({ validadeCarteira: "2027-01-31" });
+    if (!r.ok) throw new Error(r.erros.join("; "));
+    expect(r.xml).toContain("<ans:tipoTransacao>VERIFICA_ELEGIBILIDADE</ans:tipoTransacao>");
+    expect(r.xml).toContain("<ans:numeroCarteira>074929371</ans:numeroCarteira>");
+    expect(await validarMensagemTiss(r.xmlUtf8)).toEqual([]);
+    expect(await validarMensagemTiss(comLoginSenha(r.xmlUtf8, "12493066", "0".repeat(32)))).toEqual([]);
+  });
+
+  it("aponta o que falta", () => {
+    expect(pedido({ registroAns: null, carteirinha: "" })).toEqual({
+      ok: false,
+      erros: ["Convênio sem registro ANS (6 dígitos)", "Sem carteirinha"],
+    });
+  });
+
+  it("lê o recibo: elegível, não elegível e glosa", () => {
+    const recibo = (corpo: string) =>
+      envelope(`<ans:respostaElegibilidadeWS><ans:respostaElegibilidade>${corpo}</ans:respostaElegibilidade></ans:respostaElegibilidadeWS>`);
+    expect(
+      lerRespostaElegibilidade(
+        recibo(
+          "<ans:reciboElegibilidade><ans:registroANS>326305</ans:registroANS><ans:numeroCarteira>074929371</ans:numeroCarteira>" +
+            "<ans:validadeCarteira>2027-01-31</ans:validadeCarteira><ans:nomeBeneficiario>ANA TESTE</ans:nomeBeneficiario>" +
+            "<ans:respostaSolicitacao>S</ans:respostaSolicitacao></ans:reciboElegibilidade>",
+        ),
+      ),
+    ).toEqual({ tipo: "recibo", elegivel: true, nome: "ANA TESTE", carteira: "074929371", validade: "2027-01-31", glosas: [] });
+    expect(
+      lerRespostaElegibilidade(
+        recibo(
+          "<ans:reciboElegibilidade><ans:nomeBeneficiario>ANA</ans:nomeBeneficiario><ans:respostaSolicitacao>N</ans:respostaSolicitacao>" +
+            "<ans:motivosNegativa><ans:motivoNegativa><ans:codigoGlosa>1013</ans:codigoGlosa><ans:descricaoGlosa>Cadastro cancelado</ans:descricaoGlosa>" +
+            "</ans:motivoNegativa></ans:motivosNegativa></ans:reciboElegibilidade>",
+        ),
+      ),
+    ).toMatchObject({ tipo: "recibo", elegivel: false, glosas: ["1013 - Cadastro cancelado"] });
+    expect(
+      lerRespostaElegibilidade(recibo("<ans:codigoGlosa><ans:codigoGlosa>1001</ans:codigoGlosa></ans:codigoGlosa>")),
+    ).toEqual({ tipo: "erro", glosas: ["1001"] });
   });
 });

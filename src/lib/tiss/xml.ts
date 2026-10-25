@@ -69,7 +69,7 @@ export function hashTiss(campos: No[]): string {
 /**
  * Mensagem completa: elemento raiz com os campos, o hash calculado sobre
  * eles e a declaração de codificação pedida (UTF-8 para validar no xmllint,
- * ISO-8859-1 para o arquivo e o envio).
+ * ISO-8859-1 para o arquivo baixado).
  */
 export function mensagemTiss(raiz: string, campos: No[], codificacao: "UTF-8" | "ISO-8859-1" = "ISO-8859-1") {
   const hash = hashTiss(campos);

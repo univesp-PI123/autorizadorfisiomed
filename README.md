@@ -73,14 +73,14 @@ Rotina:
    de ser gravado, e fica para baixar e conferir (ISO-8859-1, com o hash MD5
    do padrão). A sessão mostra o número da última guia gerada.
    **Enviar à Amil** (na sessão) manda a guia ao webservice
-   `solicitacaoProcedimento` (SOAP, por enquanto só no endereço de
+   `solicitacaoProcedimento` (SOAP em UTF-8, por enquanto só no endereço de
    homologação) e grava a resposta na guia: status (autorizada, em análise,
    negada…), número da guia na operadora, senha e validade, glosas ou o erro
    de comunicação. O login e a senha do portal entram no cabeçalho só na hora
    do envio (a senha em MD5, como o manual da Amil pede); o XML gravado e o
    baixado não levam a senha. Guia já respondida não é reenviada, e sessão com
    guia autorizada ou em andamento não gera guia nova. Configuração no `.env`:
-   `TISS_AMIL_URL_SOLICITACAO`, `TISS_AMIL_LOGIN` e `TISS_AMIL_SENHA`.
+   `TISS_AMIL_URL`, `TISS_AMIL_LOGIN` e `TISS_AMIL_SENHA`.
 4. **Atendimentos → Aguardando confirmação:** ao aprovar a autorização, as
    sessões que ela cobre vão para Atendimentos (a tela da autorização mostra
    quantas); o operador confirma cada uma depois que ela acontece, ou cancela.

@@ -15,9 +15,21 @@ import { useSessao } from "@/contextos/SessaoContexto";
 import { formatarData } from "@/lib/analiseDados";
 import { mensagemDeErro } from "@/lib/cliente/api";
 import { useFetch } from "@/lib/cliente/hooks";
-import { convenioService, pacienteService } from "@/lib/cliente/servicos";
+import { convenioService, elegibilidadeService, pacienteService } from "@/lib/cliente/servicos";
+import type { RespostaElegibilidade } from "@/lib/cliente/tipos";
 
 const VINCULO_VAZIO = { convenioId: "", numeroCarteirinha: "", plano: "", titular: "", dataValidade: "" };
+
+/** Resposta da elegibilidade em uma frase, com o tom do selo. */
+function resumoElegibilidade(r: RespostaElegibilidade): { tom: "success" | "warning"; texto: string } {
+  if (r.tipo === "falha") return { tom: "warning", texto: `Sem resposta da Amil: ${r.mensagem}` };
+  if (r.tipo === "erro") return { tom: "warning", texto: `Recusada pela Amil: ${r.glosas.join("; ") || "sem motivo informado"}` };
+  if (r.elegivel) {
+    const extra = [r.nome, r.validade && `validade ${formatarData(r.validade)}`].filter(Boolean).join(" · ");
+    return { tom: "success", texto: `Elegível${extra ? ` — ${extra}` : ""}` };
+  }
+  return { tom: "warning", texto: `Não elegível${r.glosas.length ? `: ${r.glosas.join("; ")}` : ""}` };
+}
 
 export default function PacienteDetalhe() {
   const { id } = useParams<{ id: string }>();
@@ -28,6 +40,9 @@ export default function PacienteDetalhe() {
   const [edicao, setEdicao] = useState<DadosFormPaciente | null>(null);
   const [vinculo, setVinculo] = useState<typeof VINCULO_VAZIO | null>(null);
   const [salvando, setSalvando] = useState(false);
+  const [verificando, setVerificando] = useState<string | null>(null);
+  const podeVerificar = usuario.perfil === "admin" || usuario.perfil === "recepcionista";
+  const [elegibilidade, setElegibilidade] = useState<Record<string, RespostaElegibilidade>>({});
   const buscarConvenios = useCallback(() => convenioService.listar({ ativo: true }), []);
   const { data: convenios } = useFetch(buscarConvenios);
 
@@ -51,6 +66,18 @@ export default function PacienteDetalhe() {
   const aoEditar = (e: FormEvent) => {
     e.preventDefault();
     if (edicao) salvar(() => pacienteService.atualizar(id, edicao), "Paciente atualizado.", () => setEdicao(null));
+  };
+
+  const verificarElegibilidade = async (vinculoId: string) => {
+    setVerificando(vinculoId);
+    try {
+      const r = await elegibilidadeService.verificar(vinculoId);
+      setElegibilidade((atual) => ({ ...atual, [vinculoId]: r }));
+    } catch (err) {
+      toast.error(mensagemDeErro(err, "Não foi possível verificar a elegibilidade."));
+    } finally {
+      setVerificando(null);
+    }
   };
 
   const aoVincular = (e: FormEvent) => {
@@ -162,6 +189,23 @@ export default function PacienteDetalhe() {
                         </>
                       )}
                     </p>
+                    {elegibilidade[v.id] && (
+                      <p>
+                        <Badge tom={resumoElegibilidade(elegibilidade[v.id]).tom}>
+                          {resumoElegibilidade(elegibilidade[v.id]).texto}
+                        </Badge>
+                      </p>
+                    )}
+                    {v.convenio?.integracao === "tiss_amil" && v.ativo && podeVerificar && (
+                      <button
+                        type="button"
+                        className="sb-btn sb-btn--sm"
+                        disabled={verificando !== null}
+                        onClick={() => verificarElegibilidade(v.id)}
+                      >
+                        {verificando === v.id ? "Verificando…" : "Verificar elegibilidade na Amil"}
+                      </button>
+                    )}
                   </li>
                 ))}
               </ul>

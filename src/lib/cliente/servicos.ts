@@ -24,6 +24,7 @@ import type {
   ResultadoDocumento,
   Profissional,
   ResumoGlosas,
+  RespostaElegibilidade,
   Usuario,
   Unidade,
   UsuarioLogado,
@@ -97,6 +98,10 @@ export const usuarioService = {
 
 export const agendaService = {
   buscar: (params: Filtros = {}) => api.get<Agenda>("/agenda", params),
+};
+
+export const elegibilidadeService = {
+  verificar: (vinculoId: string) => api.post<RespostaElegibilidade>("/tiss/elegibilidade", { vinculoId }),
 };
 
 export const guiaTissService = {

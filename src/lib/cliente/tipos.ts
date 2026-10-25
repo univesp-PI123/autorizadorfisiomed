@@ -52,7 +52,7 @@ export type Vinculo = {
   titular: string | null;
   dataValidade: string | null;
   ativo: boolean;
-  convenio?: Referencia;
+  convenio?: Referencia & { integracao?: string };
 };
 
 export type Paciente = {
@@ -353,6 +353,11 @@ export type Agenda = {
   pendencias: { pendencia: string; quantidade: number }[];
   sessoes: SessaoAgenda[];
 };
+
+export type RespostaElegibilidade =
+  | { tipo: "recibo"; elegivel: boolean; nome: string | null; carteira: string | null; validade: string | null; glosas: string[] }
+  | { tipo: "erro"; glosas: string[] }
+  | { tipo: "falha"; mensagem: string };
 
 export type GuiaEnviada = {
   id: string;

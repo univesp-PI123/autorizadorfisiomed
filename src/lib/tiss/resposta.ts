@@ -1,10 +1,46 @@
-// Leitura da resposta do webservice à solicitacaoProcedimento: a mensagem
-// autorizacaoProcedimentoWS (autorização, negativa ou mensagem de erro) ou um
-// SOAP Fault com o tissFault.
+// Leitura das respostas do webservice: autorizacaoProcedimentoWS (à
+// solicitacaoProcedimento: autorização, negativa ou mensagem de erro),
+// respostaElegibilidadeWS ou um SOAP Fault com o tissFault.
 //
-// Função pura sobre o texto da resposta. Os campos são achados pelo nome,
+// Funções puras sobre o texto da resposta. Os campos são achados pelo nome,
 // com qualquer prefixo de namespace, porque cada operadora monta o envelope
 // do seu jeito.
+
+const decodificar = (t: string) =>
+  t
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
+    .replace(/&amp;/g, "&")
+    .trim();
+
+/** Conteúdo de cada ocorrência do campo, com qualquer prefixo de namespace. */
+function campos(xml: string, tag: string): string[] {
+  const re = new RegExp(`<(?:[\\w-]+:)?${tag}(?:\\s[^>]*)?>([^<]*)</(?:[\\w-]+:)?${tag}>`, "g");
+  return [...xml.matchAll(re)].map((m) => decodificar(m[1])).filter(Boolean);
+}
+const campo = (xml: string, tag: string) => campos(xml, tag)[0] ?? null;
+
+/** Conteúdo do primeiro elemento composto com esse nome. */
+function trecho(xml: string, tag: string): string | null {
+  const re = new RegExp(`<(?:[\\w-]+:)?${tag}(?:\\s[^>]*)?>([\\s\\S]*?)</(?:[\\w-]+:)?${tag}>`);
+  return xml.match(re)?.[1] ?? null;
+}
+
+/** "código - descrição" de cada glosa do trecho (a descrição é opcional). */
+function glosasDe(xml: string): string[] {
+  const codigos = campos(xml, "codigoGlosa");
+  const descricoes = campos(xml, "descricaoGlosa");
+  return codigos.map((c, i) => (descricoes.length === codigos.length ? `${c} - ${descricoes[i]}` : c));
+}
+
+/** Falha fora do padrão TISS: SOAP Fault (com ou sem tissFault) ou outra coisa. */
+function falha(xml: string, semResposta: string): { tipo: "falha"; mensagem: string } {
+  const m = campo(xml, "tissFault") ?? campo(xml, "faultstring") ?? campo(xml, "Text");
+  return { tipo: "falha", mensagem: m ?? semResposta };
+}
 
 export type RespostaSolicitacao =
   | {
@@ -18,38 +54,6 @@ export type RespostaSolicitacao =
     }
   | { tipo: "erro"; glosas: string[] } // mensagemErro: a operadora recusou a mensagem
   | { tipo: "falha"; mensagem: string }; // SOAP Fault ou resposta que não é TISS
-
-const decodificar = (t: string) =>
-  t
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&apos;/g, "'")
-    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
-    .replace(/&amp;/g, "&")
-    .trim();
-
-/** Conteúdo de cada ocorrência do campo, em ordem. */
-function campos(xml: string, tag: string): string[] {
-  const re = new RegExp(`<(?:[\\w-]+:)?${tag}(?:\\s[^>]*)?>([^<]*)</(?:[\\w-]+:)?${tag}>`, "g");
-  return [...xml.matchAll(re)].map((m) => decodificar(m[1])).filter(Boolean);
-}
-const campo = (xml: string, tag: string) => campos(xml, tag)[0] ?? null;
-
-/** Trecho de um elemento composto (o primeiro), para ler só os campos dele. */
-function trecho(xml: string, tag: string): string | null {
-  const re = new RegExp(`<(?:[\\w-]+:)?${tag}(?:\\s[^>]*)?>([\\s\\S]*?)</(?:[\\w-]+:)?${tag}>`);
-  return xml.match(re)?.[1] ?? null;
-}
-
-/** "código - descrição" de cada glosa do trecho. */
-function glosasDe(xml: string): string[] {
-  const codigos = campos(xml, "codigoGlosa");
-  const descricoes = campos(xml, "descricaoGlosa");
-  // Na negativa (motivosNegativa) só vêm os códigos; na mensagemErro vêm
-  // código e descrição, em pares.
-  return codigos.map((c, i) => (descricoes.length === codigos.length ? `${c} - ${descricoes[i]}` : c));
-}
 
 export function lerRespostaSolicitacao(xml: string): RespostaSolicitacao {
   const erro = trecho(xml, "mensagemErro");
@@ -70,7 +74,27 @@ export function lerRespostaSolicitacao(xml: string): RespostaSolicitacao {
     };
   }
 
-  const falha = campo(xml, "tissFault") ?? campo(xml, "faultstring") ?? campo(xml, "Text");
-  if (falha) return { tipo: "falha", mensagem: falha };
-  return { tipo: "falha", mensagem: "Resposta da operadora sem autorização nem mensagem de erro." };
+  return falha(xml, "Resposta da operadora sem autorização nem mensagem de erro.");
+}
+
+export type RespostaElegibilidade =
+  | { tipo: "recibo"; elegivel: boolean; nome: string | null; carteira: string | null; validade: string | null; glosas: string[] }
+  | { tipo: "erro"; glosas: string[] }
+  | { tipo: "falha"; mensagem: string };
+
+export function lerRespostaElegibilidade(xml: string): RespostaElegibilidade {
+  const resposta = trecho(xml, "respostaElegibilidade");
+  if (resposta !== null) {
+    const recibo = trecho(resposta, "reciboElegibilidade");
+    if (recibo === null) return { tipo: "erro", glosas: glosasDe(resposta) };
+    return {
+      tipo: "recibo",
+      elegivel: campo(recibo, "respostaSolicitacao") === "S",
+      nome: campo(recibo, "nomeBeneficiario"),
+      carteira: campo(recibo, "numeroCarteira"),
+      validade: campo(recibo, "validadeCarteira"),
+      glosas: glosasDe(trecho(recibo, "motivosNegativa") ?? ""),
+    };
+  }
+  return falha(xml, "Resposta da operadora sem recibo de elegibilidade.");
 }
