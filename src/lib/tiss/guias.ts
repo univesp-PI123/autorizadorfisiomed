@@ -6,7 +6,7 @@
 // o schema da ANS antes de ser gravada.
 
 import { analisarAgendamentos } from "@/lib/agenda";
-import { deDate } from "@/lib/datas";
+import { deDate, hojeISO } from "@/lib/datas";
 import { prisma } from "@/lib/prisma";
 import { pedidoDaSessao } from "@/lib/regras/pendencias";
 import { STATUS_EM_ANDAMENTO, STATUS_SOLICITACAO } from "@/lib/tiss/dominios";
@@ -50,7 +50,11 @@ export async function gerarGuias(agendamentoIds: string[], usuarioId: string) {
     const motivo = (() => {
       if (s.situacao !== "pronta") return s.pendencias.length ? s.pendencias.join("; ") : (s.motivo ?? s.situacao);
       const g = guiaEmAndamento.get(s.agendamento.id);
-      return g ? `Guia ${g.numero} já está ${STATUS_SOLICITACAO[g.statusOperadora!].toLowerCase()} na operadora` : null;
+      if (g) return `Guia ${g.numero} já está ${STATUS_SOLICITACAO[g.statusOperadora!].toLowerCase()} na operadora`;
+      // O token só vale no dia em que o paciente o gerou.
+      const t = s.agendamento.tokenInformadoEm;
+      if (s.agendamento.tokenBeneficiario && t && hojeISO(t) !== hojeISO()) return `Token de ${ddmm(hojeISO(t))} venceu: pegue um novo com o paciente`;
+      return null;
     })();
     if (!motivo) return true;
     recusadas.push({
@@ -101,6 +105,7 @@ export async function gerarGuias(agendamentoIds: string[], usuarioId: string) {
       registroAns: a.convenio!.codigoAns,
       prestador: { codigoNaOperadora: a.convenio!.codigoPrestador, nome: clinica?.razaoSocial ?? null },
       carteirinha: a.carteirinha,
+      codValidacao: a.tokenBeneficiario,
       solicitante: {
         nome: pedido.medicoNome,
         conselho: pedido.conselho,

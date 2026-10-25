@@ -55,6 +55,8 @@ export type SessaoParaAnalise = {
     convenioIds: string[];
   } | null;
   unidade: { cnes: string | null } | null;
+  // Token do beneficiário e o dia (YYYY-MM-DD) em que a equipe o informou.
+  token: { valor: string; dia: string } | null;
 };
 
 export type PedidoParaAnalise = {
@@ -144,6 +146,11 @@ export function analisarSessao(
   else if (!s.unidade.cnes) pendencias.push("Unidade sem CNES");
   if (!s.pacienteId) pendencias.push("Paciente não identificado");
   if (!s.carteirinha) pendencias.push("Sem carteirinha");
+  // A Amil exige o token do paciente na guia; ele vale só no dia em que foi
+  // gerado, que tem de ser o dia da sessão.
+  if (s.convenio.integracao === "tiss_amil" && (!s.token || s.token.dia !== s.data)) {
+    pendencias.push("Sem token do paciente do dia da sessão");
+  }
   if (!s.procedimento) pendencias.push("Sem procedimento");
   else if (!codigoGuia) pendencias.push("Procedimento sem código para a operadora");
   const p = s.profissional;

@@ -387,6 +387,10 @@ model Agendamento {
   sala                  String?   @db.VarChar(200)
   removidoEm            DateTime? // sumiu de uma importação posterior do mesmo dia
   unidadeManual         Boolean   @default(false) // unidade escolhida no sistema: a importação não troca
+  // Token do beneficiário (codValidacao da guia TISS): a equipe pega com o
+  // paciente no dia da sessão e ele vale só nesse dia. A importação não mexe.
+  tokenBeneficiario     String?   @db.VarChar(10)
+  tokenInformadoEm      DateTime?
   importacaoId          String?   @db.Uuid
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt

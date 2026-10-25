@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState, type FormEvent } from "react";
 import toast from "react-hot-toast";
 import { comUrl } from "@/components/ComUrl";
 import Icone from "@/components/Icone";
@@ -12,8 +12,8 @@ import { useSessao } from "@/contextos/SessaoContexto";
 import { formatarData } from "@/lib/analiseDados";
 import { useFetch } from "@/lib/cliente/hooks";
 import { mensagemDeErro } from "@/lib/cliente/api";
-import { agendaService, convenioService, guiaTissService, unidadeService } from "@/lib/cliente/servicos";
-import type { ResultadoGuias, SituacaoSessao } from "@/lib/cliente/tipos";
+import { agendaService, convenioService, guiaTissService, tokenService, unidadeService } from "@/lib/cliente/servicos";
+import type { ResultadoGuias, SessaoAgenda, SituacaoSessao } from "@/lib/cliente/tipos";
 import { hojeISO } from "@/lib/datas";
 
 type Tom = "warning" | "success" | "neutro";
@@ -40,6 +40,45 @@ const ondeResolver = (p: string) => {
   const r = ONDE_RESOLVER.find(([re]) => re.test(p));
   return r ? { destino: r[1], link: r[2] } : { destino: "no AnClinic", link: false };
 };
+
+/**
+ * Token que o paciente gera no app ou recebe por SMS. Vale só no dia: o
+ * campo aparece nas sessões da Amil de hoje.
+ */
+function TokenSessao({ sessao, aoSalvar }: { sessao: SessaoAgenda; aoSalvar: () => void }) {
+  const [valor, setValor] = useState(sessao.tokenDoDia ? (sessao.token ?? "") : "");
+  const [salvando, setSalvando] = useState(false);
+  const salvar = async (e: FormEvent) => {
+    e.preventDefault();
+    setSalvando(true);
+    try {
+      await tokenService.gravar(sessao.id, valor.trim() || null);
+      toast.success(valor.trim() ? "Token gravado." : "Token apagado.");
+      aoSalvar();
+    } catch (err) {
+      toast.error(mensagemDeErro(err, "Não foi possível gravar o token."));
+    } finally {
+      setSalvando(false);
+    }
+  };
+  const nome = sessao.paciente?.nome ?? sessao.pacienteAnclinic ?? "paciente";
+  return (
+    <form onSubmit={salvar} className="ferramentas" style={{ marginTop: 4 }}>
+      <input
+        className="sb-input sb-input--sm mono"
+        style={{ width: "9ch" }}
+        maxLength={10}
+        value={valor}
+        onChange={(e) => setValor(e.target.value.replace(/\s/g, ""))}
+        placeholder="Token"
+        aria-label={`Token do paciente ${nome} às ${sessao.horaInicio ?? "—"}`}
+      />
+      <button type="submit" className="sb-btn sb-btn--sm" disabled={salvando || valor.trim() === (sessao.tokenDoDia ? (sessao.token ?? "") : "")}>
+        {salvando ? "Gravando…" : "Gravar"}
+      </button>
+    </form>
+  );
+}
 
 function AgendaPage({ url }: { url: URLSearchParams }) {
   const { usuario } = useSessao();
@@ -484,6 +523,9 @@ function AgendaPage({ url }: { url: URLSearchParams }) {
                               </ul>
                             ) : (
                               s.motivo && <span className="texto-suave">{s.motivo}</span>
+                            )}
+                            {s.pedeToken && data === hojeISO() && podeEditar && s.situacao !== "cancelada" && (
+                              <TokenSessao key={`${s.id}-${s.token ?? ""}`} sessao={s} aoSalvar={agenda.recarregar} />
                             )}
                             {s.guia && (
                               <span className="texto-suave">

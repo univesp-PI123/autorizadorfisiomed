@@ -19,6 +19,7 @@ const sessao = (p: Partial<SessaoParaAnalise> = {}): SessaoParaAnalise => ({
   procedimento: { codigoGuia: "50000470", codigosAceitos: ["50000470"] },
   profissional: { conselho: "CRP", numeroConselho: "123", ufConselho: "SP", cbo: "251510", convenioIds: [AMIL] },
   unidade: { cnes: "4160088" },
+  token: { valor: "482913", dia: p.data ?? "2026-09-28" },
   ...p,
 });
 
@@ -103,6 +104,13 @@ describe("analisarSessao", () => {
     const novo = { ...PEDIDO, id: "novo", dataPedido: "2026-09-01" };
     expect(pedidoDaSessao([antigo, novo], AMIL, "2026-09-28")?.id).toBe("novo");
     expect(pedidoDaSessao([antigo, novo], AMIL, "2026-08-01")?.id).toBe("antigo");
+  });
+  it("Amil: sem token, ou com token de outro dia, fica pendente", () => {
+    const pend = "Sem token do paciente do dia da sessão";
+    expect(analisarSessao(sessao({ token: null }), ctx())).toEqual({ situacao: "pendente", pendencias: [pend] });
+    expect(analisarSessao(sessao({ token: { valor: "482913", dia: "2026-09-27" } }), ctx()).pendencias).toEqual([pend]);
+    const outro = { id: AMIL, integracao: "tiss_outra", codigoPrestador: "1", codigoAns: "000001" };
+    expect(analisarSessao(sessao({ token: null, convenio: outro }), ctx()).situacao).toBe("pronta");
   });
 });
 

@@ -72,6 +72,11 @@ Rotina:
    contra os schemas oficiais da ANS (`src/lib/tiss/schemas/v4_03_00`) antes
    de ser gravado, e fica para baixar e conferir (ISO-8859-1, com o hash MD5
    do padrão). A sessão mostra o número da última guia gerada.
+   **Token do paciente (Amil):** no dia da sessão a equipe pega com o
+   paciente o token (app ou SMS da Amil) e digita no campo da sessão, na
+   Agenda. A guia leva o token no `codValidacao`; sem o token do dia, a
+   sessão fica com a pendência "Sem token do paciente do dia da sessão". O
+   token vale só no dia: guia de outro dia não é enviada.
    **Enviar à Amil** (na sessão) manda a guia ao webservice
    `solicitacaoProcedimento` (SOAP em UTF-8, por enquanto só no endereço de
    homologação) e grava a resposta na guia: status (autorizada, em análise,

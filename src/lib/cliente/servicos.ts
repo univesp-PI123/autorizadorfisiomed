@@ -100,6 +100,11 @@ export const agendaService = {
   buscar: (params: Filtros = {}) => api.get<Agenda>("/agenda", params),
 };
 
+export const tokenService = {
+  gravar: (agendamentoId: string, token: string | null) =>
+    api.patch<{ token: string | null }>(`/agendamentos/${agendamentoId}/token`, { token }),
+};
+
 export const elegibilidadeService = {
   verificar: (vinculoId: string) => api.post<RespostaElegibilidade>("/tiss/elegibilidade", { vinculoId }),
 };

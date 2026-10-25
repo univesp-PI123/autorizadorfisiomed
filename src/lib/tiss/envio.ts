@@ -4,7 +4,7 @@
 
 import { ErroHttp, naoEncontrado } from "@/lib/api/http";
 import { prisma } from "@/lib/prisma";
-import { deDate } from "@/lib/datas";
+import { deDate, hojeISO } from "@/lib/datas";
 import { STATUS_SOLICITACAO } from "@/lib/tiss/dominios";
 import { montarPedidoElegibilidade } from "@/lib/tiss/elegibilidade";
 import { lerRespostaElegibilidade, lerRespostaSolicitacao, type RespostaElegibilidade } from "@/lib/tiss/resposta";
@@ -64,7 +64,7 @@ export type GuiaEnviada = {
 export async function enviarGuia(id: string): Promise<GuiaEnviada> {
   const guia = await prisma.guiaTiss.findUnique({
     where: { id },
-    select: { id: true, xml: true, statusOperadora: true, convenio: { select: { integracao: true } } },
+    select: { id: true, xml: true, statusOperadora: true, createdAt: true, convenio: { select: { integracao: true } } },
   });
   if (!guia) naoEncontrado("Guia");
   if (guia.convenio.integracao !== "tiss_amil") throw new ErroHttp(422, "Só as guias da Amil são enviadas pelo webservice.");
@@ -72,6 +72,11 @@ export async function enviarGuia(id: string): Promise<GuiaEnviada> {
   // prestador seria repetido. Negada ou cancelada, gera-se uma guia nova.
   if (guia.statusOperadora) {
     throw new ErroHttp(409, `A operadora já respondeu esta guia (${STATUS_SOLICITACAO[guia.statusOperadora] ?? guia.statusOperadora}).`);
+  }
+
+  // A guia leva o token do paciente, que vale só no dia em que foi gerado.
+  if (hojeISO(guia.createdAt) !== hojeISO()) {
+    throw new ErroHttp(409, "O token desta guia já venceu (vale só no dia). Pegue um novo token com o paciente e gere a guia de novo.");
   }
 
   const envio = await enviarSoap(guia.xml, exigirConfig());

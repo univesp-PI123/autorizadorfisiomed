@@ -45,6 +45,20 @@ describe("login e senha no cabeçalho", () => {
   });
 });
 
+describe("token do beneficiário", () => {
+  it("vai no codValidacao, antes da etapa, e a guia segue válida pelo schema", async () => {
+    const r = montarSolicitacaoSpSadt({ ...dados, codValidacao: "482913" });
+    if (!r.ok) throw new Error(r.erros.join("; "));
+    expect(r.xml).toMatch(/<\/ans:cabecalhoSolicitacao>\s*<ans:codValidacao>482913<\/ans:codValidacao>\s*<ans:tipoEtapaAutorizacao>/);
+    expect(await validarMensagemTiss(r.xmlUtf8)).toEqual([]);
+  });
+
+  it("recusa token com espaço ou longo demais", () => {
+    expect(montarSolicitacaoSpSadt({ ...dados, codValidacao: "12345678901" })).toMatchObject({ ok: false });
+    expect(montarSolicitacaoSpSadt({ ...dados, codValidacao: "12 34" })).toMatchObject({ ok: false });
+  });
+});
+
 describe("envelope e configuração", () => {
   it("põe a mensagem no Body sem a declaração XML dela", () => {
     const env = envelopeSoap(montar().xml);

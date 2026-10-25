@@ -24,7 +24,7 @@ export const GET = rota(async (req) => {
     where: { agendamentoIds: { hasSome: sessoes.map((s) => s.agendamento.id) } },
     select: {
       id: true, numero: true, agendamentoIds: true, enviadaEm: true, statusOperadora: true, senhaOperadora: true,
-      validadeSenha: true, glosas: true, erroEnvio: true, convenio: { select: { integracao: true } },
+      validadeSenha: true, glosas: true, erroEnvio: true, createdAt: true, convenio: { select: { integracao: true } },
     },
     orderBy: { numero: "desc" },
   });
@@ -36,7 +36,8 @@ export const GET = rota(async (req) => {
       numero: g.numero,
       situacao: situacaoDaGuia(g),
       enviada: !!g.enviadaEm,
-      podeEnviar: g.convenio.integracao === "tiss_amil" && !g.statusOperadora,
+      // Só no dia em que foi gerada: o token do paciente vale só nesse dia.
+      podeEnviar: g.convenio.integracao === "tiss_amil" && !g.statusOperadora && hojeISO(g.createdAt) === hojeISO(),
       senha: g.senhaOperadora,
       validadeSenha: g.validadeSenha && deDate(g.validadeSenha),
       glosas: g.glosas,
@@ -69,6 +70,10 @@ export const GET = rota(async (req) => {
       },
       unidade: a.unidade && { id: a.unidade.id, nome: a.unidade.nome },
       unidadeManual: a.unidadeManual,
+      // Pede o token na sessão da Amil; ele só vale se foi informado no dia.
+      pedeToken: a.convenio?.integracao === "tiss_amil",
+      token: a.tokenBeneficiario,
+      tokenDoDia: !!a.tokenInformadoEm && hojeISO(a.tokenInformadoEm) === deDate(a.data),
       statusAnclinic: a.statusAnclinic,
       agendamentosRestantes: a.agendamentosRestantes,
       atendimento: a.atendimento,

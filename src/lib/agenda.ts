@@ -3,7 +3,7 @@
 // geração automática dos atendimentos.
 
 import type { Prisma } from "@prisma/client";
-import { deDate } from "@/lib/datas";
+import { deDate, hojeISO } from "@/lib/datas";
 import { prisma } from "@/lib/prisma";
 import { codigoParaGuia, codigosAceitos, codigoTuss, type ProcedimentoComCodigos } from "@/lib/regras/codigoGuia";
 import { analisarSessao, type ContextoAnalise } from "@/lib/regras/pendencias";
@@ -120,6 +120,7 @@ export async function analisarAgendamentos(where: Prisma.AgendamentoWhereInput) 
           convenioIds: a.profissional.credenciamentos.map((c) => c.convenioId),
         },
         unidade: a.unidade,
+        token: a.tokenBeneficiario && a.tokenInformadoEm ? { valor: a.tokenBeneficiario, dia: hojeISO(a.tokenInformadoEm) } : null,
       },
       contexto(a.pacienteId),
     );

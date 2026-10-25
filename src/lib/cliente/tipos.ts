@@ -331,6 +331,9 @@ export type SessaoAgenda = {
   situacao: SituacaoSessao;
   pendencias: string[];
   motivo?: string;
+  pedeToken: boolean; // sessão da Amil: a guia leva o token do paciente
+  token: string | null;
+  tokenDoDia: boolean; // informado no dia da sessão (fora disso, não vale)
   // Última guia TISS gerada com esta sessão e a resposta da operadora.
   guia: {
     id: string;

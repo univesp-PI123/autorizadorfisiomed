@@ -23,6 +23,7 @@ export type DadosSolicitacaoSpSadt = {
   registroAns: string | null; // da operadora
   prestador: { codigoNaOperadora: string | null; nome: string | null }; // a clínica
   carteirinha: string | null;
+  codValidacao?: string | null; // token do beneficiário
   solicitante: {
     nome: string;
     conselho: string; // sigla: CRM, CRP…
@@ -48,6 +49,7 @@ export function errosSolicitacao(d: DadosSolicitacaoSpSadt): string[] {
   if (!d.prestador.codigoNaOperadora) erros.push("Convênio sem código do prestador");
   if (!d.prestador.nome) erros.push("Dados da clínica não cadastrados");
   if (!digitos(d.carteirinha)) erros.push("Sem carteirinha");
+  if (d.codValidacao && !/^\S{1,10}$/.test(d.codValidacao)) erros.push("Token do paciente inválido (até 10 caracteres)");
   if (!d.cnes) erros.push("Unidade sem CNES");
   const s = d.solicitante;
   if (!siglaConselho(s.conselho)) erros.push(`Conselho do médico inválido (${s.conselho})`);
@@ -85,6 +87,7 @@ export function montarSolicitacaoSpSadt(d: DadosSolicitacaoSpSadt): ResultadoSol
 
   const guia = el("solicitacaoSP-SADT", [
     el("cabecalhoSolicitacao", [el("registroANS", d.registroAns), el("numeroGuiaPrestador", d.numeroGuiaPrestador)]),
+    el("codValidacao", d.codValidacao ?? null),
     el("tipoEtapaAutorizacao", ETAPA_PRESTADOR_EXECUTANTE),
     el("dadosBeneficiario", [el("numeroCarteira", digitos(d.carteirinha)!.slice(0, 20)), el("atendimentoRN", "N")]),
     el("dadosSolicitante", [
