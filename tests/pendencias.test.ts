@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { codigoParaGuia, codigosAceitos, codigoTuss } from "@/lib/regras/codigoGuia";
+import { codigoParaGuia, codigosAceitos } from "@/lib/regras/codigoGuia";
 import { analisarSessao, mesmoProcedimento, pedidoDaSessao, type ContextoAnalise, type SessaoParaAnalise } from "@/lib/regras/pendencias";
 
 const AMIL = "conv-amil";
@@ -127,11 +127,6 @@ describe("codigoParaGuia", () => {
   it("sem de/para, usa o TUSS do procedimento", () => {
     expect(codigoParaGuia(proc, "outro")).toEqual({ codigo: "50000470", tabela: "22", origem: "tuss" });
     expect(codigoParaGuia({ codigoTuss: null, tabelaTuss: null }, "amil")).toBeNull();
-  });
-  it("código TUSS para a Amil, que só aceita a tabela 22", () => {
-    expect(codigoTuss(proc, "amil")).toBe("50000470");
-    expect(codigoTuss({ ...proc, equivalencias: [{ convenioId: "amil", codigo: "50000560", tabela: "22", codigoTuss: null }] }, "amil")).toBe("50000560");
-    expect(codigoTuss({ codigoTuss: null, tabelaTuss: null, equivalencias: [{ convenioId: "amil", codigo: "9001", tabela: "98", codigoTuss: null }] }, "amil")).toBeNull();
   });
 });
 

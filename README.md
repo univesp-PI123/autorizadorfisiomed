@@ -68,7 +68,9 @@ Rotina:
    selecionadas) monta as guias de solicitação de SP/SADT: uma guia por
    sessão, com quantidade 1. O médico solicitante (conselho, UF,
    CBO, indicação clínica/CID) vem do pedido médico; o procedimento vai pelo
-   código TUSS (tabela 22), o padrão pedido pela Amil. Cada XML é validado
+   código do de/para da operadora (na Amil, o do portal — ex.: 60101490 "Tea
+   Fonoaudiologia", tabela 22) ou, sem de/para, pelo TUSS. A guia vai com
+   etapa 1 (autorização prévia): na Amil cada sessão é um pedido. Cada XML é validado
    contra os schemas oficiais da ANS (`src/lib/tiss/schemas/v4_03_00`) antes
    de ser gravado, e fica para baixar e conferir (ISO-8859-1, com o hash MD5
    do padrão). A sessão mostra o número da última guia gerada.

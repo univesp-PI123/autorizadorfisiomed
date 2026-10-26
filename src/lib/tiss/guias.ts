@@ -91,8 +91,8 @@ export async function gerarGuias(agendamentoIds: string[], usuarioId: string) {
     const a = s.agendamento;
     const doPaciente = pedidosAnalise.filter((p) => p.pacienteId === a.pacienteId);
     const pedido = pedidoDaSessao(doPaciente, a.convenio!.id, deDate(a.data))!;
-    const codigo = s.codigo!.codigo;
-    const descricao = termoTuss.get(codigo) ?? a.procedimento!.descricao;
+    const { codigo, tabela } = s.codigo!;
+    const descricao = (tabela === "22" && termoTuss.get(codigo)) || a.procedimento!.descricao;
     const paciente = a.paciente?.nome ?? a.pacienteAnclinic ?? "—";
 
     const [{ numero }] = await prisma.$queryRaw<{ numero: number }[]>`
@@ -115,7 +115,7 @@ export async function gerarGuias(agendamentoIds: string[], usuarioId: string) {
       },
       dataSolicitacao: pedido.dataPedido,
       indicacaoClinica: indicacaoDoPedido(pedido.indicacaoClinica, pedido.cid),
-      procedimentos: [{ tabela: "22", codigo, descricao, quantidade: 1 }],
+      procedimentos: [{ tabela, codigo, descricao, quantidade: 1 }],
       cnes: a.unidade!.cnes,
       observacao: `Sessão: ${sessao}`,
     });

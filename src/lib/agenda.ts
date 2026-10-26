@@ -5,7 +5,7 @@
 import type { Prisma } from "@prisma/client";
 import { deDate, hojeISO } from "@/lib/datas";
 import { prisma } from "@/lib/prisma";
-import { codigoParaGuia, codigosAceitos, codigoTuss, type ProcedimentoComCodigos } from "@/lib/regras/codigoGuia";
+import { codigoParaGuia, codigosAceitos } from "@/lib/regras/codigoGuia";
 import { analisarSessao, type ContextoAnalise } from "@/lib/regras/pendencias";
 
 const INCLUIR = {
@@ -26,14 +26,6 @@ const INCLUIR = {
   unidade: { select: { id: true, nome: true, cnes: true } },
   atendimento: { select: { id: true, situacao: true } },
 } satisfies Prisma.AgendamentoInclude;
-
-// A Amil só aceita a TUSS (tabela 22); as demais operadoras recebem o código
-// do de/para.
-function codigoNaGuia(proc: ProcedimentoComCodigos, convenio: { id: string; integracao: string } | null) {
-  if (convenio?.integracao !== "tiss_amil") return codigoParaGuia(proc, convenio?.id ?? null);
-  const codigo = codigoTuss(proc, convenio.id);
-  return codigo ? { codigo, tabela: "22", origem: "tuss" as const } : null;
-}
 
 export async function analisarAgendamentos(where: Prisma.AgendamentoWhereInput) {
   const agendamentos = await prisma.agendamento.findMany({
@@ -98,7 +90,7 @@ export async function analisarAgendamentos(where: Prisma.AgendamentoWhereInput) 
   };
 
   return agendamentos.map((a) => {
-    const codigo = a.procedimento ? codigoNaGuia(a.procedimento, a.convenio) : null;
+    const codigo = a.procedimento ? codigoParaGuia(a.procedimento, a.convenio?.id ?? null) : null;
     const analise = analisarSessao(
       {
         data: deDate(a.data),
