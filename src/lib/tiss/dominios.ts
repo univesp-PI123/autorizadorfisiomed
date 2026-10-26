@@ -71,3 +71,5 @@ export const STATUS_SOLICITACAO: Record<string, string> = {
 
 /** Status em que a guia já foi aceita ou está em andamento na operadora: não se pede de novo. */
 export const STATUS_EM_ANDAMENTO = new Set(["1", "2", "4", "5", "7"]);
+// Autorizada ou autorizada parcialmente: a sessão está coberta.
+export const STATUS_AUTORIZADA = new Set(["1", "7"]);

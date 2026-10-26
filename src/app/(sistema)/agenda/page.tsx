@@ -35,6 +35,7 @@ const ONDE_RESOLVER: [RegExp, string, boolean][] = [
   [/credenciado/, "/profissionais", true],
   [/código do prestador|registro ANS/, "/convenios", true],
   [/pedido médico/i, "na página do paciente", false],
+  [/token/, "no campo Token da sessão", false],
 ];
 const ondeResolver = (p: string) => {
   const r = ONDE_RESOLVER.find(([re]) => re.test(p));
@@ -315,7 +316,7 @@ function AgendaPage({ url }: { url: URLSearchParams }) {
                             <td className="sb-strong">{g.paciente}</td>
                             <td>
                               {g.procedimento}
-                              <span className="texto-suave mono">TUSS {g.codigo}</span>
+                              <span className="texto-suave mono">código {g.codigo}</span>
                             </td>
                             <td className="sb-mono sb-end">{g.sessao}</td>
                             <td className="sb-end">

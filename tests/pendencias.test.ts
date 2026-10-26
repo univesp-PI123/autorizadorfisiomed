@@ -105,6 +105,13 @@ describe("analisarSessao", () => {
     expect(pedidoDaSessao([antigo, novo], AMIL, "2026-09-28")?.id).toBe("novo");
     expect(pedidoDaSessao([antigo, novo], AMIL, "2026-08-01")?.id).toBe("antigo");
   });
+  it("guia autorizada pela operadora cobre a sessão", () => {
+    expect(analisarSessao(sessao({ token: null, guiaAutorizada: { numero: 18, senha: "EX1" } }), ctx())).toEqual({
+      situacao: "coberta",
+      pendencias: [],
+      motivo: "Guia 18 autorizada pela operadora (senha EX1).",
+    });
+  });
   it("Amil: sem token, ou com token de outro dia, fica pendente", () => {
     const pend = "Sem token do paciente do dia da sessão";
     expect(analisarSessao(sessao({ token: null }), ctx())).toEqual({ situacao: "pendente", pendencias: [pend] });

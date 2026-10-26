@@ -60,14 +60,21 @@ export function lerRespostaSolicitacao(xml: string): RespostaSolicitacao {
   if (erro !== null) return { tipo: "erro", glosas: glosasDe(erro) };
 
   const servico = trecho(xml, "autorizacaoServico");
-  const status = servico && campo(servico, "statusSolicitacao");
+  let status = servico && campo(servico, "statusSolicitacao");
   if (servico && status) {
     const negativa = trecho(servico, "motivosNegativa");
+    // A Amil pode responder "autorizada" na guia com o item negado
+    // (quantidadeAutorizada 0 e glosa): vale o que foi liberado nos itens.
+    const autorizadas = campos(servico, "quantidadeAutorizada").map(Number);
+    if ((status === "1" || status === "7") && autorizadas.length) {
+      if (autorizadas.every((q) => q === 0)) status = "3";
+      else if (autorizadas.some((q) => q === 0)) status = "7";
+    }
     return {
       tipo: "autorizacao",
       status,
       numeroGuiaOperadora: campo(servico, "numeroGuiaOperadora"),
-      senha: campo(servico, "senha"),
+      senha: status === "3" ? null : campo(servico, "senha"),
       validadeSenha: campo(servico, "dataValidadeSenha"),
       glosas: negativa ? glosasDe(negativa) : [],
       observacao: campo(servico, "observacao"),

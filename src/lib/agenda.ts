@@ -7,6 +7,7 @@ import { deDate, hojeISO } from "@/lib/datas";
 import { prisma } from "@/lib/prisma";
 import { codigoParaGuia, codigosAceitos } from "@/lib/regras/codigoGuia";
 import { analisarSessao, type ContextoAnalise } from "@/lib/regras/pendencias";
+import { STATUS_AUTORIZADA } from "@/lib/tiss/dominios";
 
 const INCLUIR = {
   paciente: { select: { id: true, nome: true } },
@@ -35,7 +36,7 @@ export async function analisarAgendamentos(where: Prisma.AgendamentoWhereInput) 
   });
 
   const pacienteIds = [...new Set(agendamentos.map((a) => a.pacienteId).filter((id): id is string => !!id))];
-  const [clinica, pedidos, autorizacoes] = await Promise.all([
+  const [clinica, pedidos, autorizacoes, guiasAutorizadas] = await Promise.all([
     prisma.clinica.findFirst({ select: { id: true } }),
     prisma.pedidoMedico.findMany({
       where: { pacienteId: { in: pacienteIds }, ativo: true },
@@ -51,7 +52,16 @@ export async function analisarAgendamentos(where: Prisma.AgendamentoWhereInput) 
         dataFimVigencia: true, quantidadeAutorizada: true, quantidadeUtilizada: true,
       },
     }),
+    prisma.guiaTiss.findMany({
+      where: { agendamentoIds: { hasSome: agendamentos.map((a) => a.id) }, statusOperadora: { in: [...STATUS_AUTORIZADA] } },
+      select: { numero: true, senhaOperadora: true, agendamentoIds: true },
+      orderBy: { numero: "desc" },
+    }),
   ]);
+  const guiaAutorizada = (id: string) => {
+    const g = guiasAutorizadas.find((g) => g.agendamentoIds.includes(id));
+    return g ? { numero: g.numero, senha: g.senhaOperadora } : null;
+  };
 
   const contextos = new Map<string, ContextoAnalise>();
   const contexto = (pacienteId: string | null): ContextoAnalise => {
@@ -113,6 +123,7 @@ export async function analisarAgendamentos(where: Prisma.AgendamentoWhereInput) 
         },
         unidade: a.unidade,
         token: a.tokenBeneficiario && a.tokenInformadoEm ? { valor: a.tokenBeneficiario, dia: hojeISO(a.tokenInformadoEm) } : null,
+        guiaAutorizada: guiaAutorizada(a.id),
       },
       contexto(a.pacienteId),
     );

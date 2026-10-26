@@ -103,6 +103,32 @@ describe("lerRespostaSolicitacao", () => {
     });
   });
 
+  const comItens = (...itens: [number, string?][]) =>
+    lerRespostaSolicitacao(
+      envelope(
+        `<ans:autorizacaoProcedimentoWS xmlns:ans="http://www.ans.gov.br/padroes/tiss/schemas">${cabecalho}` +
+          "<ans:autorizacaoProcedimento><ans:autorizacaoServico><ans:dadosAutorizacao><ans:senha>EX1</ans:senha></ans:dadosAutorizacao>" +
+          "<ans:statusSolicitacao>1</ans:statusSolicitacao><ans:servicosAutorizados>" +
+          itens
+            .map(([q, glosa]) =>
+              `<ans:servicoAutorizado><ans:quantidadeSolicitada>1</ans:quantidadeSolicitada><ans:quantidadeAutorizada>${q}</ans:quantidadeAutorizada>` +
+              (glosa ? `<ans:motivosNegativa><ans:codigoGlosa>${glosa}</ans:codigoGlosa></ans:motivosNegativa>` : "") +
+              "</ans:servicoAutorizado>",
+            )
+            .join("") +
+          "</ans:servicosAutorizados></ans:autorizacaoServico></ans:autorizacaoProcedimento><ans:hash>x</ans:hash></ans:autorizacaoProcedimentoWS>",
+      ),
+    );
+
+  it("guia 'autorizada' com o item negado (quantidade 0) conta como negada, sem senha", () => {
+    expect(comItens([0, "3145"])).toMatchObject({ status: "3", senha: null, glosas: ["3145"] });
+  });
+
+  it("um item liberado e outro negado é autorização parcial", () => {
+    expect(comItens([1], [0, "3145"])).toMatchObject({ status: "7", senha: "EX1" });
+    expect(comItens([1])).toMatchObject({ status: "1", senha: "EX1", glosas: [] });
+  });
+
   it("negativa com os códigos de glosa, com outro prefixo de namespace", () => {
     const r = lerRespostaSolicitacao(
       envelope(
