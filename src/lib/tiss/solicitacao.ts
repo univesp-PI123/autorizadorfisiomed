@@ -12,9 +12,9 @@ export const VERSAO_TISS = "4.03.00";
 
 // Tabela 23 — caráter do atendimento: 1 = eletivo.
 const CARATER_ELETIVO = "1";
-// Tabela 73 — etapa: 2 = solicitação feita pelo prestador executante (a
-// clínica pede a autorização com base no pedido do médico).
-const ETAPA_PRESTADOR_EXECUTANTE = "2";
+// Tabela 73 — etapa: 1 = autorização prévia. Na Amil cada sessão é um pedido
+// novo; a etapa 2 só confirma uma guia já autorizada (glosa 1404 sem ela).
+const ETAPA_AUTORIZACAO_PREVIA = "1";
 
 export type DadosSolicitacaoSpSadt = {
   numeroGuiaPrestador: string;
@@ -23,6 +23,7 @@ export type DadosSolicitacaoSpSadt = {
   registroAns: string | null; // da operadora
   prestador: { codigoNaOperadora: string | null; nome: string | null }; // a clínica
   carteirinha: string | null;
+  codValidacao?: string | null; // token do beneficiário
   solicitante: {
     nome: string;
     conselho: string; // sigla: CRM, CRP…
@@ -48,6 +49,7 @@ export function errosSolicitacao(d: DadosSolicitacaoSpSadt): string[] {
   if (!d.prestador.codigoNaOperadora) erros.push("Convênio sem código do prestador");
   if (!d.prestador.nome) erros.push("Dados da clínica não cadastrados");
   if (!digitos(d.carteirinha)) erros.push("Sem carteirinha");
+  if (d.codValidacao && !/^\S{1,10}$/.test(d.codValidacao)) erros.push("Token do paciente inválido (até 10 caracteres)");
   if (!d.cnes) erros.push("Unidade sem CNES");
   const s = d.solicitante;
   if (!siglaConselho(s.conselho)) erros.push(`Conselho do médico inválido (${s.conselho})`);
@@ -85,7 +87,8 @@ export function montarSolicitacaoSpSadt(d: DadosSolicitacaoSpSadt): ResultadoSol
 
   const guia = el("solicitacaoSP-SADT", [
     el("cabecalhoSolicitacao", [el("registroANS", d.registroAns), el("numeroGuiaPrestador", d.numeroGuiaPrestador)]),
-    el("tipoEtapaAutorizacao", ETAPA_PRESTADOR_EXECUTANTE),
+    el("codValidacao", d.codValidacao ?? null),
+    el("tipoEtapaAutorizacao", ETAPA_AUTORIZACAO_PREVIA),
     el("dadosBeneficiario", [el("numeroCarteira", digitos(d.carteirinha)!.slice(0, 20)), el("atendimentoRN", "N")]),
     el("dadosSolicitante", [
       el("contratadoSolicitante", [el("codigoPrestadorNaOperadora", codigoPrestador)]),

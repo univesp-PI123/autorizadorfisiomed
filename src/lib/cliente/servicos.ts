@@ -9,6 +9,7 @@ import type {
   Convenio,
   DocumentoResumo,
   Dashboard,
+  GuiaEnviada,
   EvolucaoMes,
   Importacao,
   Paciente,
@@ -23,6 +24,7 @@ import type {
   ResultadoDocumento,
   Profissional,
   ResumoGlosas,
+  RespostaElegibilidade,
   Usuario,
   Unidade,
   UsuarioLogado,
@@ -98,8 +100,18 @@ export const agendaService = {
   buscar: (params: Filtros = {}) => api.get<Agenda>("/agenda", params),
 };
 
+export const tokenService = {
+  gravar: (agendamentoId: string, token: string | null) =>
+    api.patch<{ token: string | null }>(`/agendamentos/${agendamentoId}/token`, { token }),
+};
+
+export const elegibilidadeService = {
+  verificar: (vinculoId: string) => api.post<RespostaElegibilidade>("/tiss/elegibilidade", { vinculoId }),
+};
+
 export const guiaTissService = {
   gerar: (agendamentoIds: string[]) => api.post<ResultadoGuias>("/tiss/guias", { agendamentoIds }),
+  enviar: (id: string) => api.post<GuiaEnviada>(`/tiss/guias/${id}/enviar`),
   urlXml: (id: string) => `/api/tiss/guias/${id}/xml`,
 };
 

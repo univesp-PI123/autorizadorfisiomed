@@ -1,4 +1,4 @@
-// Tabelas de domínio do padrão TISS usadas nos cadastros.
+// Tabelas de domínio do padrão TISS usadas nos cadastros e nas guias.
 
 // Tabela 26 — Conselho profissional (sigla → código na guia).
 export const CONSELHOS = {
@@ -57,3 +57,19 @@ export function cboSugerido(especialidades: string | null | undefined): string |
   if (!especialidades) return null;
   return CBO_POR_ESPECIALIDADE.find(([re]) => re.test(especialidades))?.[1] ?? null;
 }
+
+// Status da solicitação (dm_statusSolicitacao), na resposta da operadora.
+export const STATUS_SOLICITACAO: Record<string, string> = {
+  "1": "Autorizada",
+  "2": "Em análise",
+  "3": "Negada",
+  "4": "Aguardando justificativa técnica",
+  "5": "Aguardando documentação",
+  "6": "Cancelada",
+  "7": "Autorizada parcialmente",
+};
+
+/** Status em que a guia já foi aceita ou está em andamento na operadora: não se pede de novo. */
+export const STATUS_EM_ANDAMENTO = new Set(["1", "2", "4", "5", "7"]);
+// Autorizada ou autorizada parcialmente: a sessão está coberta.
+export const STATUS_AUTORIZADA = new Set(["1", "7"]);

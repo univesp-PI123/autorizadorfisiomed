@@ -52,7 +52,7 @@ export type Vinculo = {
   titular: string | null;
   dataValidade: string | null;
   ativo: boolean;
-  convenio?: Referencia;
+  convenio?: Referencia & { integracao?: string };
 };
 
 export type Paciente = {
@@ -331,7 +331,21 @@ export type SessaoAgenda = {
   situacao: SituacaoSessao;
   pendencias: string[];
   motivo?: string;
-  guia: { id: string; numero: number } | null; // última guia TISS gerada com esta sessão
+  pedeToken: boolean; // sessão da Amil: a guia leva o token do paciente
+  token: string | null;
+  tokenDoDia: boolean; // informado no dia da sessão (fora disso, não vale)
+  // Última guia TISS gerada com esta sessão e a resposta da operadora.
+  guia: {
+    id: string;
+    numero: number;
+    situacao: string;
+    enviada: boolean;
+    podeEnviar: boolean;
+    senha: string | null;
+    validadeSenha: string | null;
+    glosas: string[];
+    erro: string | null;
+  } | null;
 };
 
 export type Agenda = {
@@ -341,6 +355,22 @@ export type Agenda = {
   resumo: Record<SituacaoSessao, number>;
   pendencias: { pendencia: string; quantidade: number }[];
   sessoes: SessaoAgenda[];
+};
+
+export type RespostaElegibilidade =
+  | { tipo: "recibo"; elegivel: boolean; nome: string | null; carteira: string | null; validade: string | null; glosas: string[] }
+  | { tipo: "erro"; glosas: string[] }
+  | { tipo: "falha"; mensagem: string };
+
+export type GuiaEnviada = {
+  id: string;
+  statusOperadora: string | null;
+  situacao: string;
+  numeroGuiaOperadora: string | null;
+  senhaOperadora: string | null;
+  validadeSenha: string | null;
+  glosas: string[];
+  erroEnvio: string | null;
 };
 
 export type ResultadoGuias = {

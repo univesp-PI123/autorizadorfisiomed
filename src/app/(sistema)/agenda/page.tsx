@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState, type FormEvent } from "react";
 import toast from "react-hot-toast";
 import { comUrl } from "@/components/ComUrl";
 import Icone from "@/components/Icone";
@@ -12,8 +12,8 @@ import { useSessao } from "@/contextos/SessaoContexto";
 import { formatarData } from "@/lib/analiseDados";
 import { useFetch } from "@/lib/cliente/hooks";
 import { mensagemDeErro } from "@/lib/cliente/api";
-import { agendaService, convenioService, guiaTissService, unidadeService } from "@/lib/cliente/servicos";
-import type { ResultadoGuias, SituacaoSessao } from "@/lib/cliente/tipos";
+import { agendaService, convenioService, guiaTissService, tokenService, unidadeService } from "@/lib/cliente/servicos";
+import type { ResultadoGuias, SessaoAgenda, SituacaoSessao } from "@/lib/cliente/tipos";
 import { hojeISO } from "@/lib/datas";
 
 type Tom = "warning" | "success" | "neutro";
@@ -35,11 +35,52 @@ const ONDE_RESOLVER: [RegExp, string, boolean][] = [
   [/credenciado/, "/profissionais", true],
   [/código do prestador|registro ANS/, "/convenios", true],
   [/pedido médico/i, "na página do paciente", false],
+  [/token/, "no campo Token da sessão", false],
+  [/portal da Amil/, "no portal da Amil (ou lance a senha no AnClinic)", false],
 ];
 const ondeResolver = (p: string) => {
   const r = ONDE_RESOLVER.find(([re]) => re.test(p));
   return r ? { destino: r[1], link: r[2] } : { destino: "no AnClinic", link: false };
 };
+
+/**
+ * Token que o paciente gera no app ou recebe por SMS. Vale só no dia: o
+ * campo aparece nas sessões da Amil de hoje.
+ */
+function TokenSessao({ sessao, aoSalvar }: { sessao: SessaoAgenda; aoSalvar: () => void }) {
+  const [valor, setValor] = useState(sessao.tokenDoDia ? (sessao.token ?? "") : "");
+  const [salvando, setSalvando] = useState(false);
+  const salvar = async (e: FormEvent) => {
+    e.preventDefault();
+    setSalvando(true);
+    try {
+      await tokenService.gravar(sessao.id, valor.trim() || null);
+      toast.success(valor.trim() ? "Token gravado." : "Token apagado.");
+      aoSalvar();
+    } catch (err) {
+      toast.error(mensagemDeErro(err, "Não foi possível gravar o token."));
+    } finally {
+      setSalvando(false);
+    }
+  };
+  const nome = sessao.paciente?.nome ?? sessao.pacienteAnclinic ?? "paciente";
+  return (
+    <form onSubmit={salvar} className="ferramentas" style={{ marginTop: 4 }}>
+      <input
+        className="sb-input sb-input--sm mono"
+        style={{ width: "9ch" }}
+        maxLength={10}
+        value={valor}
+        onChange={(e) => setValor(e.target.value.replace(/\s/g, ""))}
+        placeholder="Token"
+        aria-label={`Token do paciente ${nome} às ${sessao.horaInicio ?? "—"}`}
+      />
+      <button type="submit" className="sb-btn sb-btn--sm" disabled={salvando || valor.trim() === (sessao.tokenDoDia ? (sessao.token ?? "") : "")}>
+        {salvando ? "Gravando…" : "Gravar"}
+      </button>
+    </form>
+  );
+}
 
 function AgendaPage({ url }: { url: URLSearchParams }) {
   const { usuario } = useSessao();
@@ -56,6 +97,7 @@ function AgendaPage({ url }: { url: URLSearchParams }) {
   const [aplicando, setAplicando] = useState(false);
   const [gerando, setGerando] = useState(false);
   const [resultadoGuias, setResultadoGuias] = useState<ResultadoGuias | null>(null);
+  const [enviando, setEnviando] = useState<string | null>(null);
   const todasUnidades = useFetch(unidadeService.listar);
 
   const buscar = useCallback(() => agendaService.buscar({ data, convenioId: convenioId || undefined }), [data, convenioId]);
@@ -104,8 +146,8 @@ function AgendaPage({ url }: { url: URLSearchParams }) {
     }
   };
 
-  // Monta as guias de solicitação (XML TISS) das sessões prontas; o envio à
-  // operadora vem depois — por ora o XML fica para baixar e conferir.
+  // Monta as guias de solicitação (XML TISS) das sessões prontas; cada guia é
+  // enviada depois, pelo botão da sessão.
   const gerarGuias = async (ids: string[]) => {
     if (!ids.length) return;
     setGerando(true);
@@ -120,6 +162,23 @@ function AgendaPage({ url }: { url: URLSearchParams }) {
       toast.error(mensagemDeErro(err, "Não foi possível gerar as guias."));
     } finally {
       setGerando(false);
+    }
+  };
+  // Envia uma guia ao webservice da Amil; a resposta fica gravada na guia.
+  const enviarGuia = async (id: string) => {
+    setEnviando(id);
+    try {
+      const r = await guiaTissService.enviar(id);
+      const detalhe = r.erroEnvio ?? (r.glosas.length ? r.glosas.join("; ") : r.senhaOperadora && `senha ${r.senhaOperadora}`);
+      const texto = detalhe ? `${r.situacao}: ${detalhe}` : r.situacao;
+      if (r.statusOperadora === "1" || r.statusOperadora === "7") toast.success(texto);
+      else if (r.erroEnvio || r.statusOperadora === "3" || !r.statusOperadora) toast.error(texto);
+      else toast(texto);
+      agenda.recarregar();
+    } catch (err) {
+      toast.error(mensagemDeErro(err, "Não foi possível enviar a guia."));
+    } finally {
+      setEnviando(null);
     }
   };
   const prontas = sessoes.filter((s) => s.situacao === "pronta");
@@ -236,7 +295,8 @@ function AgendaPage({ url }: { url: URLSearchParams }) {
                   </div>
                 </div>
                 <p className="texto-suave">
-                  XML de solicitação de SP/SADT (TISS 4.03.00), validado pelo schema da ANS. Ainda não foi enviado à operadora.
+                  XML de solicitação de SP/SADT (TISS 4.03.00), validado pelo schema da ANS. Para enviar à Amil, use{" "}
+                  <strong>Enviar à Amil</strong> em cada sessão da lista.
                 </p>
                 {resultadoGuias.guias.length > 0 && (
                   <div className="tabela-rolagem">
@@ -257,7 +317,7 @@ function AgendaPage({ url }: { url: URLSearchParams }) {
                             <td className="sb-strong">{g.paciente}</td>
                             <td>
                               {g.procedimento}
-                              <span className="texto-suave mono">TUSS {g.codigo}</span>
+                              <span className="texto-suave mono">código {g.codigo}</span>
                             </td>
                             <td className="sb-mono sb-end">{g.sessao}</td>
                             <td className="sb-end">
@@ -466,13 +526,42 @@ function AgendaPage({ url }: { url: URLSearchParams }) {
                             ) : (
                               s.motivo && <span className="texto-suave">{s.motivo}</span>
                             )}
+                            {s.pedeToken && data === hojeISO() && podeEditar && s.situacao !== "cancelada" && (
+                              <TokenSessao key={`${s.id}-${s.token ?? ""}`} sessao={s} aoSalvar={agenda.recarregar} />
+                            )}
                             {s.guia && (
                               <span className="texto-suave">
                                 Guia <span className="mono">{s.guia.numero}</span> ·{" "}
                                 <a href={guiaTissService.urlXml(s.guia.id)} download>
                                   XML
                                 </a>
+                                {s.guia.enviada && ` · ${s.guia.situacao}`}
+                                {s.guia.senha && (
+                                  <>
+                                    {" "}· senha <span className="mono">{s.guia.senha}</span>
+                                    {s.guia.validadeSenha && ` até ${formatarData(s.guia.validadeSenha)}`}
+                                  </>
+                                )}
                               </span>
+                            )}
+                            {s.guia && (s.guia.glosas.length > 0 || s.guia.erro) && (
+                              <ul className="pendencias" style={{ marginTop: 4 }}>
+                                {s.guia.erro && <li>{s.guia.erro}</li>}
+                                {s.guia.glosas.map((g) => (
+                                  <li key={g}>Glosa {g}</li>
+                                ))}
+                              </ul>
+                            )}
+                            {s.guia?.podeEnviar && podeEditar && (
+                              <button
+                                type="button"
+                                className="sb-btn sb-btn--sm"
+                                style={{ marginTop: 4 }}
+                                disabled={enviando !== null}
+                                onClick={() => enviarGuia(s.guia!.id)}
+                              >
+                                {enviando === s.guia.id ? "Enviando…" : s.guia.erro ? "Tentar de novo" : "Enviar à Amil"}
+                              </button>
                             )}
                           </td>
                         </tr>

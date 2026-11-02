@@ -41,13 +41,14 @@ mesmo servidor na **AWS (EC2)**. Não usamos Neon nem Vercel.
   por semana e os PDFs, na página do paciente; envio em lote com vínculo
   automático ao paciente.
 
-## Integração AnClinic → Amil (em construção)
+## Integração AnClinic → Amil (homologação)
 
-Objetivo: solicitar as autorizações sozinho, na véspera (D-1), a partir da
-agenda do AnClinic, pelo webservice TISS da Amil (padrão TISS 4.03.00).
-**Etapa atual:** importação, conferência dos dados e geração do XML das guias
-de solicitação. O envio à Amil entra quando ela liberar o acesso ao
-webservice (por ora, só o ambiente de homologação).
+Objetivo: solicitar as autorizações a partir da agenda do AnClinic, pelo
+webservice TISS da Amil (padrão TISS 4.03.00). Na Amil cada sessão é um
+pedido e leva o token que o paciente gera no próprio dia, por isso a guia é
+pedida no dia da sessão (e não na véspera). Importação, conferência, geração
+do XML, elegibilidade e envio estão prontos e foram testados no ambiente de
+homologação da Amil; veja as limitações no fim desta seção.
 
 Rotina:
 
@@ -68,15 +69,59 @@ Rotina:
    selecionadas) monta as guias de solicitação de SP/SADT: uma guia por
    sessão, com quantidade 1. O médico solicitante (conselho, UF,
    CBO, indicação clínica/CID) vem do pedido médico; o procedimento vai pelo
-   código TUSS (tabela 22), o padrão pedido pela Amil. Cada XML é validado
+   código do de/para da operadora (na Amil, o do portal — ex.: 60101490 "Tea
+   Fonoaudiologia", tabela 22) ou, sem de/para, pelo TUSS. A guia vai com
+   etapa 1 (autorização prévia): na Amil cada sessão é um pedido. Cada XML é validado
    contra os schemas oficiais da ANS (`src/lib/tiss/schemas/v4_03_00`) antes
    de ser gravado, e fica para baixar e conferir (ISO-8859-1, com o hash MD5
    do padrão). A sessão mostra o número da última guia gerada.
+   **Token do paciente (Amil):** no dia da sessão a equipe pega com o
+   paciente o token (app ou SMS da Amil) e digita no campo da sessão, na
+   Agenda. A guia leva o token no `codValidacao`; sem o token do dia, a
+   sessão fica com a pendência "Sem token do paciente do dia da sessão". O
+   token vale só no dia: guia de outro dia não é enviada.
+   **Enviar à Amil** (na sessão) manda a guia ao webservice
+   `solicitacaoProcedimento` (SOAP em UTF-8, por enquanto só no endereço de
+   homologação) e grava a resposta na guia: status (autorizada, em análise,
+   negada…), número da guia na operadora, senha e validade, glosas ou o erro
+   de comunicação. O login e a senha do portal entram no cabeçalho só na hora
+   do envio (a senha em MD5, como o manual da Amil pede); o XML gravado e o
+   baixado não levam a senha. Configuração no `.env`: `TISS_AMIL_URL`,
+   `TISS_AMIL_LOGIN` e `TISS_AMIL_SENHA`.
+   **Regras da resposta** (`src/lib/regras/guiaSessao.ts`):
+   - Cada guia é enviada uma vez só (trava no banco contra dois cliques). Se
+     o envio nem chegou à operadora (sem conexão, HTTP 4xx), dá para tentar
+     de novo.
+   - A guia autorizada (status 1, ou 7 com quantidade liberada) cobre a
+     sessão só na data em que foi gerada e até a validade da senha. Sessão
+     remarcada para outro dia, ou senha vencida, pede guia nova.
+   - Item com quantidade autorizada 0 vale como negado. Quantidade vazia ou
+     ilegível, status 7 sem quantidade, envio sem resposta (60 s ou HTTP 5xx)
+     e resposta fora do padrão TISS deixam a sessão com a pendência
+     "Confira no portal da Amil": a guia pode ter sido recebida, então o
+     sistema não gera outra. Resolve-se lançando a senha no AnClinic.
+   - Guia em análise na operadora (status 2, 4 ou 5) impede guia nova;
+     negada, cancelada ou recusada (mensagem de erro, SOAP Fault) libera.
 4. **Atendimentos → Aguardando confirmação:** ao aprovar a autorização, as
    sessões que ela cobre vão para Atendimentos (a tela da autorização mostra
    quantas); o operador confirma cada uma depois que ela acontece, ou cancela.
    A autorização cobre a sessão pelo código do procedimento ou, nas lançadas
    à mão, pelo nome/especialidade (ex.: "Psicologia" cobre "PSICOLOGIA ABA").
+
+**Limitações conhecidas** (estado em 02/11/2026):
+
+- Só o endereço de **homologação** foi usado; produção precisa do endereço e
+  das credenciais de produção no `.env` e de um teste com paciente real.
+- **Códigos do portal:** só a fonoaudiologia tem código confirmado (60101490
+  "Tea Fonoaudiologia"). Psicologia, terapia ocupacional e ABA precisam do
+  código do portal da Amil no de/para (**Procedimentos**); sem ele vai o TUSS,
+  que a homologação recusou (glosa 2514 "serviço não contratado").
+- **Sem certificado digital ICP-Brasil (A1):** o envio do pedido médico
+  (`envioDocumento`, assinado) não foi feito; o pedido segue pelo portal.
+- **Glosa 3145** ("não autorizado por motivo técnico") apareceu na
+  homologação sem causa conhecida; o sistema trata o item como negado.
+- Não há consulta do status depois (`solicitacaoStatusAutorizacao`): guia em
+  análise ou a conferir é acompanhada no portal.
 
 **Unidade de atendimento:** vem da coluna "Unidade de Atendimento" do
 AnClinic. Para atribuir ou trocar, marque as sessões na **Agenda** (há o filtro
@@ -549,5 +594,7 @@ o schema — no servidor, o `migrate deploy` vai aplicá-la.
 
 - Tela para editar autorização (vigência, protocolo, código TUSS) — a API já
   existe (`PUT /api/autorizacoes/:id`).
-- Envio das solicitações à Amil pelo webservice TISS (aguardando a liberação
-  do acesso), consulta do status e relatório do que foi aprovado ou negado.
+- Amil: passar para produção, códigos do portal das outras terapias,
+  consulta do status (`solicitacaoStatusAutorizacao`), envio do pedido médico
+  assinado (precisa do certificado A1) e relatório do que foi aprovado ou
+  negado.

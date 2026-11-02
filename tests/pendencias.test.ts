@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { codigoParaGuia, codigosAceitos, codigoTuss } from "@/lib/regras/codigoGuia";
+import { codigoParaGuia, codigosAceitos } from "@/lib/regras/codigoGuia";
 import { analisarSessao, mesmoProcedimento, pedidoDaSessao, type ContextoAnalise, type SessaoParaAnalise } from "@/lib/regras/pendencias";
 
 const AMIL = "conv-amil";
@@ -19,6 +19,7 @@ const sessao = (p: Partial<SessaoParaAnalise> = {}): SessaoParaAnalise => ({
   procedimento: { codigoGuia: "50000470", codigosAceitos: ["50000470"] },
   profissional: { conselho: "CRP", numeroConselho: "123", ufConselho: "SP", cbo: "251510", convenioIds: [AMIL] },
   unidade: { cnes: "4160088" },
+  token: { valor: "482913", dia: p.data ?? "2026-09-28" },
   ...p,
 });
 
@@ -104,6 +105,26 @@ describe("analisarSessao", () => {
     expect(pedidoDaSessao([antigo, novo], AMIL, "2026-09-28")?.id).toBe("novo");
     expect(pedidoDaSessao([antigo, novo], AMIL, "2026-08-01")?.id).toBe("antigo");
   });
+  it("guia autorizada pela operadora cobre a sessão", () => {
+    expect(analisarSessao(sessao({ token: null, guiaAutorizada: { numero: 18, senha: "EX1" } }), ctx())).toEqual({
+      situacao: "coberta",
+      pendencias: [],
+      motivo: "Guia 18 autorizada pela operadora (senha EX1).",
+    });
+  });
+  it("guia a conferir deixa a sessão pendente, com o motivo", () => {
+    expect(analisarSessao(sessao({ guiaConferir: { numero: 19, motivo: "a operadora não respondeu ao envio" } }), ctx())).toEqual({
+      situacao: "pendente",
+      pendencias: ["Guia 19: a operadora não respondeu ao envio. Confira no portal da Amil"],
+    });
+  });
+  it("Amil: sem token, ou com token de outro dia, fica pendente", () => {
+    const pend = "Sem token do paciente do dia da sessão";
+    expect(analisarSessao(sessao({ token: null }), ctx())).toEqual({ situacao: "pendente", pendencias: [pend] });
+    expect(analisarSessao(sessao({ token: { valor: "482913", dia: "2026-09-27" } }), ctx()).pendencias).toEqual([pend]);
+    const outro = { id: AMIL, integracao: "tiss_outra", codigoPrestador: "1", codigoAns: "000001" };
+    expect(analisarSessao(sessao({ token: null, convenio: outro }), ctx()).situacao).toBe("pronta");
+  });
 });
 
 describe("codigoParaGuia", () => {
@@ -119,11 +140,6 @@ describe("codigoParaGuia", () => {
   it("sem de/para, usa o TUSS do procedimento", () => {
     expect(codigoParaGuia(proc, "outro")).toEqual({ codigo: "50000470", tabela: "22", origem: "tuss" });
     expect(codigoParaGuia({ codigoTuss: null, tabelaTuss: null }, "amil")).toBeNull();
-  });
-  it("código TUSS para a Amil, que só aceita a tabela 22", () => {
-    expect(codigoTuss(proc, "amil")).toBe("50000470");
-    expect(codigoTuss({ ...proc, equivalencias: [{ convenioId: "amil", codigo: "50000560", tabela: "22", codigoTuss: null }] }, "amil")).toBe("50000560");
-    expect(codigoTuss({ codigoTuss: null, tabelaTuss: null, equivalencias: [{ convenioId: "amil", codigo: "9001", tabela: "98", codigoTuss: null }] }, "amil")).toBeNull();
   });
 });
 

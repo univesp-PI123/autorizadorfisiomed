@@ -4,6 +4,7 @@ import { exigirSessao } from "@/lib/auth/sessao";
 import { deDate, ehDataISO, hojeISO, paraDate } from "@/lib/datas";
 import { prisma } from "@/lib/prisma";
 import type { SituacaoSessao } from "@/lib/regras/pendencias";
+import { situacaoDaGuia } from "@/lib/tiss/envio";
 
 const SITUACOES: SituacaoSessao[] = ["pendente", "pronta", "coberta", "fora", "cancelada"];
 
@@ -18,14 +19,31 @@ export const GET = rota(async (req) => {
   const situacao = sp.get("situacao") as SituacaoSessao | null;
 
   const sessoes = await analisarAgendamentos({ data: paraDate(data), ...(convenioId && { convenioId }) });
-  // Última guia TISS gerada com cada sessão.
+  // Última guia TISS gerada com cada sessão, com a resposta da operadora.
   const guias = await prisma.guiaTiss.findMany({
     where: { agendamentoIds: { hasSome: sessoes.map((s) => s.agendamento.id) } },
-    select: { id: true, numero: true, agendamentoIds: true },
+    select: {
+      id: true, numero: true, agendamentoIds: true, enviadaEm: true, statusOperadora: true, senhaOperadora: true,
+      validadeSenha: true, glosas: true, erroEnvio: true, conferir: true, createdAt: true, convenio: { select: { integracao: true } },
+    },
     orderBy: { numero: "desc" },
   });
-  const guiaDaSessao = new Map<string, { id: string; numero: number }>();
-  for (const g of guias) for (const id of g.agendamentoIds) if (!guiaDaSessao.has(id)) guiaDaSessao.set(id, { id: g.id, numero: g.numero });
+  const guiaDaSessao = new Map<string, (typeof guias)[number]>();
+  for (const g of guias) for (const id of g.agendamentoIds) if (!guiaDaSessao.has(id)) guiaDaSessao.set(id, g);
+  const resumoGuia = (g: (typeof guias)[number] | undefined) =>
+    g && {
+      id: g.id,
+      numero: g.numero,
+      situacao: situacaoDaGuia(g),
+      enviada: !!g.enviadaEm,
+      // Só no dia em que foi gerada: o token do paciente vale só nesse dia.
+      // Cada guia vai uma vez; volta a poder ir só se não chegou à operadora.
+      podeEnviar: g.convenio.integracao === "tiss_amil" && !g.enviadaEm && hojeISO(g.createdAt) === hojeISO(),
+      senha: g.senhaOperadora,
+      validadeSenha: g.validadeSenha && deDate(g.validadeSenha),
+      glosas: g.glosas,
+      erro: g.erroEnvio,
+    };
 
   const analisadas = sessoes.map(
     ({ agendamento: a, codigo, ...analise }) => ({
@@ -53,13 +71,17 @@ export const GET = rota(async (req) => {
       },
       unidade: a.unidade && { id: a.unidade.id, nome: a.unidade.nome },
       unidadeManual: a.unidadeManual,
+      // Pede o token na sessão da Amil; ele só vale se foi informado no dia.
+      pedeToken: a.convenio?.integracao === "tiss_amil",
+      token: a.tokenBeneficiario,
+      tokenDoDia: !!a.tokenInformadoEm && hojeISO(a.tokenInformadoEm) === deDate(a.data),
       statusAnclinic: a.statusAnclinic,
       agendamentosRestantes: a.agendamentosRestantes,
       atendimento: a.atendimento,
       situacao: analise.situacao,
       pendencias: analise.pendencias,
       motivo: analise.motivo,
-      guia: guiaDaSessao.get(a.id) ?? null,
+      guia: resumoGuia(guiaDaSessao.get(a.id)) ?? null,
     }),
   );
 

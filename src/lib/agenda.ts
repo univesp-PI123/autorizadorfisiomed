@@ -3,10 +3,11 @@
 // geração automática dos atendimentos.
 
 import type { Prisma } from "@prisma/client";
-import { deDate } from "@/lib/datas";
+import { deDate, hojeISO } from "@/lib/datas";
 import { prisma } from "@/lib/prisma";
-import { codigoParaGuia, codigosAceitos, codigoTuss, type ProcedimentoComCodigos } from "@/lib/regras/codigoGuia";
+import { codigoParaGuia, codigosAceitos } from "@/lib/regras/codigoGuia";
 import { analisarSessao, type ContextoAnalise } from "@/lib/regras/pendencias";
+import { guiaQueDecide, type GuiaParaSessao } from "@/lib/regras/guiaSessao";
 
 const INCLUIR = {
   paciente: { select: { id: true, nome: true } },
@@ -27,12 +28,30 @@ const INCLUIR = {
   atendimento: { select: { id: true, situacao: true } },
 } satisfies Prisma.AgendamentoInclude;
 
-// A Amil só aceita a TUSS (tabela 22); as demais operadoras recebem o código
-// do de/para.
-function codigoNaGuia(proc: ProcedimentoComCodigos, convenio: { id: string; integracao: string } | null) {
-  if (convenio?.integracao !== "tiss_amil") return codigoParaGuia(proc, convenio?.id ?? null);
-  const codigo = codigoTuss(proc, convenio.id);
-  return codigo ? { codigo, tabela: "22", origem: "tuss" as const } : null;
+/** Campos da guia TISS que decidem o efeito dela na sessão. */
+export const GUIA_PARA_SESSAO = {
+  numero: true, agendamentoIds: true, statusOperadora: true, senhaOperadora: true,
+  validadeSenha: true, dataSessao: true, conferir: true,
+} satisfies Prisma.GuiaTissSelect;
+
+type GuiaDoBanco = Prisma.GuiaTissGetPayload<{ select: typeof GUIA_PARA_SESSAO }>;
+
+/** Guias de cada sessão (id do agendamento), já com as datas em YYYY-MM-DD. */
+export function guiasParaSessao(guias: GuiaDoBanco[]): Map<string, GuiaParaSessao[]> {
+  const porSessao = new Map<string, GuiaParaSessao[]>();
+  for (const g of guias) {
+    const guia = { ...g, validadeSenha: g.validadeSenha && deDate(g.validadeSenha), dataSessao: g.dataSessao && deDate(g.dataSessao) };
+    for (const id of g.agendamentoIds) porSessao.set(id, [...(porSessao.get(id) ?? []), guia]);
+  }
+  return porSessao;
+}
+
+function efeitoDasGuias(guias: GuiaParaSessao[], data: string) {
+  const d = guiaQueDecide(guias, data);
+  return {
+    guiaAutorizada: d?.efeito === "cobre" ? { numero: d.guia.numero, senha: d.guia.senhaOperadora } : null,
+    guiaConferir: d?.efeito === "conferir" ? { numero: d.guia.numero, motivo: d.guia.conferir! } : null,
+  };
 }
 
 export async function analisarAgendamentos(where: Prisma.AgendamentoWhereInput) {
@@ -43,7 +62,7 @@ export async function analisarAgendamentos(where: Prisma.AgendamentoWhereInput) 
   });
 
   const pacienteIds = [...new Set(agendamentos.map((a) => a.pacienteId).filter((id): id is string => !!id))];
-  const [clinica, pedidos, autorizacoes] = await Promise.all([
+  const [clinica, pedidos, autorizacoes, guias] = await Promise.all([
     prisma.clinica.findFirst({ select: { id: true } }),
     prisma.pedidoMedico.findMany({
       where: { pacienteId: { in: pacienteIds }, ativo: true },
@@ -59,7 +78,13 @@ export async function analisarAgendamentos(where: Prisma.AgendamentoWhereInput) 
         dataFimVigencia: true, quantidadeAutorizada: true, quantidadeUtilizada: true,
       },
     }),
+    prisma.guiaTiss.findMany({
+      where: { agendamentoIds: { hasSome: agendamentos.map((a) => a.id) } },
+      select: GUIA_PARA_SESSAO,
+      orderBy: { numero: "desc" },
+    }),
   ]);
+  const guiasDaSessao = guiasParaSessao(guias);
 
   const contextos = new Map<string, ContextoAnalise>();
   const contexto = (pacienteId: string | null): ContextoAnalise => {
@@ -98,7 +123,7 @@ export async function analisarAgendamentos(where: Prisma.AgendamentoWhereInput) 
   };
 
   return agendamentos.map((a) => {
-    const codigo = a.procedimento ? codigoNaGuia(a.procedimento, a.convenio) : null;
+    const codigo = a.procedimento ? codigoParaGuia(a.procedimento, a.convenio?.id ?? null) : null;
     const analise = analisarSessao(
       {
         data: deDate(a.data),
@@ -120,6 +145,8 @@ export async function analisarAgendamentos(where: Prisma.AgendamentoWhereInput) 
           convenioIds: a.profissional.credenciamentos.map((c) => c.convenioId),
         },
         unidade: a.unidade,
+        token: a.tokenBeneficiario && a.tokenInformadoEm ? { valor: a.tokenBeneficiario, dia: hojeISO(a.tokenInformadoEm) } : null,
+        ...efeitoDasGuias(guiasDaSessao.get(a.id) ?? [], deDate(a.data)),
       },
       contexto(a.pacienteId),
     );

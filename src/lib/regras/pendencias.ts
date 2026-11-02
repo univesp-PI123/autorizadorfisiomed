@@ -3,7 +3,8 @@
 //   cancelada  — desmarcada/cancelada no AnClinic ou excluída da agenda
 //   fora       — convênio sem integração, não vinculado, ou sessão que não
 //                exige autorização (faturamento por "Assinatura")
-//   coberta    — já existe autorização vigente com saldo (ou senha no AnClinic)
+//   coberta    — já existe autorização vigente com saldo, senha no AnClinic
+//                ou guia autorizada pela operadora
 //   pronta     — tem tudo o que a guia TISS exige: pode ser solicitada
 //   pendente   — falta algum dado; a lista diz qual
 //
@@ -55,6 +56,13 @@ export type SessaoParaAnalise = {
     convenioIds: string[];
   } | null;
   unidade: { cnes: string | null } | null;
+  // Token do beneficiário e o dia (YYYY-MM-DD) em que a equipe o informou.
+  token: { valor: string; dia: string } | null;
+  // Guia enviada pelo sistema e autorizada pela operadora (status 1 ou 7)
+  // para esta data e dentro da validade da senha (regras/guiaSessao.ts).
+  guiaAutorizada?: { numero: number; senha: string | null } | null;
+  // Guia que a equipe precisa conferir no portal da operadora.
+  guiaConferir?: { numero: number; motivo: string } | null;
 };
 
 export type PedidoParaAnalise = {
@@ -130,6 +138,14 @@ export function analisarSessao(
   );
   if (cobertura) return { situacao: "coberta", pendencias: [], motivo: "Autorização vigente com saldo.", autorizacaoId: cobertura.id };
   if (s.senhaAutorizacao) return { situacao: "coberta", pendencias: [], motivo: `Senha ${s.senhaAutorizacao} no AnClinic.` };
+  if (s.guiaAutorizada) {
+    const { numero, senha } = s.guiaAutorizada;
+    return { situacao: "coberta", pendencias: [], motivo: `Guia ${numero} autorizada pela operadora${senha ? ` (senha ${senha})` : ""}.` };
+  }
+  if (s.guiaConferir) {
+    const { numero, motivo } = s.guiaConferir;
+    return { situacao: "pendente", pendencias: [`Guia ${numero}: ${motivo}. Confira no portal da Amil`] };
+  }
 
   if (s.convenio.integracao === "manual") return { situacao: "fora", pendencias: [], motivo: "Convênio sem envio automático." };
   if (!exigeAutorizacao(s.statusFaturamento)) {
@@ -144,6 +160,11 @@ export function analisarSessao(
   else if (!s.unidade.cnes) pendencias.push("Unidade sem CNES");
   if (!s.pacienteId) pendencias.push("Paciente não identificado");
   if (!s.carteirinha) pendencias.push("Sem carteirinha");
+  // A Amil exige o token do paciente na guia; ele vale só no dia em que foi
+  // gerado, que tem de ser o dia da sessão.
+  if (s.convenio.integracao === "tiss_amil" && (!s.token || s.token.dia !== s.data)) {
+    pendencias.push("Sem token do paciente do dia da sessão");
+  }
   if (!s.procedimento) pendencias.push("Sem procedimento");
   else if (!codigoGuia) pendencias.push("Procedimento sem código para a operadora");
   const p = s.profissional;

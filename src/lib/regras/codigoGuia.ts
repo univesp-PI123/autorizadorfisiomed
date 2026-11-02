@@ -21,13 +21,3 @@ export function codigosAceitos(proc: ProcedimentoComCodigos, convenioId: string 
   return [...new Set([eq?.codigo, eq?.codigoTuss, proc.codigoTuss].filter((c): c is string => !!c))];
 }
 
-/**
- * Código TUSS (tabela 22) do procedimento. A Amil recebe as solicitações só
- * pela TUSS: vale o TUSS do de/para da operadora, o próprio código do de/para
- * quando ele já é da tabela 22 ou, sem de/para, o TUSS do procedimento.
- */
-export function codigoTuss(proc: ProcedimentoComCodigos, convenioId: string | null): string | null {
-  const eq = convenioId ? proc.equivalencias?.find((e) => e.convenioId === convenioId) : undefined;
-  if (eq) return eq.codigoTuss ?? (eq.tabela === "22" ? eq.codigo : null) ?? proc.codigoTuss;
-  return proc.codigoTuss;
-}
