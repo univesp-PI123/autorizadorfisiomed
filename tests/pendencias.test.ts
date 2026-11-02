@@ -112,6 +112,12 @@ describe("analisarSessao", () => {
       motivo: "Guia 18 autorizada pela operadora (senha EX1).",
     });
   });
+  it("guia a conferir deixa a sessão pendente, com o motivo", () => {
+    expect(analisarSessao(sessao({ guiaConferir: { numero: 19, motivo: "a operadora não respondeu ao envio" } }), ctx())).toEqual({
+      situacao: "pendente",
+      pendencias: ["Guia 19: a operadora não respondeu ao envio. Confira no portal da Amil"],
+    });
+  });
   it("Amil: sem token, ou com token de outro dia, fica pendente", () => {
     const pend = "Sem token do paciente do dia da sessão";
     expect(analisarSessao(sessao({ token: null }), ctx())).toEqual({ situacao: "pendente", pendencias: [pend] });

@@ -24,7 +24,7 @@ export const GET = rota(async (req) => {
     where: { agendamentoIds: { hasSome: sessoes.map((s) => s.agendamento.id) } },
     select: {
       id: true, numero: true, agendamentoIds: true, enviadaEm: true, statusOperadora: true, senhaOperadora: true,
-      validadeSenha: true, glosas: true, erroEnvio: true, createdAt: true, convenio: { select: { integracao: true } },
+      validadeSenha: true, glosas: true, erroEnvio: true, conferir: true, createdAt: true, convenio: { select: { integracao: true } },
     },
     orderBy: { numero: "desc" },
   });
@@ -37,7 +37,8 @@ export const GET = rota(async (req) => {
       situacao: situacaoDaGuia(g),
       enviada: !!g.enviadaEm,
       // Só no dia em que foi gerada: o token do paciente vale só nesse dia.
-      podeEnviar: g.convenio.integracao === "tiss_amil" && !g.statusOperadora && hojeISO(g.createdAt) === hojeISO(),
+      // Cada guia vai uma vez; volta a poder ir só se não chegou à operadora.
+      podeEnviar: g.convenio.integracao === "tiss_amil" && !g.enviadaEm && hojeISO(g.createdAt) === hojeISO(),
       senha: g.senhaOperadora,
       validadeSenha: g.validadeSenha && deDate(g.validadeSenha),
       glosas: g.glosas,

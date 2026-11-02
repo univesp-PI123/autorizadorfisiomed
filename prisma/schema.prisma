@@ -521,19 +521,20 @@ model ProcedimentoOperadora {
 // enquanto só o XML, para baixar e conferir; o envio à operadora (protocolo,
 // resposta) entra junto com o webservice.
 model GuiaTiss {
-  id                 String   @id @default(uuid()) @db.Uuid
-  numero             Int      @unique @default(autoincrement()) // nº da guia no prestador
-  convenioId         String   @db.Uuid
-  pacienteId         String   @db.Uuid
-  pedidoId           String?  @db.Uuid
-  agendamentoIds     String[] @db.Uuid // sessões da agenda cobertas pelo pedido
-  codigoProcedimento String   @db.VarChar(10)
+  id                 String    @id @default(uuid()) @db.Uuid
+  numero             Int       @unique @default(autoincrement()) // nº da guia no prestador
+  convenioId         String    @db.Uuid
+  pacienteId         String    @db.Uuid
+  pedidoId           String?   @db.Uuid
+  agendamentoIds     String[]  @db.Uuid // sessões da agenda cobertas pelo pedido
+  dataSessao         DateTime? @db.Date // dia da sessão quando a guia foi gerada
+  codigoProcedimento String    @db.VarChar(10)
   quantidade         Int
-  versaoTiss         String   @db.VarChar(8)
+  versaoTiss         String    @db.VarChar(8)
   xml                String // como vai para a operadora (ISO-8859-1)
-  hash               String   @db.VarChar(32)
-  usuarioId          String?  @db.Uuid
-  createdAt          DateTime @default(now())
+  hash               String    @db.VarChar(32)
+  usuarioId          String?   @db.Uuid
+  createdAt          DateTime  @default(now())
 
   // Envio ao webservice da operadora (solicitacaoProcedimento) e a resposta.
   enviadaEm           DateTime?
@@ -543,6 +544,7 @@ model GuiaTiss {
   validadeSenha       DateTime? @db.Date
   glosas              String[] // "código - descrição" das negativas e mensagens de erro
   erroEnvio           String? // falha de comunicação ou tissFault
+  conferir            String? // resposta sem o que foi liberado, ou envio sem resposta: conferir no portal
   respostaXml         String?
 
   convenio Convenio      @relation(fields: [convenioId], references: [id])

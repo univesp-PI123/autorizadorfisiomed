@@ -64,25 +64,47 @@ export type GuiaEnviada = {
 export async function enviarGuia(id: string): Promise<GuiaEnviada> {
   const guia = await prisma.guiaTiss.findUnique({
     where: { id },
-    select: { id: true, xml: true, statusOperadora: true, createdAt: true, convenio: { select: { integracao: true } } },
+    select: { id: true, xml: true, createdAt: true, convenio: { select: { integracao: true } } },
   });
   if (!guia) naoEncontrado("Guia");
   if (guia.convenio.integracao !== "tiss_amil") throw new ErroHttp(422, "Só as guias da Amil são enviadas pelo webservice.");
-  // Guia que a operadora já respondeu não vai de novo: o número da guia no
-  // prestador seria repetido. Negada ou cancelada, gera-se uma guia nova.
-  if (guia.statusOperadora) {
-    throw new ErroHttp(409, `A operadora já respondeu esta guia (${STATUS_SOLICITACAO[guia.statusOperadora] ?? guia.statusOperadora}).`);
-  }
 
   // A guia leva o token do paciente, que vale só no dia em que foi gerado.
   if (hojeISO(guia.createdAt) !== hojeISO()) {
     throw new ErroHttp(409, "O token desta guia já venceu (vale só no dia). Pegue um novo token com o paciente e gere a guia de novo.");
   }
+  const config = exigirConfig();
 
-  const envio = await enviarSoap(guia.xml, exigirConfig());
+  // Cada guia vai uma vez só: o número da guia no prestador não se repete na
+  // operadora. A marcação é atômica, para dois cliques não enviarem duas vezes.
+  const reservada = await prisma.guiaTiss.updateMany({ where: { id, enviadaEm: null }, data: { enviadaEm: new Date() } });
+  if (!reservada.count) throw new ErroHttp(409, "Esta guia já foi enviada à operadora.");
+
+  const envio = await enviarSoap(guia.xml, config);
+  if (!envio.ok && !envio.chegou) {
+    // Não chegou à operadora: a guia volta a poder ser enviada.
+    await prisma.guiaTiss.update({ where: { id }, data: { enviadaEm: null, erroEnvio: envio.erro, respostaXml: envio.resposta ?? null } });
+    return {
+      id,
+      statusOperadora: null,
+      situacao: "Não chegou à operadora",
+      numeroGuiaOperadora: null,
+      senhaOperadora: null,
+      validadeSenha: null,
+      glosas: [],
+      erroEnvio: envio.erro,
+    };
+  }
   const lida = envio.ok ? lerRespostaSolicitacao(envio.resposta) : null;
   const dados = {
     enviadaEm: new Date(),
+    conferir: !envio.ok
+      ? "a operadora não respondeu ao envio"
+      : lida?.tipo === "autorizacao"
+        ? lida.conferir
+        : lida?.tipo === "falha" && !/Fault/.test(envio.resposta)
+          ? "a resposta da operadora veio fora do padrão TISS"
+          : null,
     respostaXml: envio.resposta ?? null,
     statusOperadora: lida?.tipo === "autorizacao" ? lida.status : null,
     numeroGuiaOperadora: lida?.tipo === "autorizacao" ? lida.numeroGuiaOperadora?.slice(0, 20) ?? null : null,
@@ -109,8 +131,15 @@ export async function enviarGuia(id: string): Promise<GuiaEnviada> {
 }
 
 /** Situação da guia em relação à operadora, em uma palavra para a tela. */
-export function situacaoDaGuia(g: { enviadaEm: Date | null; statusOperadora: string | null; erroEnvio: string | null; glosas: string[] }) {
-  if (!g.enviadaEm) return "Não enviada";
+export function situacaoDaGuia(g: {
+  enviadaEm: Date | null;
+  statusOperadora: string | null;
+  erroEnvio: string | null;
+  glosas: string[];
+  conferir: string | null;
+}) {
+  if (!g.enviadaEm) return g.erroEnvio ? "Não chegou à operadora" : "Não enviada";
+  if (g.conferir) return "Conferir no portal";
   if (g.statusOperadora) return STATUS_SOLICITACAO[g.statusOperadora] ?? `Status ${g.statusOperadora}`;
   if (g.erroEnvio) return "Falha no envio";
   return g.glosas.length ? "Recusada pela operadora" : "Sem resposta";

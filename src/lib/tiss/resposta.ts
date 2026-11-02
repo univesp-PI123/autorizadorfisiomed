@@ -23,6 +23,12 @@ function campos(xml: string, tag: string): string[] {
 }
 const campo = (xml: string, tag: string) => campos(xml, tag)[0] ?? null;
 
+/** Como campos(), mas mantém as ocorrências vazias ou com elementos dentro. */
+function camposComVazios(xml: string, tag: string): string[] {
+  const re = new RegExp(`<(?:[\\w-]+:)?${tag}(?:\\s[^>]*?)?(?:/>|>([\\s\\S]*?)</(?:[\\w-]+:)?${tag}>)`, "g");
+  return [...xml.matchAll(re)].map((m) => decodificar(m[1] ?? ""));
+}
+
 /** Conteúdo do primeiro elemento composto com esse nome. */
 function trecho(xml: string, tag: string): string | null {
   const re = new RegExp(`<(?:[\\w-]+:)?${tag}(?:\\s[^>]*)?>([\\s\\S]*?)</(?:[\\w-]+:)?${tag}>`);
@@ -51,6 +57,9 @@ export type RespostaSolicitacao =
       validadeSenha: string | null; // YYYY-MM-DD
       glosas: string[];
       observacao: string | null;
+      // Autorizada, mas sem dar para saber quanto foi liberado: a equipe
+      // confere no portal antes de a sessão contar como coberta.
+      conferir: string | null;
     }
   | { tipo: "erro"; glosas: string[] } // mensagemErro: a operadora recusou a mensagem
   | { tipo: "falha"; mensagem: string }; // SOAP Fault ou resposta que não é TISS
@@ -65,10 +74,19 @@ export function lerRespostaSolicitacao(xml: string): RespostaSolicitacao {
     const negativa = trecho(servico, "motivosNegativa");
     // A Amil pode responder "autorizada" na guia com o item negado
     // (quantidadeAutorizada 0 e glosa): vale o que foi liberado nos itens.
-    const autorizadas = campos(servico, "quantidadeAutorizada").map(Number);
-    if ((status === "1" || status === "7") && autorizadas.length) {
-      if (autorizadas.every((q) => q === 0)) status = "3";
-      else if (autorizadas.some((q) => q === 0)) status = "7";
+    // Quantidade vazia ou que não é número não vale como liberada; status 7
+    // sem quantidade não diz o que foi liberado. Status 1 sem quantidade é
+    // autorização da guia inteira.
+    let conferir: string | null = null;
+    const autorizadas = camposComVazios(servico, "quantidadeAutorizada");
+    if (status === "1" || status === "7") {
+      if (autorizadas.some((q) => !/^\d+(\.\d+)?$/.test(q))) conferir = "Quantidade autorizada ilegível na resposta da operadora";
+      else if (!autorizadas.length && status === "7") conferir = "Autorização parcial sem a quantidade liberada";
+      else if (autorizadas.length) {
+        const q = autorizadas.map(Number);
+        if (q.every((n) => n === 0)) status = "3";
+        else if (q.some((n) => n === 0)) status = "7";
+      }
     }
     return {
       tipo: "autorizacao",
@@ -78,6 +96,7 @@ export function lerRespostaSolicitacao(xml: string): RespostaSolicitacao {
       validadeSenha: campo(servico, "dataValidadeSenha"),
       glosas: negativa ? glosasDe(negativa) : [],
       observacao: campo(servico, "observacao"),
+      conferir,
     };
   }
 

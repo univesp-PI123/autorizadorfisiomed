@@ -36,6 +36,7 @@ const ONDE_RESOLVER: [RegExp, string, boolean][] = [
   [/código do prestador|registro ANS/, "/convenios", true],
   [/pedido médico/i, "na página do paciente", false],
   [/token/, "no campo Token da sessão", false],
+  [/portal da Amil/, "no portal da Amil (ou lance a senha no AnClinic)", false],
 ];
 const ondeResolver = (p: string) => {
   const r = ONDE_RESOLVER.find(([re]) => re.test(p));
@@ -559,7 +560,7 @@ function AgendaPage({ url }: { url: URLSearchParams }) {
                                 disabled={enviando !== null}
                                 onClick={() => enviarGuia(s.guia!.id)}
                               >
-                                {enviando === s.guia.id ? "Enviando…" : s.guia.enviada ? "Reenviar à Amil" : "Enviar à Amil"}
+                                {enviando === s.guia.id ? "Enviando…" : s.guia.erro ? "Tentar de novo" : "Enviar à Amil"}
                               </button>
                             )}
                           </td>

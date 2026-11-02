@@ -1,15 +1,16 @@
 // Geração das guias de solicitação (SP/SADT) a partir das sessões da agenda.
 //
 // Só entram sessões "prontas" (regras/pendencias.ts) que ainda não têm guia
-// autorizada ou em andamento na operadora. Cada sessão vira uma guia, com
-// quantidade 1 (orientação da Fisiomed). Cada guia é validada contra
+// em análise na operadora (regras/guiaSessao.ts). Cada sessão vira uma guia,
+// com quantidade 1 (orientação da Fisiomed). Cada guia é validada contra
 // o schema da ANS antes de ser gravada.
 
-import { analisarAgendamentos } from "@/lib/agenda";
+import { analisarAgendamentos, GUIA_PARA_SESSAO, guiasParaSessao } from "@/lib/agenda";
 import { deDate, hojeISO } from "@/lib/datas";
 import { prisma } from "@/lib/prisma";
 import { pedidoDaSessao } from "@/lib/regras/pendencias";
-import { STATUS_EM_ANDAMENTO, STATUS_SOLICITACAO } from "@/lib/tiss/dominios";
+import { guiaQueDecide } from "@/lib/regras/guiaSessao";
+import { STATUS_SOLICITACAO } from "@/lib/tiss/dominios";
 import { montarSolicitacaoSpSadt, VERSAO_TISS } from "@/lib/tiss/solicitacao";
 import { validarMensagemTiss } from "@/lib/tiss/validarXsd";
 
@@ -38,19 +39,16 @@ function indicacaoDoPedido(indicacao: string | null, cid: string | null): string
 export async function gerarGuias(agendamentoIds: string[], usuarioId: string) {
   const [sessoes, jaPedidas] = await Promise.all([
     analisarAgendamentos({ id: { in: agendamentoIds } }),
-    prisma.guiaTiss.findMany({
-      where: { agendamentoIds: { hasSome: agendamentoIds }, statusOperadora: { in: [...STATUS_EM_ANDAMENTO] } },
-      select: { numero: true, statusOperadora: true, agendamentoIds: true },
-    }),
+    prisma.guiaTiss.findMany({ where: { agendamentoIds: { hasSome: agendamentoIds } }, select: GUIA_PARA_SESSAO }),
   ]);
-  const guiaEmAndamento = new Map(jaPedidas.flatMap((g) => g.agendamentoIds.map((id) => [id, g] as const)));
+  const guiasDaSessao = guiasParaSessao(jaPedidas);
 
   const recusadas: SessaoRecusada[] = [];
   const prontas = sessoes.filter((s) => {
     const motivo = (() => {
       if (s.situacao !== "pronta") return s.pendencias.length ? s.pendencias.join("; ") : (s.motivo ?? s.situacao);
-      const g = guiaEmAndamento.get(s.agendamento.id);
-      if (g) return `Guia ${g.numero} já está ${STATUS_SOLICITACAO[g.statusOperadora!].toLowerCase()} na operadora`;
+      const d = guiaQueDecide(guiasDaSessao.get(s.agendamento.id) ?? [], deDate(s.agendamento.data));
+      if (d?.efeito === "bloqueia") return `Guia ${d.guia.numero} já está ${STATUS_SOLICITACAO[d.guia.statusOperadora!].toLowerCase()} na operadora`;
       // O token só vale no dia em que o paciente o gerou.
       const t = s.agendamento.tokenInformadoEm;
       if (s.agendamento.tokenBeneficiario && t && hojeISO(t) !== hojeISO()) return `Token de ${ddmm(hojeISO(t))} venceu: pegue um novo com o paciente`;
@@ -135,6 +133,7 @@ export async function gerarGuias(agendamentoIds: string[], usuarioId: string) {
         pacienteId: a.pacienteId!,
         pedidoId: pedido.id,
         agendamentoIds: [a.id],
+        dataSessao: a.data,
         codigoProcedimento: codigo,
         quantidade: 1,
         versaoTiss: VERSAO_TISS,

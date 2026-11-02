@@ -58,8 +58,11 @@ export type SessaoParaAnalise = {
   unidade: { cnes: string | null } | null;
   // Token do beneficiário e o dia (YYYY-MM-DD) em que a equipe o informou.
   token: { valor: string; dia: string } | null;
-  // Guia enviada pelo sistema e autorizada pela operadora (status 1 ou 7).
+  // Guia enviada pelo sistema e autorizada pela operadora (status 1 ou 7)
+  // para esta data e dentro da validade da senha (regras/guiaSessao.ts).
   guiaAutorizada?: { numero: number; senha: string | null } | null;
+  // Guia que a equipe precisa conferir no portal da operadora.
+  guiaConferir?: { numero: number; motivo: string } | null;
 };
 
 export type PedidoParaAnalise = {
@@ -138,6 +141,10 @@ export function analisarSessao(
   if (s.guiaAutorizada) {
     const { numero, senha } = s.guiaAutorizada;
     return { situacao: "coberta", pendencias: [], motivo: `Guia ${numero} autorizada pela operadora${senha ? ` (senha ${senha})` : ""}.` };
+  }
+  if (s.guiaConferir) {
+    const { numero, motivo } = s.guiaConferir;
+    return { situacao: "pendente", pendencias: [`Guia ${numero}: ${motivo}. Confira no portal da Amil`] };
   }
 
   if (s.convenio.integracao === "manual") return { situacao: "fora", pendencias: [], motivo: "Convênio sem envio automático." };

@@ -1,9 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { montarPedidoElegibilidade } from "@/lib/tiss/elegibilidade";
 import { lerRespostaElegibilidade, lerRespostaSolicitacao } from "@/lib/tiss/resposta";
 import { montarSolicitacaoSpSadt, type DadosSolicitacaoSpSadt } from "@/lib/tiss/solicitacao";
 import { validarMensagemTiss } from "@/lib/tiss/validarXsd";
-import { configAmil, envelopeSoap } from "@/lib/tiss/webservice";
+import { configAmil, envelopeSoap, enviarSoap } from "@/lib/tiss/webservice";
 import { comLoginSenha, hashDoXml } from "@/lib/tiss/xml";
 
 const dados: DadosSolicitacaoSpSadt = {
@@ -100,15 +100,16 @@ describe("lerRespostaSolicitacao", () => {
       validadeSenha: "2026-11-24",
       glosas: [],
       observacao: null,
+      conferir: null,
     });
   });
 
-  const comItens = (...itens: [number, string?][]) =>
+  const comItensStatus = (status: string, ...itens: [number | string, string?][]) =>
     lerRespostaSolicitacao(
       envelope(
         `<ans:autorizacaoProcedimentoWS xmlns:ans="http://www.ans.gov.br/padroes/tiss/schemas">${cabecalho}` +
           "<ans:autorizacaoProcedimento><ans:autorizacaoServico><ans:dadosAutorizacao><ans:senha>EX1</ans:senha></ans:dadosAutorizacao>" +
-          "<ans:statusSolicitacao>1</ans:statusSolicitacao><ans:servicosAutorizados>" +
+          `<ans:statusSolicitacao>${status}</ans:statusSolicitacao><ans:servicosAutorizados>` +
           itens
             .map(([q, glosa]) =>
               `<ans:servicoAutorizado><ans:quantidadeSolicitada>1</ans:quantidadeSolicitada><ans:quantidadeAutorizada>${q}</ans:quantidadeAutorizada>` +
@@ -120,6 +121,8 @@ describe("lerRespostaSolicitacao", () => {
       ),
     );
 
+  const comItens = (...itens: [number | string, string?][]) => comItensStatus("1", ...itens);
+
   it("guia 'autorizada' com o item negado (quantidade 0) conta como negada, sem senha", () => {
     expect(comItens([0, "3145"])).toMatchObject({ status: "3", senha: null, glosas: ["3145"] });
   });
@@ -127,6 +130,17 @@ describe("lerRespostaSolicitacao", () => {
   it("um item liberado e outro negado é autorização parcial", () => {
     expect(comItens([1], [0, "3145"])).toMatchObject({ status: "7", senha: "EX1" });
     expect(comItens([1])).toMatchObject({ status: "1", senha: "EX1", glosas: [] });
+  });
+
+  it("quantidade autorizada vazia ou que não é número pede conferência", () => {
+    expect(comItens([""])).toMatchObject({ status: "1", conferir: expect.stringMatching(/ilegível/) });
+    expect(comItens(["abc"])).toMatchObject({ status: "1", conferir: expect.stringMatching(/ilegível/) });
+    expect(comItens([1])).toMatchObject({ conferir: null });
+  });
+
+  it("status 7 sem quantidade pede conferência; status 1 sem quantidade, não", () => {
+    expect(comItensStatus("7")).toMatchObject({ status: "7", conferir: expect.stringMatching(/parcial/) });
+    expect(comItensStatus("1")).toMatchObject({ status: "1", conferir: null });
   });
 
   it("negativa com os códigos de glosa, com outro prefixo de namespace", () => {
@@ -218,5 +232,25 @@ describe("elegibilidade", () => {
     expect(
       lerRespostaElegibilidade(recibo("<ans:codigoGlosa><ans:codigoGlosa>1001</ans:codigoGlosa></ans:codigoGlosa>")),
     ).toEqual({ tipo: "erro", glosas: ["1001"] });
+  });
+});
+
+describe("enviarSoap: se a mensagem pode ter chegado à operadora", () => {
+  const config = { url: "https://exemplo.invalid/ws", login: "1", senhaMd5: "x" };
+  const msg = "<ans:cabecalho>\n  <ans:Padrao>4.03.00</ans:Padrao>\n</ans:cabecalho>";
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("sem conexão ou barrado no gateway (4xx): não chegou", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("fetch failed")));
+    expect(await enviarSoap(msg, config)).toMatchObject({ ok: false, chegou: false });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("Access Denied", { status: 403 })));
+    expect(await enviarSoap(msg, config)).toMatchObject({ ok: false, chegou: false });
+  });
+
+  it("tempo esgotado ou erro do servidor (5xx): pode ter chegado", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(Object.assign(new Error("t"), { name: "TimeoutError" })));
+    expect(await enviarSoap(msg, config)).toMatchObject({ ok: false, chegou: true });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("erro", { status: 502 })));
+    expect(await enviarSoap(msg, config)).toMatchObject({ ok: false, chegou: true });
   });
 });

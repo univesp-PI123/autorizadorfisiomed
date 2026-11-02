@@ -51,9 +51,12 @@ function decodificarResposta(corpo: Buffer, contentType: string | null): string 
   return corpo.toString(/^(iso-8859-1|latin1|windows-1252)$/.test(declarada) ? "latin1" : "utf8");
 }
 
+// chegou: a operadora pode ter recebido e processado a mensagem (sem
+// resposta em tempo ou erro do servidor dela). Falso quando nem houve
+// conexão ou o gateway barrou o pedido (HTTP 4xx).
 export type ResultadoEnvio =
   | { ok: true; status: number; resposta: string }
-  | { ok: false; erro: string; resposta?: string };
+  | { ok: false; erro: string; chegou: boolean; resposta?: string };
 
 /** Envia a mensagem (já com o hash) e devolve o texto da resposta. */
 export async function enviarSoap(xmlTiss: string, config: ConfigWebservice): Promise<ResultadoEnvio> {
@@ -67,13 +70,14 @@ export async function enviarSoap(xmlTiss: string, config: ConfigWebservice): Pro
       signal: AbortSignal.timeout(TEMPO_LIMITE_MS),
     });
   } catch (e) {
-    const motivo = e instanceof Error && e.name === "TimeoutError" ? "sem resposta em 60 s" : e instanceof Error ? e.message : String(e);
-    return { ok: false, erro: `Falha ao falar com a operadora: ${motivo}.` };
+    const tempoEsgotado = e instanceof Error && e.name === "TimeoutError";
+    const motivo = tempoEsgotado ? "sem resposta em 60 s" : e instanceof Error ? e.message : String(e);
+    return { ok: false, erro: `Falha ao falar com a operadora: ${motivo}.`, chegou: tempoEsgotado };
   }
   const resposta = decodificarResposta(Buffer.from(await resp.arrayBuffer()), resp.headers.get("content-type"));
   // SOAP Fault volta com HTTP 500, mas traz o tissFault: quem lê é a resposta.
   if (!resp.ok && !/Fault/.test(resposta)) {
-    return { ok: false, erro: `A operadora respondeu HTTP ${resp.status}.`, resposta };
+    return { ok: false, erro: `A operadora respondeu HTTP ${resp.status}.`, chegou: resp.status >= 500, resposta };
   }
   return { ok: true, status: resp.status, resposta };
 }
