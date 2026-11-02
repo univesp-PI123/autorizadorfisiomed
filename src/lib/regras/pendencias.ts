@@ -43,7 +43,7 @@ export type SessaoParaAnalise = {
   carteirinha: string | null;
   convenioAnclinic: string | null;
   pacienteId: string | null;
-  convenio: { id: string; integracao: string; codigoPrestador: string | null } | null;
+  convenio: { id: string; integracao: string; codigoPrestador: string | null; codigoAns?: string | null } | null;
   // codigoGuia: código que vai na guia (de/para da operadora ou TUSS);
   // codigosAceitos: códigos que, numa autorização, cobrem este procedimento.
   procedimento: { codigoGuia: string | null; codigosAceitos: string[]; descricao?: string } | null;
@@ -57,10 +57,33 @@ export type SessaoParaAnalise = {
   unidade: { cnes: string | null } | null;
 };
 
+export type PedidoParaAnalise = {
+  id?: string;
+  convenioId: string | null;
+  dataPedido: string;
+  validoAte: string | null;
+  arquivos: number;
+  cbo: string | null;
+  indicacao: boolean; // tem indicação clínica ou CID
+};
+
+/** Pedido médico que vale para a sessão: do convênio (ou de qualquer um) e vigente na data; o mais recente. */
+export function pedidoDaSessao<P extends PedidoParaAnalise>(pedidos: P[], convenioId: string, data: string): P | undefined {
+  return pedidos
+    .filter(
+      (pm) =>
+        (pm.convenioId === null || pm.convenioId === convenioId) &&
+        pm.dataPedido <= data &&
+        (!pm.validoAte || pm.validoAte >= data),
+    )
+    .sort((a, b) => b.dataPedido.localeCompare(a.dataPedido))[0];
+}
+
 export type ContextoAnalise = {
   clinicaCadastrada: boolean;
   // Pedidos médicos ativos do paciente (convenioId nulo vale para qualquer convênio).
-  pedidos: { convenioId: string | null; dataPedido: string; validoAte: string | null; arquivos: number }[];
+  // cbo e indicacao: dados do médico solicitante e do diagnóstico que vão na guia.
+  pedidos: PedidoParaAnalise[];
   // Autorizações do paciente, para saber se a sessão já está coberta.
   autorizacoes: {
     id?: string;
@@ -116,6 +139,7 @@ export function analisarSessao(
   const pendencias: string[] = [];
   if (!ctx.clinicaCadastrada) pendencias.push("Dados da clínica não cadastrados");
   if (!s.convenio.codigoPrestador) pendencias.push("Convênio sem código do prestador");
+  if (!/^\d{6}$/.test(s.convenio.codigoAns ?? "")) pendencias.push("Convênio sem registro ANS");
   if (!s.unidade) pendencias.push("Sessão sem unidade de atendimento");
   else if (!s.unidade.cnes) pendencias.push("Unidade sem CNES");
   if (!s.pacienteId) pendencias.push("Paciente não identificado");
@@ -129,14 +153,13 @@ export function analisarSessao(
     if (!p.cbo) pendencias.push("Profissional sem CBO");
     if (!p.convenioIds.includes(s.convenio.id)) pendencias.push("Profissional não credenciado no convênio");
   }
-  const pedido = ctx.pedidos.find(
-    (pm) =>
-      (pm.convenioId === null || pm.convenioId === s.convenio!.id) &&
-      pm.dataPedido <= s.data &&
-      (!pm.validoAte || pm.validoAte >= s.data),
-  );
+  const pedido = pedidoDaSessao(ctx.pedidos, s.convenio.id, s.data);
   if (!pedido) pendencias.push("Sem pedido médico válido");
-  else if (pedido.arquivos === 0) pendencias.push("Pedido médico sem PDF anexado");
+  else {
+    if (pedido.arquivos === 0) pendencias.push("Pedido médico sem PDF anexado");
+    if (!pedido.cbo) pendencias.push("Pedido médico sem CBO do médico");
+    if (!pedido.indicacao) pendencias.push("Pedido médico sem indicação clínica nem CID");
+  }
 
   return pendencias.length ? { situacao: "pendente", pendencias } : { situacao: "pronta", pendencias };
 }

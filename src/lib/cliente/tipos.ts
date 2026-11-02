@@ -331,6 +331,7 @@ export type SessaoAgenda = {
   situacao: SituacaoSessao;
   pendencias: string[];
   motivo?: string;
+  guia: { id: string; numero: number } | null; // última guia TISS gerada com esta sessão
 };
 
 export type Agenda = {
@@ -340,6 +341,12 @@ export type Agenda = {
   resumo: Record<SituacaoSessao, number>;
   pendencias: { pendencia: string; quantidade: number }[];
   sessoes: SessaoAgenda[];
+};
+
+export type ResultadoGuias = {
+  guias: { id: string; numero: number; paciente: string; procedimento: string; codigo: string; sessao: string }[];
+  erros: { paciente: string; procedimento: string; erros: string[] }[];
+  recusadas: { agendamentoId: string; paciente: string; motivo: string }[];
 };
 
 export type PedidoMedico = {

@@ -5,6 +5,9 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   // Não gera AGENTS.md / CLAUDE.md na raiz ao rodar "next dev".
   agentRules: false,
+  // O validador de XML (TISS) abre um worker a partir da própria pasta em
+  // node_modules: não pode ser empacotado.
+  serverExternalPackages: ["xmllint-wasm"],
   // Cabeçalhos de segurança básicos (no sistema antigo, papel do helmet).
   async headers() {
     return [

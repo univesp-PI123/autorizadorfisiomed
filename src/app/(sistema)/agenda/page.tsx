@@ -12,8 +12,8 @@ import { useSessao } from "@/contextos/SessaoContexto";
 import { formatarData } from "@/lib/analiseDados";
 import { useFetch } from "@/lib/cliente/hooks";
 import { mensagemDeErro } from "@/lib/cliente/api";
-import { agendaService, convenioService, unidadeService } from "@/lib/cliente/servicos";
-import type { SituacaoSessao } from "@/lib/cliente/tipos";
+import { agendaService, convenioService, guiaTissService, unidadeService } from "@/lib/cliente/servicos";
+import type { ResultadoGuias, SituacaoSessao } from "@/lib/cliente/tipos";
 import { hojeISO } from "@/lib/datas";
 
 type Tom = "warning" | "success" | "neutro";
@@ -33,7 +33,7 @@ const ONDE_RESOLVER: [RegExp, string, boolean][] = [
   [/código para a operadora/, "/procedimentos", true],
   [/Profissional sem/, "/profissionais?filtro=incompletos", true],
   [/credenciado/, "/profissionais", true],
-  [/código do prestador/, "/convenios", true],
+  [/código do prestador|registro ANS/, "/convenios", true],
   [/pedido médico/i, "na página do paciente", false],
 ];
 const ondeResolver = (p: string) => {
@@ -54,6 +54,8 @@ function AgendaPage({ url }: { url: URLSearchParams }) {
   const [unidadeDestino, setUnidadeDestino] = useState("");
   const [incluirPaciente, setIncluirPaciente] = useState(true);
   const [aplicando, setAplicando] = useState(false);
+  const [gerando, setGerando] = useState(false);
+  const [resultadoGuias, setResultadoGuias] = useState<ResultadoGuias | null>(null);
   const todasUnidades = useFetch(unidadeService.listar);
 
   const buscar = useCallback(() => agendaService.buscar({ data, convenioId: convenioId || undefined }), [data, convenioId]);
@@ -101,6 +103,26 @@ function AgendaPage({ url }: { url: URLSearchParams }) {
       setAplicando(false);
     }
   };
+
+  // Monta as guias de solicitação (XML TISS) das sessões prontas; o envio à
+  // operadora vem depois — por ora o XML fica para baixar e conferir.
+  const gerarGuias = async (ids: string[]) => {
+    if (!ids.length) return;
+    setGerando(true);
+    try {
+      const r = await guiaTissService.gerar(ids);
+      setResultadoGuias(r);
+      if (r.guias.length) toast.success(`${r.guias.length} guia(s) gerada(s).`);
+      else toast.error("Nenhuma guia gerada. Veja o motivo abaixo.");
+      setMarcadas(new Set());
+      agenda.recarregar();
+    } catch (err) {
+      toast.error(mensagemDeErro(err, "Não foi possível gerar as guias."));
+    } finally {
+      setGerando(false);
+    }
+  };
+  const prontas = sessoes.filter((s) => s.situacao === "pronta");
 
   const unidades = useMemo(() => {
     const m = new Map<string, string>();
@@ -201,6 +223,81 @@ function AgendaPage({ url }: { url: URLSearchParams }) {
               </section>
             )}
 
+            {resultadoGuias && (
+              <section className="sb-card" aria-labelledby="titulo-guias">
+                <div className="sb-card__header">
+                  <h2 className="sb-card__title" id="titulo-guias">
+                    Guias TISS geradas
+                  </h2>
+                  <div className="ferramentas">
+                    <button type="button" className="sb-btn sb-btn--sm" onClick={() => setResultadoGuias(null)}>
+                      Fechar
+                    </button>
+                  </div>
+                </div>
+                <p className="texto-suave">
+                  XML de solicitação de SP/SADT (TISS 4.03.00), validado pelo schema da ANS. Ainda não foi enviado à operadora.
+                </p>
+                {resultadoGuias.guias.length > 0 && (
+                  <div className="tabela-rolagem">
+                    <table className="sb-table">
+                      <thead>
+                        <tr>
+                          <th scope="col">Guia</th>
+                          <th scope="col">Paciente</th>
+                          <th scope="col">Procedimento</th>
+                          <th scope="col" className="sb-end">Sessão</th>
+                          <th scope="col" className="sb-end">Arquivo</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {resultadoGuias.guias.map((g) => (
+                          <tr key={g.id}>
+                            <td className="sb-mono">{g.numero}</td>
+                            <td className="sb-strong">{g.paciente}</td>
+                            <td>
+                              {g.procedimento}
+                              <span className="texto-suave mono">TUSS {g.codigo}</span>
+                            </td>
+                            <td className="sb-mono sb-end">{g.sessao}</td>
+                            <td className="sb-end">
+                              <a href={guiaTissService.urlXml(g.id)} download>
+                                Baixar XML
+                              </a>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+                {resultadoGuias.erros.length > 0 && (
+                  <>
+                    <h3 className="sb-card__title">Não geradas</h3>
+                    <ul className="pendencias">
+                      {resultadoGuias.erros.map((e, i) => (
+                        <li key={i}>
+                          <strong>{e.paciente}</strong> — {e.procedimento}: {e.erros.join("; ")}
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+                {resultadoGuias.recusadas.length > 0 && (
+                  <>
+                    <h3 className="sb-card__title">Sessões que não estavam prontas</h3>
+                    <ul className="pendencias">
+                      {resultadoGuias.recusadas.map((r) => (
+                        <li key={r.agendamentoId}>
+                          <strong>{r.paciente}</strong>: {r.motivo}
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+              </section>
+            )}
+
             <section className="sb-card" aria-labelledby="titulo-sessoes">
               <div className="sb-card__header">
                 <h2 className="sb-card__title" id="titulo-sessoes">
@@ -240,6 +337,16 @@ function AgendaPage({ url }: { url: URLSearchParams }) {
                     ))}
                     <option value="sem">Sem unidade de atendimento ({agenda.data.semUnidade})</option>
                   </select>
+                  {podeEditar && prontas.length > 0 && (
+                    <button
+                      type="button"
+                      className="sb-btn sb-btn--primary sb-btn--sm"
+                      onClick={() => gerarGuias(prontas.map((s) => s.id))}
+                      disabled={gerando}
+                    >
+                      {gerando ? "Gerando…" : `Gerar XML das prontas (${prontas.length})`}
+                    </button>
+                  )}
                 </div>
               </div>
               {podeEditar && marcadas.size > 0 && (
@@ -267,6 +374,15 @@ function AgendaPage({ url }: { url: URLSearchParams }) {
                   </label>
                   <button type="button" className="sb-btn sb-btn--primary sb-btn--sm" onClick={atribuirUnidade} disabled={!unidadeDestino || aplicando}>
                     {aplicando ? "Aplicando…" : "Aplicar"}
+                  </button>
+                  <button
+                    type="button"
+                    className="sb-btn sb-btn--sm"
+                    onClick={() => gerarGuias([...marcadas])}
+                    disabled={gerando}
+                    title="Só as sessões prontas para solicitar viram guia"
+                  >
+                    {gerando ? "Gerando…" : "Gerar XML das selecionadas"}
                   </button>
                   <button type="button" className="sb-btn sb-btn--sm" onClick={() => setMarcadas(new Set())}>
                     Limpar seleção
@@ -349,6 +465,14 @@ function AgendaPage({ url }: { url: URLSearchParams }) {
                               </ul>
                             ) : (
                               s.motivo && <span className="texto-suave">{s.motivo}</span>
+                            )}
+                            {s.guia && (
+                              <span className="texto-suave">
+                                Guia <span className="mono">{s.guia.numero}</span> ·{" "}
+                                <a href={guiaTissService.urlXml(s.guia.id)} download>
+                                  XML
+                                </a>
+                              </span>
                             )}
                           </td>
                         </tr>

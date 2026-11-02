@@ -44,3 +44,15 @@ export function paraDate(dataISO: string): Date {
 export function deDate(data: Date): string {
   return data.toISOString().slice(0, 10);
 }
+
+/** Data ("YYYY-MM-DD") e hora ("HH:MM:SS") de um instante no fuso da clínica. */
+export function dataHoraNoFuso(agora: Date = new Date()): { data: string; hora: string } {
+  const hora = new Intl.DateTimeFormat("en-GB", {
+    timeZone: FUSO_CLINICA,
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  }).format(agora);
+  return { data: hojeISO(agora), hora };
+}

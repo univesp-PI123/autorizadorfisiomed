@@ -28,6 +28,20 @@ export const UFS = [
   "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO",
 ] as const;
 
+// Tabela 59 — na guia a UF vai pelo código do IBGE, não pela sigla.
+const UF_IBGE: Record<(typeof UFS)[number], string> = {
+  RO: "11", AC: "12", AM: "13", RR: "14", PA: "15", AP: "16", TO: "17",
+  MA: "21", PI: "22", CE: "23", RN: "24", PB: "25", PE: "26", AL: "27", SE: "28", BA: "29",
+  MG: "31", ES: "32", RJ: "33", SP: "35",
+  PR: "41", SC: "42", RS: "43",
+  MS: "50", MT: "51", GO: "52", DF: "53",
+};
+
+export function codigoUf(sigla: string | null | undefined): string | null {
+  const s = sigla?.trim().toUpperCase();
+  return s && s in UF_IBGE ? UF_IBGE[s as keyof typeof UF_IBGE] : null;
+}
+
 // CBO sugerido a partir da especialidade cadastrada no AnClinic. É só um
 // ponto de partida: o valor fica editável no cadastro do profissional.
 const CBO_POR_ESPECIALIDADE: [RegExp, string][] = [

@@ -1,6 +1,7 @@
 import { api } from "./api";
 import type {
   Agenda,
+  ResultadoGuias,
   Atendimento,
   Autorizacao,
   AutorizacoesPorConvenio,
@@ -95,6 +96,11 @@ export const usuarioService = {
 
 export const agendaService = {
   buscar: (params: Filtros = {}) => api.get<Agenda>("/agenda", params),
+};
+
+export const guiaTissService = {
+  gerar: (agendamentoIds: string[]) => api.post<ResultadoGuias>("/tiss/guias", { agendamentoIds }),
+  urlXml: (id: string) => `/api/tiss/guias/${id}/xml`,
 };
 
 export const importacaoService = {
