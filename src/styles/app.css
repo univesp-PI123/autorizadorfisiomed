@@ -242,9 +242,7 @@ textarea.sb-input { height: auto; min-height: 72px; padding: 10px 14px; resize: 
 /* Menu recolhido: só o símbolo. Expandido: logo inteiro (branco no escuro). */
 .logo-menu { display: flex; align-items: center; }
 .logo-menu img { display: block; }
-.logo-menu__simbolo { filter: brightness(0) saturate(100%) invert(38%) sepia(35%) saturate(1285%) hue-rotate(158deg) brightness(91%) contrast(92%); }
 .logo-menu__inteiro { display: none !important; height: 36px; width: auto; }
-.logo-menu__inteiro { filter: brightness(0) saturate(100%) invert(38%) sepia(35%) saturate(1285%) hue-rotate(158deg) brightness(91%) contrast(92%); }
 .sb-rail--open .logo-menu__simbolo { display: none; }
 .sb-rail--open .logo-menu__inteiro { display: block !important; }
 [data-theme="dark"] .logo-menu__inteiro { filter: brightness(0) invert(1); }
