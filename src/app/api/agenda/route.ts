@@ -11,7 +11,7 @@ const SITUACOES: SituacaoSessao[] = ["pendente", "pronta", "coberta", "fora", "c
 // Sessões de um dia (padrão: hoje) com a situação de cada uma em relação à
 // autorização.
 export const GET = rota(async (req) => {
-  await exigirSessao(req, ["admin", "recepcionista", "financeiro"]);
+  await exigirSessao(req);
   const sp = req.nextUrl.searchParams;
   const data = sp.get("data") || hojeISO();
   if (!ehDataISO(data)) throw new ErroHttp(422, "Data inválida.");

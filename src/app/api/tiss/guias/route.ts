@@ -11,7 +11,7 @@ const esquema = z.object({
 // Gera as guias de solicitação (XML TISS) das sessões prontas escolhidas na
 // agenda. Ainda não envia à operadora: o XML fica para baixar e conferir.
 export const POST = rota(async (req) => {
-  const usuario = await exigirSessao(req, ["admin", "recepcionista"]);
+  const usuario = await exigirSessao(req);
   const { agendamentoIds } = await lerCorpo(req, esquema);
   return json(await gerarGuias(agendamentoIds, usuario.id), 201);
 });

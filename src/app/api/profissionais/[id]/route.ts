@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { esquemaProfissional, lerCorpo } from "@/lib/validacao";
 
 export const PUT = rota<{ id: string }>(async (req, { params }) => {
-  await exigirSessao(req, ["admin", "recepcionista"]);
+  await exigirSessao(req);
   const { id } = await params;
   const { convenioIds, ...dados } = await lerCorpo(req, esquemaProfissional);
   if (!(await prisma.profissional.findUnique({ where: { id } }))) naoEncontrado("Profissional");

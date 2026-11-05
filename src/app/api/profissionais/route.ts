@@ -4,7 +4,7 @@ import { exigirSessao } from "@/lib/auth/sessao";
 import { prisma } from "@/lib/prisma";
 
 export const GET = rota(async (req) => {
-  await exigirSessao(req, ["admin", "recepcionista", "financeiro"]);
+  await exigirSessao(req);
   const sp = req.nextUrl.searchParams;
   const pag = paginacao(req, 50);
   const busca = sp.get("busca")?.trim();

@@ -80,16 +80,10 @@ async function usuarioDoToken(token: string | undefined): Promise<UsuarioSessao 
   }
 }
 
-/** Para route handlers: exige login e, opcionalmente, um dos perfis. */
-export async function exigirSessao(
-  req: NextRequest,
-  perfis?: PerfilUsuario[],
-): Promise<UsuarioSessao> {
+/** Para route handlers: exige login. (O sistema tem um perfil só: admin.) */
+export async function exigirSessao(req: NextRequest): Promise<UsuarioSessao> {
   const usuario = await usuarioDoToken(req.cookies.get(COOKIE_SESSAO)?.value);
   if (!usuario) throw new ErroHttp(401, "Sessão expirada. Faça login novamente.");
-  if (perfis && !perfis.includes(usuario.perfil)) {
-    throw new ErroHttp(403, `Acesso negado. Perfis permitidos: ${perfis.join(", ")}.`);
-  }
   return usuario;
 }
 

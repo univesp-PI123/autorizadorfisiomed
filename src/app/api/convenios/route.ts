@@ -17,7 +17,7 @@ export const GET = rota(async (req) => {
 });
 
 export const POST = rota(async (req) => {
-  await exigirSessao(req, ["admin", "financeiro"]);
+  await exigirSessao(req);
   const dados = await lerCorpo(req, esquemaConvenio);
   if (await prisma.convenio.findUnique({ where: { nome: dados.nome } })) {
     throw new ErroHttp(409, "Convênio com este nome já existe.");

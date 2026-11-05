@@ -8,6 +8,13 @@ const nextConfig: NextConfig = {
   // O validador de XML (TISS) abre um worker a partir da própria pasta em
   // node_modules: não pode ser empacotado.
   serverExternalPackages: ["xmllint-wasm"],
+  // Telas que mudaram (03/11/2026): Agenda virou Solicitações e Atendimentos saiu.
+  async redirects() {
+    return [
+      { source: "/agenda", destination: "/solicitacoes", permanent: false },
+      { source: "/atendimentos", destination: "/solicitacoes", permanent: false },
+    ];
+  },
   // Cabeçalhos de segurança básicos (no sistema antigo, papel do helmet).
   async headers() {
     return [

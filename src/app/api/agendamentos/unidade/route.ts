@@ -15,7 +15,7 @@ const esquema = z.object({
 // fica marcada como manual: a próxima importação do AnClinic não a troca.
 // Tirar a unidade devolve o controle ao AnClinic.
 export const PATCH = rota(async (req) => {
-  await exigirSessao(req, ["admin", "recepcionista"]);
+  await exigirSessao(req);
   const { ids, unidadeId, incluirPaciente } = await lerCorpo(req, esquema);
   if (unidadeId && !(await prisma.unidade.findUnique({ where: { id: unidadeId } }))) {
     throw new ErroHttp(422, "Unidade não encontrada.");

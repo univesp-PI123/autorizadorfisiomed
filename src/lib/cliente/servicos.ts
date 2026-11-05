@@ -2,7 +2,6 @@ import { api } from "./api";
 import type {
   Agenda,
   ResultadoGuias,
-  Atendimento,
   Autorizacao,
   AutorizacoesPorConvenio,
   Clinica,
@@ -71,12 +70,6 @@ export const autorizacaoService = {
 };
 
 export const atendimentoService = {
-  listar: (params: Filtros = {}) =>
-    api.get<Paginado<Atendimento> & { aguardandoConfirmacao: number }>("/atendimentos", params),
-  confirmar: (id: string) => api.patch<Atendimento>(`/atendimentos/${id}/situacao`, { acao: "confirmar" }),
-  cancelar: (id: string, motivo: string) => api.patch<Atendimento>(`/atendimentos/${id}/situacao`, { acao: "cancelar", motivo }),
-  criar: (dados: unknown) => api.post<Atendimento>("/atendimentos", dados),
-  atualizar: (id: string, dados: unknown) => api.put<Atendimento>(`/atendimentos/${id}`, dados),
   resumoGlosas: () => api.get<ResumoGlosas>("/atendimentos/resumo/glosas"),
 };
 

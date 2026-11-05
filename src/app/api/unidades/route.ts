@@ -6,7 +6,7 @@ import { esquemaUnidade, lerCorpo } from "@/lib/validacao";
 // As unidades vêm da importação da agenda (pelo nome no AnClinic) ou são
 // criadas aqui; os dados (CNES, endereço) se completam na tela.
 export const GET = rota(async (req) => {
-  await exigirSessao(req, ["admin", "recepcionista", "financeiro"]);
+  await exigirSessao(req);
   const unidades = await prisma.unidade.findMany({
     orderBy: { nome: "asc" },
     include: { _count: { select: { agendamentos: { where: { removidoEm: null } } } } },
@@ -15,7 +15,7 @@ export const GET = rota(async (req) => {
 });
 
 export const POST = rota(async (req) => {
-  await exigirSessao(req, ["admin"]);
+  await exigirSessao(req);
   const dados = await lerCorpo(req, esquemaUnidade);
   if (await prisma.unidade.findUnique({ where: { nomeAnclinic: dados.nome } })) {
     throw new ErroHttp(409, "Já existe uma unidade com este nome.");

@@ -6,20 +6,18 @@ import { useState } from "react";
 import Icone from "@/components/Icone";
 import { LogoMenu } from "@/components/Marca";
 import { useAlertas } from "@/contextos/AlertaContexto";
-import { useSessao } from "@/contextos/SessaoContexto";
-import { ITENS_MENU } from "@/lib/navegacao";
+import { ITENS_MENU, itemDaRota } from "@/lib/navegacao";
 
 // Barra lateral do Sóbrio: recolhida por padrão (só ícones), botão redondo
 // para expandir e popup com as sub-opções ao passar o mouse ou focar.
 export default function Rail() {
-  const { usuario } = useSessao();
   const { totalAlertas } = useAlertas();
   const pathname = usePathname();
   const busca = useSearchParams().toString();
   const [aberta, setAberta] = useState(false);
 
-  const itens = ITENS_MENU.filter((i) => i.perfis.includes(usuario.perfil));
-  const grupos = [...new Set(itens.map((i) => i.grupo))];
+  const grupos = [...new Set(ITENS_MENU.map((i) => i.grupo))];
+  const itemAtual = itemDaRota(pathname);
   const atual = pathname + (busca ? `?${busca}` : "");
 
   // O popup abre no hover e também no foco (teclado). Depois de um clique com
@@ -47,11 +45,10 @@ export default function Rail() {
         {grupos.map((grupo) => (
           <div key={grupo} style={{ display: "contents" }}>
             <span className="sb-rail__group">{grupo}</span>
-            {itens
+            {ITENS_MENU
               .filter((i) => i.grupo === grupo)
               .map((item) => {
-                const ativo = pathname === item.caminho || pathname.startsWith(item.caminho + "/");
-                const subitens = item.subitens.filter((s) => !s.perfis || s.perfis.includes(usuario.perfil));
+                const ativo = item === itemAtual;
                 return (
                   <div className="sb-nav-item" key={item.caminho}>
                     <Link
@@ -71,7 +68,7 @@ export default function Rail() {
                     <div className="sb-flyout">
                       <div className="sb-flyout__panel" role="menu" aria-label={item.rotulo}>
                         <span className="sb-flyout__title">{item.rotulo}</span>
-                        {subitens.map((s) => (
+                        {item.subitens.map((s) => (
                           <Link
                             key={s.href}
                             className="sb-flyout__link"

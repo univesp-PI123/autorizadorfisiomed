@@ -8,7 +8,6 @@ import Carregando from "@/components/ui/Carregando";
 import MensagemErro from "@/components/ui/MensagemErro";
 import Modal from "@/components/ui/Modal";
 import { Badge } from "@/components/ui/StatusBadge";
-import { useSessao } from "@/contextos/SessaoContexto";
 import { mensagemDeErro } from "@/lib/cliente/api";
 import { useFetch } from "@/lib/cliente/hooks";
 import { clinicaService, unidadeService } from "@/lib/cliente/servicos";
@@ -34,7 +33,7 @@ const formDaUnidade = (u: Unidade): FormUnidade =>
 
 const formatarCnpj = (c: string) => c.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5");
 
-function FormClinica({ clinica, podeEditar, aoSalvar }: { clinica: Clinica | null; podeEditar: boolean; aoSalvar: () => void }) {
+function FormClinica({ clinica, aoSalvar }: { clinica: Clinica | null; aoSalvar: () => void }) {
   const [form, setForm] = useState({
     razaoSocial: clinica?.razaoSocial ?? "",
     nomeFantasia: clinica?.nomeFantasia ?? "",
@@ -72,36 +71,32 @@ function FormClinica({ clinica, podeEditar, aoSalvar }: { clinica: Clinica | nul
             <label className="sb-label" htmlFor="cli-razao">
               Razão social<span className="obrigatorio" aria-hidden="true">*</span>
             </label>
-            <input id="cli-razao" name="razaoSocial" className="sb-input" value={form.razaoSocial} onChange={aoMudar} disabled={!podeEditar} required />
+            <input id="cli-razao" name="razaoSocial" className="sb-input" value={form.razaoSocial} onChange={aoMudar} required />
           </div>
           <div className="sb-field">
             <label className="sb-label" htmlFor="cli-fantasia">
               Nome fantasia
             </label>
-            <input id="cli-fantasia" name="nomeFantasia" className="sb-input" value={form.nomeFantasia} onChange={aoMudar} disabled={!podeEditar} />
+            <input id="cli-fantasia" name="nomeFantasia" className="sb-input" value={form.nomeFantasia} onChange={aoMudar} />
           </div>
           <div className="sb-field">
             <label className="sb-label" htmlFor="cli-cnpj">
               CNPJ<span className="obrigatorio" aria-hidden="true">*</span>
             </label>
-            <input id="cli-cnpj" name="cnpj" inputMode="numeric" className="sb-input mono" value={form.cnpj} onChange={aoMudar} disabled={!podeEditar} required />
+            <input id="cli-cnpj" name="cnpj" inputMode="numeric" className="sb-input mono" value={form.cnpj} onChange={aoMudar} required />
           </div>
         </div>
-        {podeEditar && (
-          <div>
-            <button type="submit" className="sb-btn sb-btn--primary" disabled={salvando}>
-              {salvando ? "Salvando…" : "Salvar"}
-            </button>
-          </div>
-        )}
+        <div>
+          <button type="submit" className="sb-btn sb-btn--primary" disabled={salvando}>
+            {salvando ? "Salvando…" : "Salvar"}
+          </button>
+        </div>
       </div>
     </form>
   );
 }
 
 export default function UnidadesPage() {
-  const { usuario } = useSessao();
-  const podeEditar = usuario.perfil === "admin";
   const clinica = useFetch(clinicaService.buscar);
   const unidades = useFetch(unidadeService.listar);
   const [editando, setEditando] = useState<Unidade | null>(null);
@@ -147,7 +142,7 @@ export default function UnidadesPage() {
       ) : clinica.erro ? (
         <MensagemErro mensagem={clinica.erro} onRetry={clinica.recarregar} />
       ) : (
-        <FormClinica key={clinica.data?.id ?? "nova"} clinica={clinica.data} podeEditar={podeEditar} aoSalvar={clinica.recarregar} />
+        <FormClinica key={clinica.data?.id ?? "nova"} clinica={clinica.data} aoSalvar={clinica.recarregar} />
       )}
 
       <section className="sb-card" id="unidades" aria-labelledby="titulo-unidades">
@@ -156,21 +151,19 @@ export default function UnidadesPage() {
             Unidades de atendimento
           </h2>
           <div className="ferramentas">
-            <Link href="/agenda?unidade=sem" className="sb-btn">
+            <Link href="/solicitacoes?unidade=sem" className="sb-btn">
               Sessões sem unidade
             </Link>
-            {podeEditar && (
-              <button type="button" className="sb-btn sb-btn--primary" onClick={abrirNova}>
-                <Icone nome="mais" />
-                Nova unidade
-              </button>
-            )}
+            <button type="button" className="sb-btn sb-btn--primary" onClick={abrirNova}>
+              <Icone nome="mais" />
+              Nova unidade
+            </button>
           </div>
         </div>
         <div className="sb-card__body">
           <p className="texto-apoio">
             A unidade de cada sessão vem da coluna &ldquo;Unidade de Atendimento&rdquo; do AnClinic. Para atribuir ou trocar, selecione
-            as sessões na <Link href="/agenda" className="link-texto">Agenda</Link> e use &ldquo;Aplicar&rdquo;; a escolha feita no sistema não é desfeita pelas
+            as sessões na <Link href="/solicitacoes" className="link-texto">Solicitações</Link> e use &ldquo;Aplicar&rdquo;; a escolha feita no sistema não é desfeita pelas
             próximas importações.
           </p>
         </div>
@@ -191,11 +184,9 @@ export default function UnidadesPage() {
                   <th scope="col" className="sb-end">
                     Sessões
                   </th>
-                  {podeEditar && (
-                    <th scope="col" className="sb-end">
-                      <span className="sr-only">Ações</span>
-                    </th>
-                  )}
+                  <th scope="col" className="sb-end">
+                    <span className="sr-only">Ações</span>
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -220,13 +211,11 @@ export default function UnidadesPage() {
                         {u.municipio && <span className="texto-suave">{`${u.municipio}/${u.uf ?? ""} · CEP ${u.cep ?? "—"}`}</span>}
                       </td>
                       <td className="sb-mono sb-end">{u._count?.agendamentos ?? 0}</td>
-                      {podeEditar && (
-                        <td className="sb-end">
-                          <button type="button" className="sb-btn sb-btn--sm" onClick={() => abrir(u)} aria-label={`Editar ${u.nome}`}>
-                            Editar
-                          </button>
-                        </td>
-                      )}
+                      <td className="sb-end">
+                        <button type="button" className="sb-btn sb-btn--sm" onClick={() => abrir(u)} aria-label={`Editar ${u.nome}`}>
+                          Editar
+                        </button>
+                      </td>
                     </tr>
                   ))
                 )}

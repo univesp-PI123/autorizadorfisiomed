@@ -8,13 +8,13 @@ import BotaoTema from "@/components/BotaoTema";
 import Icone from "@/components/Icone";
 import { useAlertas } from "@/contextos/AlertaContexto";
 import { useSessao } from "@/contextos/SessaoContexto";
-import { itemDaRota, ROTULO_PERFIL } from "@/lib/navegacao";
+import { abaDaRota, itemDaRota } from "@/lib/navegacao";
 
-// Títulos das páginas de detalhe (o menu só conhece as raízes).
-function tituloDaPagina(pathname: string, rotuloRaiz: string) {
+// Títulos das páginas de detalhe e das abas (o menu só conhece as raízes).
+function tituloDaPagina(pathname: string, item: ReturnType<typeof itemDaRota>) {
   if (/^\/pacientes\/[^/]+$/.test(pathname)) return "Paciente";
   if (/^\/autorizacoes\/[^/]+$/.test(pathname)) return "Autorização";
-  return rotuloRaiz;
+  return abaDaRota(item, pathname)?.rotulo ?? item?.rotulo ?? "Fisiomed ABA";
 }
 
 export default function Topbar() {
@@ -25,8 +25,7 @@ export default function Topbar() {
   const [busca, setBusca] = useState("");
 
   const item = itemDaRota(pathname);
-  const titulo = tituloDaPagina(pathname, item?.rotulo ?? "Fisiomed ABA");
-  const podeBuscarPacientes = ["admin", "recepcionista", "terapeuta"].includes(usuario.perfil);
+  const titulo = tituloDaPagina(pathname, item);
 
   const aoBuscar = (e: FormEvent) => {
     e.preventDefault();
@@ -39,7 +38,7 @@ export default function Topbar() {
     <header className="topbar">
       <div className="topbar__title">
         <nav className="caption" aria-label="Você está em">
-          {item?.grupo ?? "Geral"} / {item && titulo !== item.rotulo ? (
+          {item?.grupo ?? "Geral"} / {item && titulo !== item.rotulo && !abaDaRota(item, pathname) ? (
             <>
               <Link href={item.caminho}>{item.rotulo}</Link> / {titulo}
             </>
@@ -50,19 +49,17 @@ export default function Topbar() {
         <h1 className="page-title">{titulo}</h1>
       </div>
 
-      {podeBuscarPacientes && (
-        <form className="busca" role="search" onSubmit={aoBuscar}>
-          <input
-            className="sb-input sb-input--sm"
-            type="search"
-            placeholder="Buscar paciente por nome ou CPF…"
-            aria-label="Buscar paciente por nome ou CPF"
-            value={busca}
-            onChange={(e) => setBusca(e.target.value)}
-            style={{ width: 260 }}
-          />
-        </form>
-      )}
+      <form className="busca" role="search" onSubmit={aoBuscar}>
+        <input
+          className="sb-input sb-input--sm"
+          type="search"
+          placeholder="Buscar paciente por nome ou CPF…"
+          aria-label="Buscar paciente por nome ou CPF"
+          value={busca}
+          onChange={(e) => setBusca(e.target.value)}
+          style={{ width: 260 }}
+        />
+      </form>
 
       <div className="topbar__acoes">
         {totalAlertas > 0 && (
@@ -72,7 +69,6 @@ export default function Topbar() {
         )}
         <div className="topbar__usuario">
           <strong>{usuario.nome}</strong>
-          <span>{ROTULO_PERFIL[usuario.perfil]}</span>
         </div>
         <BotaoAcessibilidade />
         <BotaoTema />

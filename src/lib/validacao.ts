@@ -37,18 +37,9 @@ const emailOpcional = z.preprocess(vazioParaNulo, email.nullable().optional());
 const uuid = (mensagem: string) => z.string().uuid(mensagem);
 const uuidOpcional = (mensagem: string) =>
   z.preprocess(vazioParaNulo, uuid(mensagem).nullable().optional());
-const hora = z.preprocess(
-  vazioParaNulo,
-  z
-    .string()
-    .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Hora inválida (use HH:MM).")
-    .nullable()
-    .optional(),
-);
 
 // --- Auth / usuários ----------------------------------------------------
 
-export const PERFIS = ["admin", "recepcionista", "terapeuta", "financeiro"] as const;
 const senhaNova = z.string().min(8, "A senha deve ter ao menos 8 caracteres.").max(128);
 
 export const esquemaLogin = z.object({
@@ -60,14 +51,12 @@ export const esquemaUsuarioNovo = z.object({
   nome: textoObrigatorio(150, "Nome é obrigatório."),
   email,
   senha: senhaNova,
-  perfil: z.enum(PERFIS, { message: "Perfil inválido." }),
 });
 
 export const esquemaUsuarioEdicao = z
   .object({
     nome: textoObrigatorio(150, "Nome é obrigatório."),
     email,
-    perfil: z.enum(PERFIS, { message: "Perfil inválido." }),
     ativo: z.boolean(),
   })
   .partial();
@@ -298,59 +287,6 @@ export const esquemaMudancaStatus = z.object({
   dataResposta: dataOpcional("Data de resposta inválida."),
   observacao: textoOpcional(2000),
 });
-
-// --- Atendimentos ------------------------------------------------------
-
-export const STATUS_COBRANCA = ["pendente", "faturado", "pago", "glosado", "cancelado"] as const;
-
-// Registro manual (operador): procedimento da base, sessão de 1 hora começando
-// em hora cheia ou meia hora. O fim é calculado no servidor.
-export const esquemaAtendimento = z
-  .object({
-    pacienteId: uuid("Selecione um paciente."),
-    autorizacaoId: uuidOpcional("Autorização inválida."),
-    procedimentoId: uuidOpcional("Procedimento inválido."),
-    procedimento: textoOpcional(200),
-    dataAtendimento: data("Data do atendimento inválida."),
-    horaInicio: z.preprocess(
-      vazioParaNulo,
-      z
-        .string()
-        .regex(/^([01]\d|2[0-3]):(00|30)$/, "O início deve ser em hora cheia ou meia hora (ex.: 15:00, 15:30).")
-        .nullable()
-        .optional(),
-    ),    
-    observacoes: textoOpcional(2000),
-  })
-  .refine((d) => d.procedimentoId || d.procedimento, { message: "Escolha o procedimento.", path: ["procedimentoId"] });
-
-// Paciente e autorização não mudam depois de registrado: isso alteraria a
-// contagem de sessões usadas.
-export const esquemaAtendimentoEdicao = z
-  .object({
-    procedimento: textoObrigatorio(200, "Procedimento é obrigatório."),
-    codigoProcedimento: textoOpcional(30),
-    dataAtendimento: data("Data do atendimento inválida."),
-    horaInicio: hora,
-    horaFim: hora,
-    statusCobranca: z.enum(STATUS_COBRANCA, { message: "Status de cobrança inválido." }),   
-    motivoGlosa: textoOpcional(2000),
-    evolucao: textoOpcional(5000),
-    observacoes: textoOpcional(2000),
-  })
-  .partial()
-  .refine((d) => d.statusCobranca !== "glosado" || !!d.motivoGlosa, {
-    message: "Informe o motivo da glosa.",
-    path: ["motivoGlosa"],
-  });
-
-export const esquemaSituacaoAtendimento = z.discriminatedUnion("acao", [
-  z.object({ acao: z.literal("confirmar") }),
-  z.object({
-    acao: z.literal("cancelar"),
-    motivo: z.string({ required_error: "Informe o motivo do cancelamento." }).trim().min(3, "Informe o motivo do cancelamento.").max(2000),
-  }),
-]);
 
 /** Lê e valida o corpo JSON da requisição. */
 export async function lerCorpo<T extends z.ZodTypeAny>(

@@ -11,7 +11,6 @@ import Carregando from "@/components/ui/Carregando";
 import MensagemErro from "@/components/ui/MensagemErro";
 import Modal from "@/components/ui/Modal";
 import StatusBadge, { Badge } from "@/components/ui/StatusBadge";
-import { useSessao } from "@/contextos/SessaoContexto";
 import { formatarData } from "@/lib/analiseDados";
 import { mensagemDeErro } from "@/lib/cliente/api";
 import { useFetch } from "@/lib/cliente/hooks";
@@ -33,7 +32,6 @@ function resumoElegibilidade(r: RespostaElegibilidade): { tom: "success" | "warn
 
 export default function PacienteDetalhe() {
   const { id } = useParams<{ id: string }>();
-  const { usuario } = useSessao();
   const buscar = useCallback(() => pacienteService.buscarPorId(id), [id]);
   const { data: paciente, carregando, erro, recarregar } = useFetch(buscar);
 
@@ -41,7 +39,6 @@ export default function PacienteDetalhe() {
   const [vinculo, setVinculo] = useState<typeof VINCULO_VAZIO | null>(null);
   const [salvando, setSalvando] = useState(false);
   const [verificando, setVerificando] = useState<string | null>(null);
-  const podeVerificar = usuario.perfil === "admin" || usuario.perfil === "recepcionista";
   const [elegibilidade, setElegibilidade] = useState<Record<string, RespostaElegibilidade>>({});
   const buscarConvenios = useCallback(() => convenioService.listar({ ativo: true }), []);
   const { data: convenios } = useFetch(buscarConvenios);
@@ -196,7 +193,7 @@ export default function PacienteDetalhe() {
                         </Badge>
                       </p>
                     )}
-                    {v.convenio?.integracao === "tiss_amil" && v.ativo && podeVerificar && (
+                    {v.convenio?.integracao === "tiss_amil" && v.ativo && (
                       <button
                         type="button"
                         className="sb-btn sb-btn--sm"
@@ -269,11 +266,7 @@ export default function PacienteDetalhe() {
         </div>
       </section>
 
-      <PedidosMedicos
-        pacienteId={paciente.id}
-        convenios={convenios ?? []}
-        podeEditar={usuario.perfil === "admin" || usuario.perfil === "recepcionista"}
-      />
+      <PedidosMedicos pacienteId={paciente.id} convenios={convenios ?? []} />
 
       <Modal
         aberto={edicao !== null}

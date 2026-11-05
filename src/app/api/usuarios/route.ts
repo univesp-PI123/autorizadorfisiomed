@@ -6,7 +6,7 @@ import { CAMPOS_PUBLICOS_USUARIO } from "@/lib/usuarios";
 import { esquemaUsuarioNovo, lerCorpo } from "@/lib/validacao";
 
 export const GET = rota(async (req) => {
-  await exigirSessao(req, ["admin"]);
+  await exigirSessao(req);
   const ativo = filtroBooleano(req.nextUrl.searchParams.get("ativo"));
   const usuarios = await prisma.usuario.findMany({
     where: ativo !== undefined ? { ativo } : {},
@@ -17,7 +17,7 @@ export const GET = rota(async (req) => {
 });
 
 export const POST = rota(async (req) => {
-  await exigirSessao(req, ["admin"]);
+  await exigirSessao(req);
   const { senha, ...dados } = await lerCorpo(req, esquemaUsuarioNovo);
   if (await prisma.usuario.findUnique({ where: { email: dados.email } })) {
     throw new ErroHttp(409, "E-mail já cadastrado.");

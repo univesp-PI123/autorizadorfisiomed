@@ -43,7 +43,7 @@ export const GET = rota<Params>(async (req, { params }) => {
 
 // Edita os dados descritivos. Status tem rota própria (/status).
 export const PUT = rota<Params>(async (req, { params }) => {
-  const usuario = await exigirSessao(req, ["admin", "recepcionista", "financeiro"]);
+  const usuario = await exigirSessao(req);
   const { id } = await params;
   const dados = await lerCorpo(req, esquemaAutorizacaoEdicao);
 

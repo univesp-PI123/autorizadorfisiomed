@@ -20,7 +20,7 @@ const esquema = z.object({
 // Grava (ou apaga) o token que o paciente gerou para a sessão. Ele vale só no
 // dia em que foi gerado, por isso só se informa no dia da própria sessão.
 export const PATCH = rota<Params>(async (req, { params }) => {
-  await exigirSessao(req, ["admin", "recepcionista"]);
+  await exigirSessao(req);
   const { id } = await params;
   const { token } = await lerCorpo(req, esquema);
   const sessao = await prisma.agendamento.findUnique({ where: { id }, select: { data: true } });

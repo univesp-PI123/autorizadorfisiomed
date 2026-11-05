@@ -1,8 +1,9 @@
 # SGA — Fisiomed ABA
 
-Sistema de Gestão de Autorizações de Convênios. Centraliza pacientes,
-carteirinhas, autorizações e atendimentos para reduzir sessões realizadas sem
-cobertura e perdas de receita por glosa.
+Sistema de Gestão de Autorizações de Convênios. O foco é **solicitar as
+autorizações** das sessões agendadas no AnClinic (a agenda continua no
+AnClinic; aqui não se agenda nada), com pacientes, carteirinhas e
+autorizações centralizados para reduzir sessões sem cobertura e glosas.
 
 Aplicação única em **Next.js** (telas + API) com **PostgreSQL**, rodando no
 mesmo servidor na **AWS (EC2)**. Não usamos Neon nem Vercel.
@@ -13,30 +14,26 @@ mesmo servidor na **AWS (EC2)**. Não usamos Neon nem Vercel.
 
 ## Funcionalidades
 
+Menu (desde 05/11/2026, a pedido do grupo):
+
 - **Visão geral** — indicadores (autorizações ativas, pendentes, vencendo,
-  atendimentos do mês), autorizações vencendo, ações rápidas, cobrança e
-  gráfico de atendimentos por mês.
-- **Pacientes** — cadastro, edição, desativação e carteirinhas de convênio.
-- **Convênios** — cadastro de operadoras, prazos e antecedência dos alertas.
+  sessões de hoje), autorizações vencendo, ações rápidas e gráfico mensal.
+- **Relatórios** — evolução mensal, autorizações por convênio, glosas;
+  exportação CSV/JSON.
+- **Solicitações** (antiga Agenda) — as sessões importadas do AnClinic, a
+  situação de cada uma em relação à autorização, o token do paciente, a
+  geração do XML e o envio à Amil (veja abaixo).
 - **Autorizações** — ciclo completo com histórico:
   `pendente → em análise → autorizada/negada`, e `vencida`/`esgotada`
   aplicados automaticamente pelo sistema.
-- **Atendimentos** — gerados a partir da agenda: ao aprovar uma autorização,
-  as sessões que ela cobre (na vigência, até o saldo, inclusive as futuras)
-  viram atendimentos *aguardando confirmação*, com o valor do faturamento do
-  AnClinic; depois que a sessão acontece, o operador confirma (desconta a
-  sessão da autorização) ou cancela, com motivo. Registro manual só pelo operador, em
-  sessões de 1 hora (início em hora cheia ou meia hora). Cobrança: faturado,
-  pago ou glosado, com motivo da glosa em lista.
+- **Pacientes** — cadastro, edição, desativação e carteirinhas de convênio.
+- **Cadastros** — numa aba só: Convênios (operadoras, prazos, antecedência
+  dos alertas), Profissionais, Procedimentos e Clínica e unidades — os dados
+  que a guia TISS exige (CNES, conselho e CBO, código TUSS).
+- **Importações e configurações** — importação da agenda do AnClinic e da
+  lista de profissionais credenciados, envio de documentos em lote, troca da
+  própria senha e gestão de usuários.
 - **Alertas** — autorizações vencendo em 7 dias, no topo da tela.
-- **Relatórios** — evolução mensal, autorizações por convênio, glosas;
-  exportação CSV/JSON.
-- **Configurações** — troca da própria senha; gestão de usuários (admin).
-- **Agenda e importações** — importação da agenda do AnClinic e da lista de
-  profissionais credenciados; situação de cada sessão em relação à
-  autorização (veja abaixo).
-- **Clínica, unidades, profissionais e procedimentos** — os dados que a guia
-  TISS exige (CNES, conselho e CBO, código TUSS).
 - **Pedidos médicos e plano terapêutico** — médico solicitante, CID, sessões
   por semana e os PDFs, na página do paciente; envio em lote com vínculo
   automático ao paciente.
@@ -58,14 +55,14 @@ Rotina:
    ligados a um convênio do sistema e os avisos, com as linhas da planilha.
    Importar o mesmo dia de novo atualiza; sessões que sumiram da agenda ficam
    como excluídas.
-2. **Agenda** (abre no dia de hoje): cada sessão aparece como *com
+2. **Solicitações** (abre no dia de hoje): cada sessão aparece como *com
    pendência* (e o que falta), *pronta para solicitar*, *coberta* (autorização
    vigente com saldo ou senha no AnClinic), *fora da integração* (outros
    convênios, ou faturamento por "Assinatura") ou *cancelada*. "Pendências"
    agrupa o que falta e leva à tela onde se resolve cada item; o filtro "Sem
    unidade de atendimento" acha as sessões que precisam ser corrigidas no
    AnClinic.
-3. **Agenda → Gerar XML:** *Gerar XML das prontas* (ou das sessões
+3. **Solicitações → Gerar XML:** *Gerar XML das prontas* (ou das sessões
    selecionadas) monta as guias de solicitação de SP/SADT: uma guia por
    sessão, com quantidade 1. O médico solicitante (conselho, UF,
    CBO, indicação clínica/CID) vem do pedido médico; o procedimento vai pelo
@@ -76,8 +73,8 @@ Rotina:
    de ser gravado, e fica para baixar e conferir (ISO-8859-1, com o hash MD5
    do padrão). A sessão mostra o número da última guia gerada.
    **Token do paciente (Amil):** no dia da sessão a equipe pega com o
-   paciente o token (app ou SMS da Amil) e digita no campo da sessão, na
-   Agenda. A guia leva o token no `codValidacao`; sem o token do dia, a
+   paciente o token (app ou SMS da Amil) e digita no campo da sessão, em
+   Solicitações. A guia leva o token no `codValidacao`; sem o token do dia, a
    sessão fica com a pendência "Sem token do paciente do dia da sessão". O
    token vale só no dia: guia de outro dia não é enviada.
    **Enviar à Amil** (na sessão) manda a guia ao webservice
@@ -102,11 +99,12 @@ Rotina:
      sistema não gera outra. Resolve-se lançando a senha no AnClinic.
    - Guia em análise na operadora (status 2, 4 ou 5) impede guia nova;
      negada, cancelada ou recusada (mensagem de erro, SOAP Fault) libera.
-4. **Atendimentos → Aguardando confirmação:** ao aprovar a autorização, as
-   sessões que ela cobre vão para Atendimentos (a tela da autorização mostra
-   quantas); o operador confirma cada uma depois que ela acontece, ou cancela.
-   A autorização cobre a sessão pelo código do procedimento ou, nas lançadas
-   à mão, pelo nome/especialidade (ex.: "Psicologia" cobre "PSICOLOGIA ABA").
+4. **Autorização aprovada:** as sessões que ela cobre ficam ligadas a ela (a
+   tela da autorização mostra quantas). A autorização cobre a sessão pelo
+   código do procedimento ou, nas lançadas à mão, pelo nome/especialidade
+   (ex.: "Psicologia" cobre "PSICOLOGIA ABA"). A tela de Atendimentos (confirmar
+   ou cancelar cada sessão) saiu em 05/11/2026: sem a confirmação, o saldo
+   de sessões das autorizações manuais não é mais descontado.
 
 **Limitações conhecidas** (estado em 02/11/2026):
 
@@ -124,15 +122,14 @@ Rotina:
   análise ou a conferir é acompanhada no portal.
 
 **Unidade de atendimento:** vem da coluna "Unidade de Atendimento" do
-AnClinic. Para atribuir ou trocar, marque as sessões na **Agenda** (há o filtro
+AnClinic. Para atribuir ou trocar, marque as sessões em **Solicitações** (há o filtro
 "Sem unidade de atendimento"), escolha a unidade e clique em *Aplicar* — dá
 para incluir de uma vez as outras sessões sem unidade dos mesmos pacientes. A
 escolha feita no sistema não é desfeita pelas próximas importações. Unidades
 que não existem no AnClinic podem ser criadas em **Clínica e unidades**.
 
-**Busca de paciente:** nas autorizações (lista e nova autorização) e no
-registro de atendimento, um campo único acha o paciente pelo nome, CPF ou
-número da carteirinha.
+**Busca de paciente:** nas autorizações (lista e nova autorização), um campo
+único acha o paciente pelo nome, CPF ou número da carteirinha.
 
 Preparação (uma vez):
 
@@ -248,25 +245,11 @@ Por isso o servidor precisa de acesso à internet na hora do build.
 
 ## Perfis de acesso
 
-| Tela / ação                         | Admin | Recepção | Terapeuta | Financeiro |
-|-------------------------------------|:-----:|:--------:|:---------:|:----------:|
-| Visão geral, Configurações (própria senha) | ✅ | ✅ | ✅ | ✅ |
-| Pacientes                           | ✅ | ✅ | ✅ |    |
-| Convênios (ver)                     | ✅ | ✅ |    | ✅ |
-| Convênios (criar/editar)            | ✅ |    |    | ✅ |
-| Autorizações                        | ✅ | ✅ |    | ✅ |
-| Atendimentos (registrar, confirmar ou cancelar) | ✅ | ✅ |    |    |
-| Atendimentos (ver)                  | ✅ | ✅ | ✅ | ✅ |
-| Atendimentos (cobrança/glosa)       | ✅ | ✅ |    | ✅ |
-| Relatórios                          | ✅ |    |    | ✅ |
-| Agenda, histórico de importações, cadastros da integração (ver) | ✅ | ✅ |    | ✅ |
-| Importar planilhas; editar profissionais e procedimentos | ✅ | ✅ |    |    |
-| Dados da clínica e unidades (editar) | ✅ |    |    |    |
-| Pedidos médicos e documentos (ver)  | ✅ | ✅ | ✅ |    |
-| Pedidos médicos e documentos (enviar) | ✅ | ✅ |    |    |
-| Gestão de usuários                  | ✅ |    |    |    |
-
-As permissões são verificadas na API, não só escondidas na tela.
+Há um perfil só, **administrador**: todo usuário vê e faz tudo (pedido do
+grupo em 03/11/2026 — o foco é solicitar autorizações). Os perfis Recepção,
+Terapeuta e Financeiro foram removidos; a migration
+`20261105120000_perfil_unico_admin` transformou esses usuários em
+administradores. A API continua exigindo login em todas as rotas.
 
 ## Estrutura de pastas
 

@@ -80,18 +80,20 @@ async function criarDemo(adminId: string) {
     await prisma.procedimento.upsert({ where: { codigoAnclinic }, update: {}, create: { codigoAnclinic, descricao } });
   }
 
+  // Usuários de teste. O sistema tem um perfil só (admin); Carlos aparece
+  // como terapeuta nos atendimentos de exemplo.
   const terapeutas: string[] = [];
-  for (const [nome, email, perfil] of [
-    ["Ana Recepcionista", "recepcao@demo.local", "recepcionista"],
-    ["Carlos Terapeuta", "terapeuta@demo.local", "terapeuta"],
-    ["Fernanda Financeiro", "financeiro@demo.local", "financeiro"],
+  for (const [nome, email] of [
+    ["Ana Recepcionista", "recepcao@demo.local"],
+    ["Carlos Terapeuta", "terapeuta@demo.local"],
+    ["Fernanda Financeiro", "financeiro@demo.local"],
   ] as const) {
     const u = await prisma.usuario.upsert({
       where: { email },
       update: {},
-      create: { nome, email, perfil, senhaHash: senhaDemo },
+      create: { nome, email, senhaHash: senhaDemo },
     });
-    if (perfil === "terapeuta") terapeutas.push(u.id);
+    if (email === "terapeuta@demo.local") terapeutas.push(u.id);
   }
 
   const convenios = [];

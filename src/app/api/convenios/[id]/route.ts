@@ -14,7 +14,7 @@ export const GET = rota<Params>(async (req, { params }) => {
 });
 
 export const PUT = rota<Params>(async (req, { params }) => {
-  await exigirSessao(req, ["admin", "financeiro"]);
+  await exigirSessao(req);
   const { id } = await params;
   const dados = await lerCorpo(req, esquemaConvenio);
   const outro = await prisma.convenio.findUnique({ where: { nome: dados.nome } });

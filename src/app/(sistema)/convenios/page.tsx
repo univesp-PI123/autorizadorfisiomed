@@ -8,7 +8,6 @@ import Carregando from "@/components/ui/Carregando";
 import MensagemErro from "@/components/ui/MensagemErro";
 import Modal from "@/components/ui/Modal";
 import { Badge } from "@/components/ui/StatusBadge";
-import { useSessao } from "@/contextos/SessaoContexto";
 import { mensagemDeErro } from "@/lib/cliente/api";
 import { useFetch } from "@/lib/cliente/hooks";
 import { convenioService } from "@/lib/cliente/servicos";
@@ -63,10 +62,8 @@ const CAMPOS: [keyof FormConvenio, string, string, boolean?, boolean?][] = [
 ];
 
 function ConveniosPage({ url }: { url: URLSearchParams }) {
-  const { usuario } = useSessao();
-  const podeEditar = usuario.perfil === "admin" || usuario.perfil === "financeiro";
   const [editando, setEditando] = useState<Convenio | null>(null);
-  const [modalAberto, setModalAberto] = useState(podeEditar && url.get("novo") === "1");
+  const [modalAberto, setModalAberto] = useState(url.get("novo") === "1");
   const [form, setForm] = useState(FORM_INICIAL);
   const [salvando, setSalvando] = useState(false);
 
@@ -112,12 +109,10 @@ function ConveniosPage({ url }: { url: URLSearchParams }) {
       <section className="sb-card">
         <div className="sb-card__header">
           <h2 className="sb-card__title">Convênios</h2>
-          {podeEditar && (
-            <button type="button" className="sb-btn sb-btn--primary" onClick={() => abrir(null)}>
-              <Icone nome="mais" />
-              Novo convênio
-            </button>
-          )}
+          <button type="button" className="sb-btn sb-btn--primary" onClick={() => abrir(null)}>
+            <Icone nome="mais" />
+            Novo convênio
+          </button>
         </div>
         {carregando ? (
           <Carregando mensagem="Carregando convênios…" />
@@ -141,17 +136,15 @@ function ConveniosPage({ url }: { url: URLSearchParams }) {
                     Alerta
                   </th>
                   <th scope="col">Situação</th>
-                  {podeEditar && (
-                    <th scope="col" className="sb-end">
-                      <span className="sr-only">Ações</span>
-                    </th>
-                  )}
+                  <th scope="col" className="sb-end">
+                    <span className="sr-only">Ações</span>
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {(convenios ?? []).length === 0 ? (
                   <tr>
-                    <td colSpan={podeEditar ? 8 : 7} className="vazio">
+                    <td colSpan={8} className="vazio">
                       Nenhum convênio cadastrado.
                     </td>
                   </tr>
@@ -171,13 +164,11 @@ function ConveniosPage({ url }: { url: URLSearchParams }) {
                       <td className="sb-mono sb-end">{c.prazoAutorizacaoDias} d</td>
                       <td className="sb-mono sb-end">{c.alertaAntecipacaoDias} d antes</td>
                       <td>{c.ativo ? <Badge tom="success">Ativo</Badge> : <Badge>Inativo</Badge>}</td>
-                      {podeEditar && (
-                        <td className="sb-end">
-                          <button type="button" className="sb-btn sb-btn--sm" onClick={() => abrir(c)} aria-label={`Editar ${c.nome}`}>
-                            Editar
-                          </button>
-                        </td>
-                      )}
+                      <td className="sb-end">
+                        <button type="button" className="sb-btn sb-btn--sm" onClick={() => abrir(c)} aria-label={`Editar ${c.nome}`}>
+                          Editar
+                        </button>
+                      </td>
                     </tr>
                   ))
                 )}

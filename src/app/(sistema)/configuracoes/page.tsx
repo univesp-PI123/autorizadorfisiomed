@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import toast from "react-hot-toast";
 import Icone from "@/components/Icone";
 import Carregando from "@/components/ui/Carregando";
@@ -12,27 +12,19 @@ import { formatarDataHora } from "@/lib/analiseDados";
 import { mensagemDeErro } from "@/lib/cliente/api";
 import { useFetch } from "@/lib/cliente/hooks";
 import { usuarioService } from "@/lib/cliente/servicos";
-import type { Perfil, Usuario } from "@/lib/cliente/tipos";
-import { ROTULO_PERFIL } from "@/lib/navegacao";
+import type { Usuario } from "@/lib/cliente/tipos";
 
-const FORM_USUARIO = { nome: "", email: "", senha: "", perfil: "recepcionista" as Perfil };
-const PERFIS: Perfil[] = ["admin", "recepcionista", "terapeuta", "financeiro"];
+const FORM_USUARIO = { nome: "", email: "", senha: "" };
 const SENHA_VAZIA = { senhaAtual: "", novaSenha: "", confirmar: "" };
 
 export default function ConfiguracoesPage() {
   const { usuario } = useSessao();
-  const ehAdmin = usuario.perfil === "admin";
   const [modalUsuario, setModalUsuario] = useState(false);
   const [formUsuario, setFormUsuario] = useState(FORM_USUARIO);
   const [senhaForm, setSenhaForm] = useState(SENHA_VAZIA);
   const [salvando, setSalvando] = useState(false);
 
-  // Só o admin lista usuários (a API recusa os demais).
-  const buscarUsuarios = useCallback(
-    () => (ehAdmin ? usuarioService.listar() : Promise.resolve([] as Usuario[])),
-    [ehAdmin],
-  );
-  const usuarios = useFetch(buscarUsuarios);
+  const usuarios = useFetch(usuarioService.listar);
 
   const executar = async (acao: () => Promise<unknown>, sucesso: string, aoConcluir: () => void) => {
     setSalvando(true);
@@ -112,10 +104,6 @@ export default function ConfiguracoesPage() {
                 <dt>E-mail</dt>
                 <dd>{usuario.email}</dd>
               </div>
-              <div>
-                <dt>Perfil</dt>
-                <dd>{ROTULO_PERFIL[usuario.perfil]}</dd>
-              </div>
             </dl>
           </div>
         </div>
@@ -140,63 +128,59 @@ export default function ConfiguracoesPage() {
         </form>
       </section>
 
-      {ehAdmin && (
-        <section className="sb-card" id="usuarios-sistema" aria-labelledby="titulo-usuarios">
-          <div className="sb-card__header">
-            <h2 className="sb-card__title" id="titulo-usuarios">
-              Usuários do sistema
-            </h2>
-            <button type="button" className="sb-btn sb-btn--primary" onClick={() => setModalUsuario(true)}>
-              <Icone nome="mais" />
-              Novo usuário
-            </button>
+      <section className="sb-card" id="usuarios-sistema" aria-labelledby="titulo-usuarios">
+        <div className="sb-card__header">
+          <h2 className="sb-card__title" id="titulo-usuarios">
+            Usuários do sistema
+          </h2>
+          <button type="button" className="sb-btn sb-btn--primary" onClick={() => setModalUsuario(true)}>
+            <Icone nome="mais" />
+            Novo usuário
+          </button>
+        </div>
+        {usuarios.carregando ? (
+          <Carregando />
+        ) : usuarios.erro ? (
+          <div className="sb-card__body">
+            <MensagemErro mensagem={usuarios.erro} onRetry={usuarios.recarregar} />
           </div>
-          {usuarios.carregando ? (
-            <Carregando />
-          ) : usuarios.erro ? (
-            <div className="sb-card__body">
-              <MensagemErro mensagem={usuarios.erro} onRetry={usuarios.recarregar} />
-            </div>
-          ) : (
-            <div className="tabela-rolagem">
-              <table className="sb-table">
-                <thead>
-                  <tr>
-                    <th scope="col">Nome</th>
-                    <th scope="col">E-mail</th>
-                    <th scope="col">Perfil</th>
-                    <th scope="col">Situação</th>
-                    <th scope="col" className="sb-end">
-                      Último acesso
-                    </th>
-                    <th scope="col" className="sb-end">
-                      <span className="sr-only">Ações</span>
-                    </th>
+        ) : (
+          <div className="tabela-rolagem">
+            <table className="sb-table">
+              <thead>
+                <tr>
+                  <th scope="col">Nome</th>
+                  <th scope="col">E-mail</th>
+                  <th scope="col">Situação</th>
+                  <th scope="col" className="sb-end">
+                    Último acesso
+                  </th>
+                  <th scope="col" className="sb-end">
+                    <span className="sr-only">Ações</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {(usuarios.data ?? []).map((u) => (
+                  <tr key={u.id}>
+                    <td className="sb-strong">{u.nome}</td>
+                    <td>{u.email}</td>
+                    <td>{u.ativo ? <Badge tom="success">Ativo</Badge> : <Badge>Inativo</Badge>}</td>
+                    <td className="sb-mono sb-end">{formatarDataHora(u.ultimoAcesso)}</td>
+                    <td className="sb-end">
+                      {u.id !== usuario.id && (
+                        <button type="button" className="sb-btn sb-btn--sm" onClick={() => alternarAtivo(u)} disabled={salvando}>
+                          {u.ativo ? "Desativar" : "Reativar"}
+                        </button>
+                      )}
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {(usuarios.data ?? []).map((u) => (
-                    <tr key={u.id}>
-                      <td className="sb-strong">{u.nome}</td>
-                      <td>{u.email}</td>
-                      <td>{ROTULO_PERFIL[u.perfil]}</td>
-                      <td>{u.ativo ? <Badge tom="success">Ativo</Badge> : <Badge>Inativo</Badge>}</td>
-                      <td className="sb-mono sb-end">{formatarDataHora(u.ultimoAcesso)}</td>
-                      <td className="sb-end">
-                        {u.id !== usuario.id && (
-                          <button type="button" className="sb-btn sb-btn--sm" onClick={() => alternarAtivo(u)} disabled={salvando}>
-                            {u.ativo ? "Desativar" : "Reativar"}
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
-      )}
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
 
       <Modal
         aberto={modalUsuario}
@@ -246,18 +230,6 @@ export default function ConfiguracoesPage() {
             <span id="u-senha-ajuda" className="sb-help">
               Mínimo de 8 caracteres. A pessoa pode trocá-la depois em Configurações.
             </span>
-          </div>
-          <div className="sb-field">
-            <label className="sb-label" htmlFor="u-perfil">
-              Perfil
-            </label>
-            <select id="u-perfil" className="sb-input" value={formUsuario.perfil} onChange={(e) => setFormUsuario((f) => ({ ...f, perfil: e.target.value as Perfil }))}>
-              {PERFIS.map((p) => (
-                <option key={p} value={p}>
-                  {ROTULO_PERFIL[p]}
-                </option>
-              ))}
-            </select>
           </div>
         </form>
       </Modal>

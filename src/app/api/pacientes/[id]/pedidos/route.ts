@@ -18,7 +18,7 @@ const INCLUIR = {
 // Pedidos médicos do paciente, com os PDFs, e os documentos avulsos (enviados
 // em lote sem pedido ainda cadastrado).
 export const GET = rota<Params>(async (req, { params }) => {
-  await exigirSessao(req, ["admin", "recepcionista", "terapeuta"]);
+  await exigirSessao(req);
   const { id } = await params;
   const [pedidos, avulsos] = await Promise.all([
     prisma.pedidoMedico.findMany({
@@ -34,7 +34,7 @@ export const GET = rota<Params>(async (req, { params }) => {
 // Multipart: campos do pedido + um ou mais "arquivos" (PDF). Um plano
 // terapêutico entre eles completa as sessões por semana do pedido.
 export const POST = rota<Params>(async (req, { params }) => {
-  const usuario = await exigirSessao(req, ["admin", "recepcionista"]);
+  const usuario = await exigirSessao(req);
   const { id: pacienteId } = await params;
   let form: FormData;
   try {

@@ -1,30 +1,29 @@
 import type { NomeIcone } from "@/components/Icone";
-import type { Perfil } from "@/lib/cliente/tipos";
 
-const TODOS: Perfil[] = ["admin", "recepcionista", "terapeuta", "financeiro"];
+export type SubItem = { rotulo: string; href: string };
 
-export type SubItem = { rotulo: string; href: string; perfis?: Perfil[] };
+// Telas que dividem um item do menu: aparecem como abas no topo do conteúdo.
+export type Aba = { rotulo: string; caminho: string };
 
 export type ItemMenu = {
   caminho: string;
   rotulo: string;
   grupo: string;
   icone: NomeIcone;
-  perfis: Perfil[];
   // Opções do popup ao passar o mouse sobre o item.
   subitens: SubItem[];
+  abas?: Aba[];
 };
 
-// Itens do menu, seus grupos e quais perfis veem cada tela. Usado pela barra
-// lateral e para barrar quem digitar o endereço de uma tela fora do perfil.
-// Nos submenus, as ações ("Nova…", "Registrar…", "Importar…") vêm primeiro.
+// Itens do menu e seus grupos. O sistema tem um perfil só (admin), então
+// todo usuário vê tudo. Nos submenus, as ações ("Nova…", "Importar…") vêm
+// primeiro.
 export const ITENS_MENU: ItemMenu[] = [
   {
     caminho: "/dashboard",
     rotulo: "Visão geral",
     grupo: "Geral",
     icone: "painel",
-    perfis: TODOS,
     subitens: [{ rotulo: "Painel principal", href: "/dashboard" }],
   },
   {
@@ -32,7 +31,6 @@ export const ITENS_MENU: ItemMenu[] = [
     rotulo: "Relatórios",
     grupo: "Geral",
     icone: "relatorios",
-    perfis: ["admin", "financeiro"],
     subitens: [
       { rotulo: "Atendimentos por mês", href: "/relatorios#rel-evolucao" },
       { rotulo: "Autorizações por convênio", href: "/relatorios#rel-convenio" },
@@ -40,11 +38,23 @@ export const ITENS_MENU: ItemMenu[] = [
     ],
   },
   {
+    caminho: "/solicitacoes",
+    rotulo: "Solicitações",
+    grupo: "Operação",
+    icone: "agenda",
+    subitens: [
+      { rotulo: "Importar agenda do AnClinic", href: "/importacoes#importar-agenda" },
+      { rotulo: "Sessões do dia", href: "/solicitacoes" },
+      { rotulo: "Com pendência", href: "/solicitacoes?situacao=pendente" },
+      { rotulo: "Prontas para solicitar", href: "/solicitacoes?situacao=pronta" },
+      { rotulo: "Sem unidade de atendimento", href: "/solicitacoes?unidade=sem" },
+    ],
+  },
+  {
     caminho: "/autorizacoes",
     rotulo: "Autorizações",
     grupo: "Operação",
     icone: "autorizacoes",
-    perfis: ["admin", "recepcionista", "financeiro"],
     subitens: [
       { rotulo: "Nova autorização", href: "/autorizacoes?novo=1" },
       { rotulo: "Todas", href: "/autorizacoes" },
@@ -54,39 +64,10 @@ export const ITENS_MENU: ItemMenu[] = [
     ],
   },
   {
-    caminho: "/agenda",
-    rotulo: "Agenda",
-    grupo: "Operação",
-    icone: "agenda",
-    perfis: ["admin", "recepcionista", "financeiro"],
-    subitens: [
-      { rotulo: "Importar agenda", href: "/importacoes#importar-agenda", perfis: ["admin", "recepcionista"] },
-      { rotulo: "Sessões", href: "/agenda" },
-      { rotulo: "Com pendência", href: "/agenda?situacao=pendente" },
-      { rotulo: "Prontas para solicitar", href: "/agenda?situacao=pronta" },
-      { rotulo: "Sem unidade de atendimento", href: "/agenda?unidade=sem" },
-    ],
-  },
-  {
-    caminho: "/atendimentos",
-    rotulo: "Atendimentos",
-    grupo: "Operação",
-    icone: "atendimentos",
-    perfis: TODOS,
-    subitens: [
-      { rotulo: "Registrar atendimento", href: "/atendimentos?novo=1", perfis: ["admin", "recepcionista"] },
-      { rotulo: "Todos", href: "/atendimentos" },
-      { rotulo: "Aguardando confirmação", href: "/atendimentos?situacao=aguardando_confirmacao" },
-      { rotulo: "Sem autorização", href: "/atendimentos?semAutorizacao=true" },
-      { rotulo: "Glosados", href: "/atendimentos?statusCobranca=glosado" },
-    ],
-  },
-  {
     caminho: "/pacientes",
     rotulo: "Pacientes",
     grupo: "Cadastros",
     icone: "pacientes",
-    perfis: ["admin", "recepcionista", "terapeuta"],
     subitens: [
       { rotulo: "Novo paciente", href: "/pacientes?novo=1" },
       { rotulo: "Ativos", href: "/pacientes" },
@@ -95,77 +76,51 @@ export const ITENS_MENU: ItemMenu[] = [
   },
   {
     caminho: "/convenios",
-    rotulo: "Convênios",
+    rotulo: "Cadastros",
     grupo: "Cadastros",
     icone: "convenios",
-    perfis: ["admin", "recepcionista", "financeiro"],
     subitens: [
-      { rotulo: "Novo convênio", href: "/convenios?novo=1", perfis: ["admin", "financeiro"] },
-      { rotulo: "Lista", href: "/convenios" },
-    ],
-  },
-  {
-    caminho: "/profissionais",
-    rotulo: "Profissionais",
-    grupo: "Cadastros",
-    icone: "profissionais",
-    perfis: ["admin", "recepcionista", "financeiro"],
-    subitens: [
-      { rotulo: "Todos", href: "/profissionais" },
-    ],
-  },
-  {
-    caminho: "/procedimentos",
-    rotulo: "Procedimentos",
-    grupo: "Cadastros",
-    icone: "procedimentos",
-    perfis: ["admin", "recepcionista", "financeiro"],
-    subitens: [{ rotulo: "Equivalências e tabelas", href: "/procedimentos" }],
-  },
-  {
-    caminho: "/unidades",
-    rotulo: "Clínica e unidades",
-    grupo: "Cadastros",
-    icone: "unidades",
-    perfis: ["admin", "recepcionista", "financeiro"],
-    subitens: [
+      { rotulo: "Novo convênio", href: "/convenios?novo=1" },
+      { rotulo: "Convênios", href: "/convenios" },
+      { rotulo: "Profissionais", href: "/profissionais" },
+      { rotulo: "Procedimentos", href: "/procedimentos" },
       { rotulo: "Clínica e unidades", href: "/unidades" },
+    ],
+    abas: [
+      { rotulo: "Convênios", caminho: "/convenios" },
+      { rotulo: "Profissionais", caminho: "/profissionais" },
+      { rotulo: "Procedimentos", caminho: "/procedimentos" },
+      { rotulo: "Clínica e unidades", caminho: "/unidades" },
     ],
   },
   {
     caminho: "/importacoes",
-    rotulo: "Importações",
-    grupo: "Sistema",
-    icone: "importar",
-    perfis: ["admin", "recepcionista", "financeiro"],
-    subitens: [
-      { rotulo: "Importar agenda", href: "/importacoes#importar-agenda", perfis: ["admin", "recepcionista"] },
-      { rotulo: "Importar profissionais", href: "/importacoes#importar-profissionais", perfis: ["admin", "recepcionista"] },
-      { rotulo: "Enviar documentos", href: "/importacoes#importar-documentos", perfis: ["admin", "recepcionista"] },
-      { rotulo: "Histórico", href: "/importacoes#historico" },
-    ],
-  },
-  {
-    caminho: "/configuracoes",
-    rotulo: "Configurações",
+    rotulo: "Importações e configurações",
     grupo: "Sistema",
     icone: "configuracoes",
-    perfis: TODOS,
     subitens: [
+      { rotulo: "Importar agenda", href: "/importacoes#importar-agenda" },
+      { rotulo: "Importar profissionais", href: "/importacoes#importar-profissionais" },
+      { rotulo: "Enviar documentos", href: "/importacoes#importar-documentos" },
+      { rotulo: "Histórico de importações", href: "/importacoes#historico" },
       { rotulo: "Minha conta", href: "/configuracoes#minha-conta" },
-      { rotulo: "Usuários", href: "/configuracoes#usuarios-sistema", perfis: ["admin"] },
+      { rotulo: "Usuários", href: "/configuracoes#usuarios-sistema" },
+    ],
+    abas: [
+      { rotulo: "Importações", caminho: "/importacoes" },
+      { rotulo: "Configurações", caminho: "/configuracoes" },
     ],
   },
 ];
 
+const naRota = (pathname: string, caminho: string) => pathname === caminho || pathname.startsWith(caminho + "/");
+
+/** Item do menu da tela atual (inclusive as telas que são abas de um item). */
 export function itemDaRota(pathname: string) {
-  const raiz = "/" + (pathname.split("/")[1] ?? "");
-  return ITENS_MENU.find((i) => i.caminho === raiz);
+  return ITENS_MENU.find((i) => naRota(pathname, i.caminho) || i.abas?.some((a) => naRota(pathname, a.caminho)));
 }
 
-export const ROTULO_PERFIL: Record<Perfil, string> = {
-  admin: "Administrador",
-  recepcionista: "Recepção",
-  terapeuta: "Terapeuta",
-  financeiro: "Financeiro",
-};
+/** Aba da tela atual, quando o item do menu tem abas. */
+export function abaDaRota(item: ItemMenu | undefined, pathname: string) {
+  return item?.abas?.find((a) => naRota(pathname, a.caminho));
+}

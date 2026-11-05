@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 // Procedimentos do AnClinic (criados pela importação da agenda ou da tabela da
 // operadora), com o equivalente na operadora escolhida e o termo TUSS.
 export const GET = rota(async (req) => {
-  await exigirSessao(req, ["admin", "recepcionista", "financeiro", "terapeuta"]);
+  await exigirSessao(req);
   const convenioId = req.nextUrl.searchParams.get("convenioId") || null;
   const procedimentos = await prisma.procedimento.findMany({
     orderBy: { codigoAnclinic: "asc" },

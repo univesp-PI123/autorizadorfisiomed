@@ -18,7 +18,7 @@ const ROTULOS: Record<string, string> = {
 };
 
 export const PATCH = rota<{ id: string }>(async (req, { params }) => {
-  const usuario = await exigirSessao(req, ["admin", "recepcionista", "financeiro"]);
+  const usuario = await exigirSessao(req);
   const { id } = await params;
   const dados = await lerCorpo(req, esquemaMudancaStatus);
   await marcarVencidas();

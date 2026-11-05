@@ -9,7 +9,6 @@ import MensagemErro from "@/components/ui/MensagemErro";
 import Modal from "@/components/ui/Modal";
 import Paginacao from "@/components/ui/Paginacao";
 import { Badge } from "@/components/ui/StatusBadge";
-import { useSessao } from "@/contextos/SessaoContexto";
 import { mensagemDeErro } from "@/lib/cliente/api";
 import { useFetch, usePaginacao } from "@/lib/cliente/hooks";
 import { convenioService, importacaoService, procedimentoService } from "@/lib/cliente/servicos";
@@ -96,8 +95,6 @@ function ListaBusca<T>({
 }
 
 export default function ProcedimentosPage() {
-  const { usuario } = useSessao();
-  const podeEditar = usuario.perfil === "admin" || usuario.perfil === "recepcionista";
   const convenios = useFetch(convenioService.listar);
   const [escolhido, setConvenioId] = useState("");
   const [aba, setAba] = useState<Aba>("equivalencias");
@@ -235,12 +232,10 @@ export default function ProcedimentosPage() {
                 </option>
               ))}
             </select>
-            {podeEditar && (
-              <button type="button" className="sb-btn sb-btn--primary" onClick={() => setImportar(true)}>
-                <Icone nome="importar" />
-                Importar tabela
-              </button>
-            )}
+            <button type="button" className="sb-btn sb-btn--primary" onClick={() => setImportar(true)}>
+              <Icone nome="importar" />
+              Importar tabela
+            </button>
           </div>
         </div>
         <div className="abas" role="tablist" aria-label="Tabelas de procedimentos">
@@ -280,11 +275,9 @@ export default function ProcedimentosPage() {
                       <th scope="col" className="sb-end">
                         Sessões
                       </th>
-                      {podeEditar && (
-                        <th scope="col" className="sb-end">
-                          <span className="sr-only">Ações</span>
-                        </th>
-                      )}
+                      <th scope="col" className="sb-end">
+                        <span className="sr-only">Ações</span>
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -323,13 +316,11 @@ export default function ProcedimentosPage() {
                             </td>
                             <td className="sb-mono">{guia ?? <Badge tom="warning">Falta</Badge>}</td>
                             <td className="sb-mono sb-end">{p._count?.agendamentos ?? 0}</td>
-                            {podeEditar && (
-                              <td className="sb-end">
-                                <button type="button" className="sb-btn sb-btn--sm" onClick={() => abrir(p)} aria-label={`Editar ${p.descricao}`}>
-                                  Editar
-                                </button>
-                              </td>
-                            )}
+                            <td className="sb-end">
+                              <button type="button" className="sb-btn sb-btn--sm" onClick={() => abrir(p)} aria-label={`Editar ${p.descricao}`}>
+                                Editar
+                              </button>
+                            </td>
                           </tr>
                         );
                       })
