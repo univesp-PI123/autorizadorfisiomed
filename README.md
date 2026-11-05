@@ -102,9 +102,16 @@ Rotina:
 4. **Autorização aprovada:** as sessões que ela cobre ficam ligadas a ela (a
    tela da autorização mostra quantas). A autorização cobre a sessão pelo
    código do procedimento ou, nas lançadas à mão, pelo nome/especialidade
-   (ex.: "Psicologia" cobre "PSICOLOGIA ABA"). A tela de Atendimentos (confirmar
-   ou cancelar cada sessão) saiu em 05/11/2026: sem a confirmação, o saldo
-   de sessões das autorizações manuais não é mais descontado.
+   (ex.: "Psicologia" cobre "PSICOLOGIA ABA").
+5. **Desconto automático do saldo:** a partir do dia seguinte, a sessão que
+   não foi desmarcada nem excluída no AnClinic conta como realizada e é
+   descontada da autorização sozinha; a autorização vira *esgotada* quando
+   o saldo acaba. Se a autorização não puder mais cobrir a sessão (negada,
+   sem saldo, fora da vigência), a sessão fica registrada como "sem
+   autorização", com o motivo. Isso roda sempre que alguém abre a Visão
+   geral, as Autorizações ou as Solicitações (`descontarSessoesRealizadas`
+   em `src/lib/regras/atendimentos.ts`). Substitui a confirmação manual da
+   tela de Atendimentos, que saiu em 05/11/2026.
 
 **Limitações conhecidas** (estado em 02/11/2026):
 

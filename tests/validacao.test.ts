@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fimDaSessao } from "@/lib/regras/atendimentos";
+import { fimDaSessao, sessaoRealizada } from "@/lib/regras/atendimentos";
 import {
   esquemaAutorizacao,
   esquemaPaciente,
@@ -48,6 +48,20 @@ describe("atendimentos gerados da agenda", () => {
   it("sessão de 1 hora", () => {
     expect(fimDaSessao("15:30")).toBe("16:30");
     expect(fimDaSessao("23:30")).toBe("00:30");
+  });
+  it("sessão realizada (desconto automático): só de dias anteriores e não desmarcada", () => {
+    const hoje = new Date("2026-11-05T00:00:00Z");
+    const ontem = new Date("2026-11-04T00:00:00Z");
+    const ativa = { statusAnclinic: "Atendido", removidoEm: null };
+    expect(sessaoRealizada(ontem, hoje, ativa)).toBe(true);
+    // As de hoje ainda podem ser desmarcadas: esperam o dia seguinte.
+    expect(sessaoRealizada(hoje, hoje, ativa)).toBe(false);
+    expect(sessaoRealizada(new Date("2026-11-06T00:00:00Z"), hoje, ativa)).toBe(false);
+    // Desmarcada ou excluída no AnClinic não conta.
+    expect(sessaoRealizada(ontem, hoje, { statusAnclinic: "Desmarcado", removidoEm: null })).toBe(false);
+    expect(sessaoRealizada(ontem, hoje, { statusAnclinic: null, removidoEm: hoje })).toBe(false);
+    // Atendimento lançado à mão (sem sessão da agenda) conta pela data.
+    expect(sessaoRealizada(ontem, hoje, null)).toBe(true);
   });
 });
 

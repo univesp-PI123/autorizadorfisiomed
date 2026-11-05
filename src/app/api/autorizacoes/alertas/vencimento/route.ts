@@ -2,12 +2,12 @@ import { json, rota } from "@/lib/api/http";
 import { exigirSessao } from "@/lib/auth/sessao";
 import { hojeISO, paraDate, somarDias } from "@/lib/datas";
 import { prisma } from "@/lib/prisma";
-import { marcarVencidas } from "@/lib/regras/autorizacao";
+import { atualizarAutorizacoes } from "@/lib/regras/atendimentos";
 
 // Autorizações ativas que vencem nos próximos N dias (padrão 7).
 export const GET = rota(async (req) => {
   await exigirSessao(req);
-  await marcarVencidas();
+  await atualizarAutorizacoes();
   const dias = Math.min(
     365,
     Math.max(0, Number.parseInt(req.nextUrl.searchParams.get("dias") ?? "7", 10) || 7),

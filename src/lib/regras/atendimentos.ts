@@ -1,13 +1,14 @@
 // sessões da agenda que ela cobre (dentro da vigência, até o saldo) viram
-// atendimentos "aguardando confirmação". Depois que a sessão acontece,
-// o operador confirma (aí ela é descontada da autorização) ou cancela,
-// com motivo.
+// atendimentos "aguardando confirmação". Depois que a sessão acontece (dia
+// seguinte), ela é confirmada e descontada da autorização sozinha
+// (descontarSessoesRealizadas); se foi desmarcada no AnClinic, é cancelada.
 
 import { Prisma } from "@prisma/client";
 import { analisarAgendamentos } from "@/lib/agenda";
 import { ErroHttp } from "@/lib/api/http";
 import { hojeISO, paraDate, somarDias } from "@/lib/datas";
 import { prisma } from "@/lib/prisma";
+import { marcarVencidas } from "./autorizacao";
 import { sessaoInativa } from "./pendencias";
 
 type Tx = Prisma.TransactionClient;
@@ -22,17 +23,22 @@ export function fimDaSessao(inicio: string): string {
   return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
 }
 
+// Uma autorização "vencida" ainda cobre as sessões feitas dentro da vigência:
+// o desconto pode rodar depois de a vigência acabar.
+const STATUS_QUE_DESCONTAM = ["autorizada", "vencida"] as const;
+
 /**
- * Desconta uma sessão da autorização, se ela estiver autorizada, vigente na
- * data e com saldo — numa única instrução, para dois pedidos simultâneos não
- * passarem do limite. Esgotou: muda para "esgotada", com histórico.
+ * Desconta uma sessão da autorização, se ela estiver autorizada (ou vencida),
+ * com a data da sessão na vigência e com saldo — numa única instrução, para
+ * dois pedidos simultâneos não passarem do limite. Esgotou: a autorizada muda
+ * para "esgotada", com histórico.
  */
 export async function consumirSessao(tx: Tx, autorizacaoId: string, pacienteId: string, data: Date) {
   const aut = await tx.autorizacao.findUnique({ where: { id: autorizacaoId } });
   if (!aut || aut.pacienteId !== pacienteId) {
     throw new ErroHttp(422, "A autorização escolhida não pertence a este paciente.");
   }
-  if (aut.status !== "autorizada") {
+  if (!(STATUS_QUE_DESCONTAM as readonly string[]).includes(aut.status)) {
     throw new ErroHttp(422, `Autorização com status "${aut.status}" não pode ser utilizada.`);
   }
   if ((aut.dataInicioVigencia && data < aut.dataInicioVigencia) || (aut.dataFimVigencia && data > aut.dataFimVigencia)) {
@@ -41,7 +47,7 @@ export async function consumirSessao(tx: Tx, autorizacaoId: string, pacienteId: 
   const { count } = await tx.autorizacao.updateMany({
     where: {
       id: aut.id,
-      status: "autorizada",
+      status: { in: [...STATUS_QUE_DESCONTAM] },
       ...(aut.quantidadeAutorizada !== null && { quantidadeUtilizada: { lt: aut.quantidadeAutorizada } }),
     },
     data: { quantidadeUtilizada: { increment: 1 } },
@@ -49,7 +55,11 @@ export async function consumirSessao(tx: Tx, autorizacaoId: string, pacienteId: 
   if (count === 0) throw new ErroHttp(409, "Esta autorização não tem mais sessões disponíveis.");
 
   const atualizada = await tx.autorizacao.findUniqueOrThrow({ where: { id: aut.id } });
-  if (atualizada.quantidadeAutorizada !== null && atualizada.quantidadeUtilizada >= atualizada.quantidadeAutorizada) {
+  if (
+    atualizada.status === "autorizada" &&
+    atualizada.quantidadeAutorizada !== null &&
+    atualizada.quantidadeUtilizada >= atualizada.quantidadeAutorizada
+  ) {
     await tx.autorizacao.update({
       where: { id: aut.id },
       data: {
@@ -71,8 +81,7 @@ const JANELA_DIAS = 60; // sessões mais antigas que isso não geram atendimento
 /**
  * Cria os atendimentos pendentes das sessões cobertas e cancela os pendentes
  * cujas sessões foram desmarcadas no AnClinic. Idempotente (um atendimento
- * por sessão); roda após importar a agenda, ao autorizar e ao abrir a tela de
- * atendimentos.
+ * por sessão); roda após importar a agenda e ao autorizar.
  */
 export async function sincronizarAtendimentos() {
   const hoje = hojeISO();
@@ -148,4 +157,85 @@ export async function sincronizarAtendimentos() {
   }
   const { count } = await prisma.atendimento.createMany({ data: dados, skipDuplicates: true });
   return { criados: count };
+}
+
+/**
+ * A sessão já aconteceu? Conta como realizada a de dia anterior a hoje que
+ * não foi desmarcada nem excluída no AnClinic. As de hoje esperam o dia
+ * seguinte, porque ainda podem ser desmarcadas.
+ */
+export function sessaoRealizada(
+  dataAtendimento: Date,
+  hoje: Date,
+  agendamento: { statusAnclinic: string | null; removidoEm: Date | null } | null,
+): boolean {
+  if (dataAtendimento >= hoje) return false;
+  return !agendamento || (!agendamento.removidoEm && !sessaoInativa(agendamento.statusAnclinic));
+}
+
+/**
+ * Desconta das autorizações as sessões que já aconteceram, no lugar da
+ * confirmação manual (a tela de Atendimentos saiu em 05/11/2026): o
+ * atendimento "aguardando confirmação" de uma sessão realizada vira
+ * "confirmado" e a sessão sai do saldo. Se a autorização não puder mais
+ * cobrir a sessão (sem saldo, fora da vigência, negada…), o atendimento é
+ * confirmado como "sem autorização", com o motivo. Idempotente; roda antes
+ * das consultas que mostram saldo e status (como marcarVencidas).
+ */
+export async function descontarSessoesRealizadas() {
+  const hoje = paraDate(hojeISO());
+  const pendentes = await prisma.atendimento.findMany({
+    where: { situacao: "aguardando_confirmacao", dataAtendimento: { lt: hoje } },
+    select: {
+      id: true,
+      pacienteId: true,
+      autorizacaoId: true,
+      dataAtendimento: true,
+      observacoes: true,
+      agendamento: { select: { statusAnclinic: true, removidoEm: true } },
+    },
+    orderBy: { dataAtendimento: "asc" },
+  });
+
+  let descontadas = 0;
+  for (const p of pendentes) {
+    // Desmarcadas no AnClinic são canceladas por sincronizarAtendimentos.
+    if (!sessaoRealizada(p.dataAtendimento, hoje, p.agendamento)) continue;
+    const confirmar = { situacao: "confirmado" as const, confirmadoEm: new Date() };
+    try {
+      await prisma.$transaction(async (tx) => {
+        // A condição na situação evita descontar duas vezes se duas
+        // requisições rodarem juntas.
+        const { count } = await tx.atendimento.updateMany({
+          where: { id: p.id, situacao: "aguardando_confirmacao" },
+          data: confirmar,
+        });
+        if (count === 0) return;
+        if (p.autorizacaoId) await consumirSessao(tx, p.autorizacaoId, p.pacienteId, p.dataAtendimento);
+        descontadas++;
+      });
+    } catch (err) {
+      if (!(err instanceof ErroHttp)) throw err;
+      await prisma.atendimento.updateMany({
+        where: { id: p.id, situacao: "aguardando_confirmacao" },
+        data: {
+          ...confirmar,
+          autorizacaoId: null,
+          semAutorizacao: true,
+          observacoes: [p.observacoes, `Não descontada da autorização: ${err.message}`].filter(Boolean).join("\n"),
+        },
+      });
+    }
+  }
+  return { descontadas };
+}
+
+/**
+ * Atualiza o que depende da data antes das consultas de autorizações:
+ * desconta as sessões realizadas e marca as autorizações vencidas, nesta
+ * ordem (a sessão do último dia da vigência ainda é descontada).
+ */
+export async function atualizarAutorizacoes() {
+  await descontarSessoesRealizadas();
+  await marcarVencidas();
 }

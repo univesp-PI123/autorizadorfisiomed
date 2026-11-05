@@ -1,11 +1,11 @@
 import { json, rota } from "@/lib/api/http";
 import { exigirSessao } from "@/lib/auth/sessao";
 import { prisma } from "@/lib/prisma";
-import { marcarVencidas } from "@/lib/regras/autorizacao";
+import { atualizarAutorizacoes } from "@/lib/regras/atendimentos";
 
 export const GET = rota(async (req) => {
   await exigirSessao(req);
-  await marcarVencidas();
+  await atualizarAutorizacoes();
 
   const [grupos, convenios] = await Promise.all([
     prisma.autorizacao.groupBy({

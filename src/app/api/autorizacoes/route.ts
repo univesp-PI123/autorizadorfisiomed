@@ -4,12 +4,12 @@ import { exigirSessao } from "@/lib/auth/sessao";
 import { hojeISO, paraDate, somarDias } from "@/lib/datas";
 import { idsPacientesPorBusca } from "@/lib/pacientes/busca";
 import { prisma } from "@/lib/prisma";
-import { marcarVencidas } from "@/lib/regras/autorizacao";
+import { atualizarAutorizacoes } from "@/lib/regras/atendimentos";
 import { esquemaAutorizacao, lerCorpo, STATUS_AUTORIZACAO } from "@/lib/validacao";
 
 export const GET = rota(async (req) => {
   await exigirSessao(req);
-  await marcarVencidas();
+  await atualizarAutorizacoes();
   const sp = req.nextUrl.searchParams;
   const pag = paginacao(req);
 

@@ -3,8 +3,8 @@ import { ErroHttp, json, naoEncontrado, rota } from "@/lib/api/http";
 import { exigirSessao } from "@/lib/auth/sessao";
 import { deDate, hojeISO, paraDate } from "@/lib/datas";
 import { prisma } from "@/lib/prisma";
-import { sincronizarAtendimentos } from "@/lib/regras/atendimentos";
-import { marcarVencidas, podeTransitar, statusAutomatico } from "@/lib/regras/autorizacao";
+import { atualizarAutorizacoes, sincronizarAtendimentos } from "@/lib/regras/atendimentos";
+import { podeTransitar, statusAutomatico } from "@/lib/regras/autorizacao";
 import { esquemaMudancaStatus, lerCorpo } from "@/lib/validacao";
 
 const ROTULOS: Record<string, string> = {
@@ -21,7 +21,7 @@ export const PATCH = rota<{ id: string }>(async (req, { params }) => {
   const usuario = await exigirSessao(req);
   const { id } = await params;
   const dados = await lerCorpo(req, esquemaMudancaStatus);
-  await marcarVencidas();
+  await atualizarAutorizacoes();
 
   const atual = await prisma.autorizacao.findUnique({ where: { id } });
   if (!atual) naoEncontrado("Autorização");

@@ -3,7 +3,8 @@ import { json, naoEncontrado, rota } from "@/lib/api/http";
 import { exigirSessao } from "@/lib/auth/sessao";
 import { deDate, hojeISO } from "@/lib/datas";
 import { prisma } from "@/lib/prisma";
-import { marcarVencidas, statusAutomatico } from "@/lib/regras/autorizacao";
+import { atualizarAutorizacoes } from "@/lib/regras/atendimentos";
+import { statusAutomatico } from "@/lib/regras/autorizacao";
 import { esquemaAutorizacaoEdicao, lerCorpo } from "@/lib/validacao";
 
 type Params = { id: string };
@@ -11,7 +12,7 @@ type Params = { id: string };
 export const GET = rota<Params>(async (req, { params }) => {
   await exigirSessao(req);
   const { id } = await params;
-  await marcarVencidas();
+  await atualizarAutorizacoes();
   const autorizacao = await prisma.autorizacao.findUnique({
     where: { id },
     include: {
