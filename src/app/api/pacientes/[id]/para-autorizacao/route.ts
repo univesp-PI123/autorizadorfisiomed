@@ -8,7 +8,7 @@ import { codigoParaGuia } from "@/lib/regras/codigoGuia";
 // procedimentos que ele tem na agenda (por convênio) e o pedido médico com o
 // plano terapêutico vigente.
 export const GET = rota<{ id: string }>(async (req, { params }) => {
-  await exigirSessao(req, ["admin", "recepcionista", "financeiro"]);
+  await exigirSessao(req);
   const { id } = await params;
   const paciente = await prisma.paciente.findUnique({
     where: { id },

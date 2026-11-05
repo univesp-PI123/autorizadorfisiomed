@@ -11,10 +11,9 @@ import { prisma } from "@/lib/prisma";
 import { sincronizarAtendimentos } from "@/lib/regras/atendimentos";
 
 const TAMANHO_MAX = 15 * 1024 * 1024;
-const PERFIS_IMPORTACAO = ["admin", "recepcionista"] as const;
 
 export const GET = rota(async (req) => {
-  await exigirSessao(req, [...PERFIS_IMPORTACAO, "financeiro"]);
+  await exigirSessao(req);
   const importacoes = await prisma.importacao.findMany({
     orderBy: { createdAt: "desc" },
     take: 30,
@@ -28,7 +27,7 @@ const TIPOS = ["agenda", "profissionais", "tabela_operadora", "tuss"] as const;
 // Recebe a planilha (multipart: arquivo, tipo, convenioId). convenioId é
 // opcional para a lista de credenciados e obrigatório para a tabela da operadora.
 export const POST = rota(async (req) => {
-  const usuario = await exigirSessao(req, [...PERFIS_IMPORTACAO]);
+  const usuario = await exigirSessao(req);
   let form: FormData;
   try {
     form = await req.formData();

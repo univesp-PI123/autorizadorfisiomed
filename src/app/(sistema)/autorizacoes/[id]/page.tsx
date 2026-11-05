@@ -12,7 +12,6 @@ import MensagemErro from "@/components/ui/MensagemErro";
 import Modal from "@/components/ui/Modal";
 import StatusBadge, { rotuloStatus } from "@/components/ui/StatusBadge";
 import { useAlertas } from "@/contextos/AlertaContexto";
-import { useSessao } from "@/contextos/SessaoContexto";
 import { formatarData, formatarDataHora, percentualSessoes } from "@/lib/analiseDados";
 import { mensagemDeErro } from "@/lib/cliente/api";
 import { useFetch } from "@/lib/cliente/hooks";
@@ -25,7 +24,6 @@ const DADOS_VAZIOS = { motivoNegativa: "", numeroAutorizacao: "", dataResposta: 
 
 export default function AutorizacaoDetalhe() {
   const { id } = useParams<{ id: string }>();
-  const { usuario } = useSessao();
   const { buscarAlertas } = useAlertas();
   const [modalStatus, setModalStatus] = useState(false);
   const [novoStatus, setNovoStatus] = useState<StatusAutorizacao | "">("");
@@ -38,7 +36,7 @@ export default function AutorizacaoDetalhe() {
   if (carregando) return <Carregando mensagem="Carregando autorização…" />;
   if (erro || !aut) return <MensagemErro mensagem={erro ?? "Autorização não encontrada."} onRetry={recarregar} />;
 
-  const transicoes = usuario.perfil === "terapeuta" ? [] : TRANSICOES_MANUAIS[aut.status];
+  const transicoes = TRANSICOES_MANUAIS[aut.status];
 
   const fecharModal = () => {
     setModalStatus(false);
@@ -58,7 +56,7 @@ export default function AutorizacaoDetalhe() {
       );
       if (atualizada.atendimentosGerados !== undefined) {
         if (atualizada.atendimentosGerados > 0) {
-          toast.success(`${atualizada.atendimentosGerados} sessão(ões) da agenda enviadas para Atendimentos, aguardando confirmação.`);
+          toast.success(`${atualizada.atendimentosGerados} sessão(ões) da agenda vinculada(s) a esta autorização.`);
         } else {
           toast("Nenhuma sessão da agenda coberta por esta autorização. Confira convênio, procedimento e vigência.", { duration: 8000 });
         }
@@ -199,13 +197,12 @@ export default function AutorizacaoDetalhe() {
       <section className="sb-card" aria-labelledby="atendimentos-aut-titulo">
         <div className="sb-card__header">
           <h3 id="atendimentos-aut-titulo" className="sb-card__title">
-            Atendimentos desta autorização
+            Sessões desta autorização
           </h3>
-          <Link href={`/atendimentos?autorizacaoId=${aut.id}`}>Ver atendimentos</Link>
         </div>
         <div className="sb-card__body">
           {aut.status !== "autorizada" && !Object.keys(aut.atendimentos ?? {}).length ? (
-            <p className="texto-suave">Quando a autorização for aprovada, as sessões da agenda que ela cobre vão para Atendimentos.</p>
+            <p className="texto-suave">Quando a autorização for aprovada, as sessões da agenda que ela cobre aparecem aqui.</p>
           ) : (
             <dl className="dl-grade dl-grade--4">
               {(

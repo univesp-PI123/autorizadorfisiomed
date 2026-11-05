@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { fimDaSessao } from "@/lib/regras/atendimentos";
+import { fimDaSessao, sessaoRealizada } from "@/lib/regras/atendimentos";
 import {
-  esquemaAtendimento,
-  esquemaAtendimentoEdicao,
-  esquemaSituacaoAtendimento,
   esquemaAutorizacao,
   esquemaPaciente,
   esquemaUsuarioNovo,
@@ -39,37 +36,32 @@ describe("esquemaAutorizacao", () => {
   });
 });
 
-describe("esquemaAtendimento", () => {
-  it("aceita sem autorização e valida hora", () => {
-    const r = esquemaAtendimento.parse({ pacienteId: UUID, procedimento: "ABA", dataAtendimento: "2026-09-27", autorizacaoId: "", horaInicio: "08:30", });
-expect(r.autorizacaoId).toBeNull();
-expect(esquemaAtendimento.safeParse({ pacienteId: UUID, procedimento: "ABA", dataAtendimento: "2026-09-27", horaInicio: "25:00" }).success).toBe(false);
-// Só hora cheia ou meia hora.
-  });
-});
-
 describe("esquemaUsuarioNovo", () => {
   it("normaliza o e-mail e exige senha de 8+ caracteres", () => {
-    const r = esquemaUsuarioNovo.parse({ nome: "Ana", email: " Ana@Clinica.COM ", senha: "12345678", perfil: "terapeuta" });
+    const r = esquemaUsuarioNovo.parse({ nome: "Ana", email: " Ana@Clinica.COM ", senha: "12345678" });
     expect(r.email).toBe("ana@clinica.com");
-    expect(esquemaUsuarioNovo.safeParse({ nome: "Ana", email: "a@b.com", senha: "1234567", perfil: "terapeuta" }).success).toBe(false);
-    expect(esquemaUsuarioNovo.safeParse({ nome: "Ana", email: "a@b.com", senha: "12345678", perfil: "root" }).success).toBe(false);
+    expect(esquemaUsuarioNovo.safeParse({ nome: "Ana", email: "a@b.com", senha: "1234567" }).success).toBe(false);
   });
 });
 
-describe("confirmação e glosa", () => {
-  it("cancelar exige motivo", () => {
-    expect(esquemaSituacaoAtendimento.safeParse({ acao: "cancelar", motivo: " " }).success).toBe(false);
-    expect(esquemaSituacaoAtendimento.safeParse({ acao: "cancelar", motivo: "Paciente faltou" }).success).toBe(true);
-    expect(esquemaSituacaoAtendimento.safeParse({ acao: "confirmar" }).success).toBe(true);
-  });
-  it("glosado exige motivo", () => {
-    expect(esquemaAtendimentoEdicao.safeParse({ statusCobranca: "glosado", motivoGlosa: "" }).success).toBe(false);
-    expect(esquemaAtendimentoEdicao.safeParse({ statusCobranca: "glosado", motivoGlosa: "Autorização vencida" }).success).toBe(true);
-  });
+describe("atendimentos gerados da agenda", () => {
   it("sessão de 1 hora", () => {
     expect(fimDaSessao("15:30")).toBe("16:30");
     expect(fimDaSessao("23:30")).toBe("00:30");
+  });
+  it("sessão realizada (desconto automático): só de dias anteriores e não desmarcada", () => {
+    const hoje = new Date("2026-11-05T00:00:00Z");
+    const ontem = new Date("2026-11-04T00:00:00Z");
+    const ativa = { statusAnclinic: "Atendido", removidoEm: null };
+    expect(sessaoRealizada(ontem, hoje, ativa)).toBe(true);
+    // As de hoje ainda podem ser desmarcadas: esperam o dia seguinte.
+    expect(sessaoRealizada(hoje, hoje, ativa)).toBe(false);
+    expect(sessaoRealizada(new Date("2026-11-06T00:00:00Z"), hoje, ativa)).toBe(false);
+    // Desmarcada ou excluída no AnClinic não conta.
+    expect(sessaoRealizada(ontem, hoje, { statusAnclinic: "Desmarcado", removidoEm: null })).toBe(false);
+    expect(sessaoRealizada(ontem, hoje, { statusAnclinic: null, removidoEm: hoje })).toBe(false);
+    // Atendimento lançado à mão (sem sessão da agenda) conta pela data.
+    expect(sessaoRealizada(ontem, hoje, null)).toBe(true);
   });
 });
 

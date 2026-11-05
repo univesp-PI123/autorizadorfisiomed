@@ -9,7 +9,7 @@ type Params = { id: string };
 
 // Abre o PDF no navegador (só com login).
 export const GET = rota<Params>(async (req, { params }) => {
-  await exigirSessao(req, ["admin", "recepcionista", "terapeuta"]);
+  await exigirSessao(req);
   const { id } = await params;
   const doc = await prisma.documento.findUnique({ where: { id } });
   if (!doc) naoEncontrado("Documento");
@@ -28,7 +28,7 @@ export const GET = rota<Params>(async (req, { params }) => {
 
 // Liga (ou desliga) o documento a um pedido médico do mesmo paciente.
 export const PATCH = rota<Params>(async (req, { params }) => {
-  await exigirSessao(req, ["admin", "recepcionista"]);
+  await exigirSessao(req);
   const { id } = await params;
   const { pedidoId } = await lerCorpo(req, z.object({ pedidoId: z.string().uuid("Pedido inválido.").nullable() }));
   const doc = await prisma.documento.findUnique({ where: { id } });

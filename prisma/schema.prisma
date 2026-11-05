@@ -17,11 +17,10 @@ datasource db {
 
 // --- Enums -----------------------------------------------------------
 
+// Um perfil só (pedido do grupo em 03/11/2026): o sistema serve para
+// solicitar autorizações, e todo usuário tem acesso a tudo.
 enum PerfilUsuario {
   admin
-  recepcionista
-  terapeuta
-  financeiro
 }
 
 // Máquina de estados da autorização. As transições válidas ficam em
@@ -81,7 +80,7 @@ model Usuario {
   nome         String        @db.VarChar(150)
   email        String        @unique @db.VarChar(255)
   senhaHash    String
-  perfil       PerfilUsuario @default(recepcionista)
+  perfil       PerfilUsuario @default(admin)
   ativo        Boolean       @default(true)
   ultimoAcesso DateTime?
   createdAt    DateTime      @default(now())

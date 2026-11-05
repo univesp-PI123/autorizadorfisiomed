@@ -3,6 +3,7 @@ import { analisarAgendamentos } from "@/lib/agenda";
 import { exigirSessao } from "@/lib/auth/sessao";
 import { deDate, ehDataISO, hojeISO, paraDate } from "@/lib/datas";
 import { prisma } from "@/lib/prisma";
+import { atualizarAutorizacoes } from "@/lib/regras/atendimentos";
 import type { SituacaoSessao } from "@/lib/regras/pendencias";
 import { situacaoDaGuia } from "@/lib/tiss/envio";
 
@@ -11,12 +12,14 @@ const SITUACOES: SituacaoSessao[] = ["pendente", "pronta", "coberta", "fora", "c
 // Sessões de um dia (padrão: hoje) com a situação de cada uma em relação à
 // autorização.
 export const GET = rota(async (req) => {
-  await exigirSessao(req, ["admin", "recepcionista", "financeiro"]);
+  await exigirSessao(req);
   const sp = req.nextUrl.searchParams;
   const data = sp.get("data") || hojeISO();
   if (!ehDataISO(data)) throw new ErroHttp(422, "Data inválida.");
   const convenioId = sp.get("convenioId") || undefined;
   const situacao = sp.get("situacao") as SituacaoSessao | null;
+  // Saldo e status das autorizações em dia antes de analisar a cobertura.
+  await atualizarAutorizacoes();
 
   const sessoes = await analisarAgendamentos({ data: paraDate(data), ...(convenioId && { convenioId }) });
   // Última guia TISS gerada com cada sessão, com a resposta da operadora.

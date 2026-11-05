@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 
 // Tabela de procedimentos de uma operadora (importada), com a busca.
 export const GET = rota(async (req) => {
-  await exigirSessao(req, ["admin", "recepcionista", "financeiro"]);
+  await exigirSessao(req);
   const sp = req.nextUrl.searchParams;
   const convenioId = sp.get("convenioId");
   if (!convenioId) throw new ErroHttp(422, "Escolha o convênio.");

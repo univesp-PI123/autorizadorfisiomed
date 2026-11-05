@@ -6,7 +6,7 @@ import { esquemaProcedimento, lerCorpo } from "@/lib/validacao";
 // Edita o procedimento do AnClinic e, opcionalmente, o equivalente dele na
 // tabela de uma operadora (de/para).
 export const PUT = rota<{ id: string }>(async (req, { params }) => {
-  await exigirSessao(req, ["admin", "recepcionista"]);
+  await exigirSessao(req);
   const { id } = await params;
   const { equivalencia, ...dados } = await lerCorpo(req, esquemaProcedimento);
   if (!(await prisma.procedimento.findUnique({ where: { id } }))) naoEncontrado("Procedimento");

@@ -1,13 +1,13 @@
 import { json, naoEncontrado, rota } from "@/lib/api/http";
 import { exigirSessao } from "@/lib/auth/sessao";
 import { prisma } from "@/lib/prisma";
-import { marcarVencidas } from "@/lib/regras/autorizacao";
+import { atualizarAutorizacoes } from "@/lib/regras/atendimentos";
 
 export const GET = rota<{ id: string }>(async (req, { params }) => {
   await exigirSessao(req);
   const { id } = await params;
   if (!(await prisma.convenio.findUnique({ where: { id } }))) naoEncontrado("Convênio");
-  await marcarVencidas();
+  await atualizarAutorizacoes();
 
   const porStatus = await prisma.autorizacao.groupBy({
     by: ["status"],

@@ -64,11 +64,9 @@ const FORM_VAZIO = () => ({
 export default function PedidosMedicos({
   pacienteId,
   convenios,
-  podeEditar,
 }: {
   pacienteId: string;
   convenios: Convenio[];
-  podeEditar: boolean;
 }) {
   const buscar = useCallback(() => pedidoMedicoService.listar(pacienteId), [pacienteId]);
   const { data, carregando, erro, recarregar } = useFetch(buscar);
@@ -181,12 +179,10 @@ export default function PedidosMedicos({
         <h3 id="pedidos-titulo" className="sb-card__title">
           Pedidos médicos e plano terapêutico
         </h3>
-        {podeEditar && (
-          <button type="button" className="sb-btn sb-btn--sm" onClick={() => setAberto(true)}>
-            <Icone nome="mais" />
-            Novo pedido
-          </button>
-        )}
+        <button type="button" className="sb-btn sb-btn--sm" onClick={() => setAberto(true)}>
+          <Icone nome="mais" />
+          Novo pedido
+        </button>
       </div>
       {carregando ? (
         <Carregando />
@@ -218,11 +214,9 @@ export default function PedidosMedicos({
                       <Badge>Desativado</Badge>
                     )}
                     {p.sessoesSemanais !== null && <Badge>{p.sessoesSemanais} sessões/semana</Badge>}
-                    {podeEditar && (
-                      <button type="button" className="sb-btn sb-btn--sm empurra" onClick={() => alternar(p)}>
-                        {p.ativo ? "Desativar" : "Reativar"}
-                      </button>
-                    )}
+                    <button type="button" className="sb-btn sb-btn--sm empurra" onClick={() => alternar(p)}>
+                      {p.ativo ? "Desativar" : "Reativar"}
+                    </button>
                   </div>
                   <p className="texto-suave">
                     Pedido de <span className="mono">{formatarData(p.dataPedido)}</span>
@@ -254,7 +248,7 @@ export default function PedidosMedicos({
                 {avulsos.map((d) => (
                   <li key={d.id} className="ferramentas">
                     <ListaDocumentos documentos={[d]} />
-                    {podeEditar && pedidos.length > 0 && (
+                    {pedidos.length > 0 && (
                       <select
                         className="sb-input sb-input--sm empurra"
                         defaultValue=""

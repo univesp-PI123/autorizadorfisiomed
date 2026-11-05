@@ -7,7 +7,7 @@ type Params = { id: string };
 // Envia a guia ao webservice da operadora (solicitacaoProcedimento) e devolve
 // a resposta já gravada na guia.
 export const POST = rota<Params>(async (req, { params }) => {
-  await exigirSessao(req, ["admin", "recepcionista"]);
+  await exigirSessao(req);
   const { id } = await params;
   return json(await enviarGuia(id));
 });

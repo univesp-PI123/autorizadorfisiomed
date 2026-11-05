@@ -78,7 +78,7 @@ export default function ResumoImportacao({ importacao: imp }: { importacao: Impo
             </>
           )}
           {" "}· <span className="mono">{r.sessoes}</span> sessões.{" "}
-          <Link href={`/agenda?data=${r.periodo.inicio}`} className="link-texto">
+          <Link href={`/solicitacoes?data=${r.periodo.inicio}`} className="link-texto">
             Ver situação das sessões
           </Link>
         </p>

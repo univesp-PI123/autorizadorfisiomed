@@ -1,7 +1,7 @@
 // Formato dos dados como chegam da API (datas "só dia" em YYYY-MM-DD,
 // valores monetários como texto).
 
-export type Perfil = "admin" | "recepcionista" | "terapeuta" | "financeiro";
+export type Perfil = "admin";
 
 export type StatusAutorizacao =
   | "pendente"
@@ -197,9 +197,8 @@ export type Dashboard = {
   autorizacoesAtivas: number;
   autorizacoesPendentes: number;
   autorizacoesVencendo: number;
-  atendimentosMes: number;
+  sessoesHoje: number;
   glosasAberto: number;
-  semAutorizacaoMes: number;
   totalGlosado: number;
 };
 

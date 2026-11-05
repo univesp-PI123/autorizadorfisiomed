@@ -8,7 +8,6 @@ import ResumoImportacao from "@/components/ResumoImportacao";
 import Carregando from "@/components/ui/Carregando";
 import MensagemErro from "@/components/ui/MensagemErro";
 import Modal from "@/components/ui/Modal";
-import { useSessao } from "@/contextos/SessaoContexto";
 import { formatarDataHora } from "@/lib/analiseDados";
 import { mensagemDeErro } from "@/lib/cliente/api";
 import { useFetch } from "@/lib/cliente/hooks";
@@ -93,8 +92,6 @@ function FormImportacao({
 }
 
 export default function ImportacoesPage() {
-  const { usuario } = useSessao();
-  const podeImportar = usuario.perfil === "admin" || usuario.perfil === "recepcionista";
   const [aberta, setAberta] = useState<Importacao | null>(null);
   const historico = useFetch(importacaoService.listar);
   const convenios = useFetch(convenioService.listar);
@@ -106,37 +103,35 @@ export default function ImportacoesPage() {
 
   return (
     <>
-      {podeImportar && (
-        <section className="grid-meio">
-          <FormImportacao tipo="agenda" titulo="Agenda do AnClinic" aoImportar={aoImportar}>
-            <p className="texto-apoio">
-              No AnClinic, exporte o <strong style={{ fontWeight: 500 }}>Relatório de Agendamento</strong> em Excel, de um ou
-              mais dias, com todas as unidades. Importar o mesmo dia de novo atualiza as sessões; as que sumiram da agenda
-              são marcadas como excluídas.
-            </p>
-          </FormImportacao>
-          <FormImportacao tipo="profissionais" titulo="Profissionais credenciados" aoImportar={aoImportar}>
-            <p className="texto-apoio">
-              Planilha com Nome, CPF, Conselho, Número no conselho, UF e Especialidades. Com um convênio escolhido, ela vira a
-              lista completa de credenciados nele.
-            </p>
-            <div className="sb-field">
-              <label className="sb-label" htmlFor="imp-convenio">
-                Credenciados no convênio
-              </label>
-              <select id="imp-convenio" name="convenioId" className="sb-input" defaultValue="">
-                <option value="">Só atualizar os cadastros</option>
-                {(convenios.data ?? []).map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.nome}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </FormImportacao>
-        </section>
-      )}
-      {podeImportar && <EnvioDocumentos aoConcluir={historico.recarregar} />}
+      <section className="grid-meio">
+        <FormImportacao tipo="agenda" titulo="Agenda do AnClinic" aoImportar={aoImportar}>
+          <p className="texto-apoio">
+            No AnClinic, exporte o <strong style={{ fontWeight: 500 }}>Relatório de Agendamento</strong> em Excel, de um ou
+            mais dias, com todas as unidades. Importar o mesmo dia de novo atualiza as sessões; as que sumiram da agenda
+            são marcadas como excluídas.
+          </p>
+        </FormImportacao>
+        <FormImportacao tipo="profissionais" titulo="Profissionais credenciados" aoImportar={aoImportar}>
+          <p className="texto-apoio">
+            Planilha com Nome, CPF, Conselho, Número no conselho, UF e Especialidades. Com um convênio escolhido, ela vira a
+            lista completa de credenciados nele.
+          </p>
+          <div className="sb-field">
+            <label className="sb-label" htmlFor="imp-convenio">
+              Credenciados no convênio
+            </label>
+            <select id="imp-convenio" name="convenioId" className="sb-input" defaultValue="">
+              <option value="">Só atualizar os cadastros</option>
+              {(convenios.data ?? []).map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.nome}
+                </option>
+              ))}
+            </select>
+          </div>
+        </FormImportacao>
+      </section>
+      <EnvioDocumentos aoConcluir={historico.recarregar} />
 
       <section className="sb-card" id="historico" aria-labelledby="titulo-historico">
         <div className="sb-card__header">

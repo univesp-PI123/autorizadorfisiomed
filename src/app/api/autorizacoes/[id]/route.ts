@@ -3,7 +3,8 @@ import { json, naoEncontrado, rota } from "@/lib/api/http";
 import { exigirSessao } from "@/lib/auth/sessao";
 import { deDate, hojeISO } from "@/lib/datas";
 import { prisma } from "@/lib/prisma";
-import { marcarVencidas, statusAutomatico } from "@/lib/regras/autorizacao";
+import { atualizarAutorizacoes } from "@/lib/regras/atendimentos";
+import { statusAutomatico } from "@/lib/regras/autorizacao";
 import { esquemaAutorizacaoEdicao, lerCorpo } from "@/lib/validacao";
 
 type Params = { id: string };
@@ -11,7 +12,7 @@ type Params = { id: string };
 export const GET = rota<Params>(async (req, { params }) => {
   await exigirSessao(req);
   const { id } = await params;
-  await marcarVencidas();
+  await atualizarAutorizacoes();
   const autorizacao = await prisma.autorizacao.findUnique({
     where: { id },
     include: {
@@ -43,7 +44,7 @@ export const GET = rota<Params>(async (req, { params }) => {
 
 // Edita os dados descritivos. Status tem rota própria (/status).
 export const PUT = rota<Params>(async (req, { params }) => {
-  const usuario = await exigirSessao(req, ["admin", "recepcionista", "financeiro"]);
+  const usuario = await exigirSessao(req);
   const { id } = await params;
   const dados = await lerCorpo(req, esquemaAutorizacaoEdicao);
 

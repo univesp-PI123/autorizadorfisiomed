@@ -8,7 +8,7 @@ const esquema = z.object({ vinculoId: z.string().uuid() });
 
 // Verifica na Amil (webservice TISS) se a carteirinha do vínculo está elegível.
 export const POST = rota(async (req) => {
-  await exigirSessao(req, ["admin", "recepcionista"]);
+  await exigirSessao(req);
   const { vinculoId } = await lerCorpo(req, esquema);
   return json(await verificarElegibilidade(vinculoId));
 });

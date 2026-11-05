@@ -4,12 +4,12 @@ import { exigirSessao } from "@/lib/auth/sessao";
 import { hojeISO, paraDate, somarDias } from "@/lib/datas";
 import { idsPacientesPorBusca } from "@/lib/pacientes/busca";
 import { prisma } from "@/lib/prisma";
-import { marcarVencidas } from "@/lib/regras/autorizacao";
+import { atualizarAutorizacoes } from "@/lib/regras/atendimentos";
 import { esquemaAutorizacao, lerCorpo, STATUS_AUTORIZACAO } from "@/lib/validacao";
 
 export const GET = rota(async (req) => {
   await exigirSessao(req);
-  await marcarVencidas();
+  await atualizarAutorizacoes();
   const sp = req.nextUrl.searchParams;
   const pag = paginacao(req);
 
@@ -58,7 +58,7 @@ export const GET = rota(async (req) => {
 });
 
 export const POST = rota(async (req) => {
-  const usuario = await exigirSessao(req, ["admin", "recepcionista", "financeiro"]);
+  const usuario = await exigirSessao(req);
   const dados = await lerCorpo(req, esquemaAutorizacao);
 
   const [paciente, convenio] = await Promise.all([

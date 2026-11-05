@@ -324,6 +324,10 @@ textarea.sb-input { height: auto; min-height: 72px; padding: 10px 14px; resize: 
 .aba { font: 500 13px/20px var(--font-sans); color: var(--ink-secondary); background: none; border: 0; border-bottom: 2px solid transparent; padding: var(--space-2) var(--space-3); cursor: pointer; white-space: nowrap; }
 .aba:hover { color: var(--ink); }
 .aba[aria-selected="true"] { color: var(--accent-hover); border-bottom-color: var(--accent); }
+/* Abas de seção (telas que dividem um item do menu, ex.: Cadastros) */
+.abas--secao { padding: 0; margin-bottom: var(--space-4); }
+a.aba { text-decoration: none; }
+.aba[aria-current="page"] { color: var(--accent-hover); border-bottom-color: var(--accent); }
 .link-botao { font: inherit; color: var(--accent-hover); background: none; border: 0; padding: 0; text-decoration: underline; cursor: pointer; }
 .busca-paciente__campo { position: relative; }
 .busca-paciente__lista { position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 60; max-height: 280px; overflow-y: auto; list-style: none; margin: 0; padding: 4px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); box-shadow: var(--shadow-popover); }

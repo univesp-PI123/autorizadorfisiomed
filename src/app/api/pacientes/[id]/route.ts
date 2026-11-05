@@ -1,7 +1,7 @@
 import { ErroHttp, json, naoEncontrado, rota } from "@/lib/api/http";
 import { exigirSessao } from "@/lib/auth/sessao";
 import { prisma } from "@/lib/prisma";
-import { marcarVencidas } from "@/lib/regras/autorizacao";
+import { atualizarAutorizacoes } from "@/lib/regras/atendimentos";
 import { esquemaPaciente, lerCorpo } from "@/lib/validacao";
 
 type Params = { id: string };
@@ -9,7 +9,7 @@ type Params = { id: string };
 export const GET = rota<Params>(async (req, { params }) => {
   await exigirSessao(req);
   const { id } = await params;
-  await marcarVencidas();
+  await atualizarAutorizacoes();
   const paciente = await prisma.paciente.findUnique({
     where: { id },
     include: {

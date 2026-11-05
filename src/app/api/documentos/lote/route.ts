@@ -21,7 +21,7 @@ type ResumoLote = {
 // manda os arquivos em partes de até 10; todas as partes de um mesmo envio
 // somam no mesmo registro de importação (importacaoId).
 export const POST = rota(async (req) => {
-  const usuario = await exigirSessao(req, ["admin", "recepcionista"]);
+  const usuario = await exigirSessao(req);
   let form: FormData;
   try {
     form = await req.formData();

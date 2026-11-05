@@ -6,7 +6,6 @@ import { GraficoBarras } from "@/components/Graficos";
 import Carregando from "@/components/ui/Carregando";
 import MensagemErro from "@/components/ui/MensagemErro";
 import { useAlertas } from "@/contextos/AlertaContexto";
-import { useSessao } from "@/contextos/SessaoContexto";
 import { diasParaVencimento, formatarData, formatarMes} from "@/lib/analiseDados";
 import { useFetch } from "@/lib/cliente/hooks";
 import { relatorioService } from "@/lib/cliente/servicos";
@@ -34,7 +33,6 @@ function Indicador({
 }
 
 export default function Dashboard() {
-  const { usuario } = useSessao();
   const { alertas } = useAlertas();
   const { data, carregando, erro, recarregar } = useFetch(relatorioService.dashboard);
   const buscarEvolucao = useCallback(() => relatorioService.evolucaoAtendimentos(6), []);
@@ -51,14 +49,13 @@ export default function Dashboard() {
   }));
   const pico = meses.reduce<(typeof meses)[number] | null>((p, m) => (!p || m.total > p.total ? m : p), null);
 
-  const perfil = usuario.perfil;
   const acoes = [
-    { rotulo: "Nova autorização", href: "/autorizacoes?novo=1", mostrar: perfil !== "terapeuta" },
-    { rotulo: "Registrar atendimento", href: "/atendimentos?novo=1", mostrar: perfil !== "financeiro" },
-    { rotulo: "Novo paciente", href: "/pacientes?novo=1", mostrar: perfil !== "financeiro" },
-    { rotulo: "Ver pendentes", href: "/autorizacoes?status=pendente", mostrar: perfil !== "terapeuta" },
-    { rotulo: "Relatórios", href: "/relatorios", mostrar: perfil === "admin" || perfil === "financeiro" },
-  ].filter((a) => a.mostrar);
+    { rotulo: "Solicitações de hoje", href: "/solicitacoes" },
+    { rotulo: "Nova autorização", href: "/autorizacoes?novo=1" },
+    { rotulo: "Novo paciente", href: "/pacientes?novo=1" },
+    { rotulo: "Ver pendentes", href: "/autorizacoes?status=pendente" },
+    { rotulo: "Relatórios", href: "/relatorios" },
+  ];
 
   return (
     <>
@@ -82,10 +79,10 @@ export default function Dashboard() {
           href="/autorizacoes?vencendoEm=7"
         />
         <Indicador
-          rotulo="Atendimentos no mês"
-          valor={data.atendimentosMes}
-          sub={`${data.semAutorizacaoMes} sem autorização`}
-          href="/atendimentos"
+          rotulo="Sessões hoje"
+          valor={data.sessoesHoje}
+          sub="Importadas do AnClinic"
+          href="/solicitacoes"
         />
       </section>
 

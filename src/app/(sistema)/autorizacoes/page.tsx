@@ -11,7 +11,6 @@ import MensagemErro from "@/components/ui/MensagemErro";
 import Modal from "@/components/ui/Modal";
 import Paginacao from "@/components/ui/Paginacao";
 import StatusBadge, { Badge, rotuloStatus } from "@/components/ui/StatusBadge";
-import { useSessao } from "@/contextos/SessaoContexto";
 import { diasParaVencimento, formatarData } from "@/lib/analiseDados";
 import { mensagemDeErro } from "@/lib/cliente/api";
 import { useFetch, usePaginacao } from "@/lib/cliente/hooks";
@@ -37,11 +36,10 @@ const formInicial = () => ({
 });
 
 function AutorizacoesPage({ url }: { url: URLSearchParams }) {
-  const { usuario } = useSessao();
   const [filtroStatus, setFiltroStatus] = useState(url.get("status") ?? "");
   const [vencendoEm, setVencendoEm] = useState(url.get("vencendoEm") ?? "");
   const filtroPaciente = url.get("pacienteId") ?? "";
-  const [modalAberto, setModalAberto] = useState(url.get("novo") === "1" && usuario.perfil !== "terapeuta");
+  const [modalAberto, setModalAberto] = useState(url.get("novo") === "1");
   const [form, setForm] = useState(formInicial);
   const [salvando, setSalvando] = useState(false);
   const [paciente, setPaciente] = useState<PacienteBusca | null>(null);
@@ -225,12 +223,10 @@ function AutorizacoesPage({ url }: { url: URLSearchParams }) {
               <option value="15">Vencendo em 15 dias</option>
               <option value="30">Vencendo em 30 dias</option>
             </select>
-            {usuario.perfil !== "terapeuta" && (
-              <button type="button" className="sb-btn sb-btn--primary" onClick={() => setModalAberto(true)}>
-                <Icone nome="mais" />
-                Nova autorização
-              </button>
-            )}
+            <button type="button" className="sb-btn sb-btn--primary" onClick={() => setModalAberto(true)}>
+              <Icone nome="mais" />
+              Nova autorização
+            </button>
           </div>
         </div>
 

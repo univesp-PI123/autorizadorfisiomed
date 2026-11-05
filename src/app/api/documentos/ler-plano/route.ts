@@ -6,7 +6,7 @@ import { lerPlano } from "@/lib/documentos/plano";
 // Lê o plano terapêutico sem gravar nada: o formulário de pedido médico usa
 // para se preencher sozinho.
 export const POST = rota(async (req) => {
-  await exigirSessao(req, ["admin", "recepcionista"]);
+  await exigirSessao(req);
   let form: FormData;
   try {
     form = await req.formData();

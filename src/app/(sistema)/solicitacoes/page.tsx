@@ -8,7 +8,6 @@ import Icone from "@/components/Icone";
 import Carregando from "@/components/ui/Carregando";
 import MensagemErro from "@/components/ui/MensagemErro";
 import { Badge } from "@/components/ui/StatusBadge";
-import { useSessao } from "@/contextos/SessaoContexto";
 import { formatarData } from "@/lib/analiseDados";
 import { useFetch } from "@/lib/cliente/hooks";
 import { mensagemDeErro } from "@/lib/cliente/api";
@@ -82,15 +81,13 @@ function TokenSessao({ sessao, aoSalvar }: { sessao: SessaoAgenda; aoSalvar: () 
   );
 }
 
-function AgendaPage({ url }: { url: URLSearchParams }) {
-  const { usuario } = useSessao();
+function SolicitacoesPage({ url }: { url: URLSearchParams }) {
   const [data, setData] = useState(url.get("data") ?? hojeISO());
   const [convenioId, setConvenioId] = useState(url.get("convenioId") ?? "");
   const [situacao, setSituacao] = useState<SituacaoSessao | "">((url.get("situacao") as SituacaoSessao) ?? "");
   const [busca, setBusca] = useState("");
   // "" = todas; "sem" = sessões sem unidade de atendimento; senão, o id da unidade.
   const [unidade, setUnidade] = useState(url.get("unidade") ?? "");
-  const podeEditar = usuario.perfil === "admin" || usuario.perfil === "recepcionista";
   const [marcadas, setMarcadas] = useState<Set<string>>(new Set());
   const [unidadeDestino, setUnidadeDestino] = useState("");
   const [incluirPaciente, setIncluirPaciente] = useState(true);
@@ -216,18 +213,16 @@ function AgendaPage({ url }: { url: URLSearchParams }) {
                 </option>
               ))}
             </select>
-            {(usuario.perfil === "admin" || usuario.perfil === "recepcionista") && (
-              <Link href="/importacoes" className="sb-btn sb-btn--primary">
-                <Icone nome="importar" />
-                Importar agenda
-              </Link>
-            )}
+            <Link href="/importacoes#importar-agenda" className="sb-btn sb-btn--primary">
+              <Icone nome="importar" />
+              Importar agenda do AnClinic
+            </Link>
           </div>
         </div>
       </section>
 
       {agenda.carregando && !agenda.data ? (
-        <Carregando mensagem="Carregando agenda…" />
+        <Carregando mensagem="Carregando sessões…" />
       ) : agenda.erro ? (
         <MensagemErro mensagem={agenda.erro} onRetry={agenda.recarregar} />
       ) : agenda.data && agenda.data.total === 0 ? (
@@ -397,7 +392,7 @@ function AgendaPage({ url }: { url: URLSearchParams }) {
                     ))}
                     <option value="sem">Sem unidade de atendimento ({agenda.data.semUnidade})</option>
                   </select>
-                  {podeEditar && prontas.length > 0 && (
+                  {prontas.length > 0 && (
                     <button
                       type="button"
                       className="sb-btn sb-btn--primary sb-btn--sm"
@@ -409,7 +404,7 @@ function AgendaPage({ url }: { url: URLSearchParams }) {
                   )}
                 </div>
               </div>
-              {podeEditar && marcadas.size > 0 && (
+              {marcadas.size > 0 && (
                 <div className="barra-lote" role="region" aria-label="Atribuir unidade às sessões selecionadas">
                   <span>
                     <span className="mono">{marcadas.size}</span> sessão(ões) selecionada(s)
@@ -453,16 +448,14 @@ function AgendaPage({ url }: { url: URLSearchParams }) {
                 <table className="sb-table">
                   <thead>
                     <tr>
-                      {podeEditar && (
-                        <th scope="col" className="col-check">
-                          <input
-                            type="checkbox"
-                            aria-label="Selecionar todas as sessões listadas"
-                            checked={sessoes.length > 0 && sessoes.every((x) => marcadas.has(x.id))}
-                            onChange={(e) => setMarcadas(e.target.checked ? new Set(sessoes.map((x) => x.id)) : new Set())}
-                          />
-                        </th>
-                      )}
+                      <th scope="col" className="col-check">
+                        <input
+                          type="checkbox"
+                          aria-label="Selecionar todas as sessões listadas"
+                          checked={sessoes.length > 0 && sessoes.every((x) => marcadas.has(x.id))}
+                          onChange={(e) => setMarcadas(e.target.checked ? new Set(sessoes.map((x) => x.id)) : new Set())}
+                        />
+                      </th>
                       <th scope="col">Horário</th>
                       <th scope="col">Paciente</th>
                       <th scope="col">Procedimento</th>
@@ -475,23 +468,21 @@ function AgendaPage({ url }: { url: URLSearchParams }) {
                   <tbody>
                     {sessoes.length === 0 ? (
                       <tr>
-                        <td colSpan={podeEditar ? 8 : 7} className="vazio">
+                        <td colSpan={8} className="vazio">
                           Nenhuma sessão com esses filtros.
                         </td>
                       </tr>
                     ) : (
                       sessoes.map((s) => (
                         <tr key={s.id}>
-                          {podeEditar && (
-                            <td className="col-check">
-                              <input
-                                type="checkbox"
-                                checked={marcadas.has(s.id)}
-                                onChange={(e) => marcar(s.id, e.target.checked)}
-                                aria-label={`Selecionar sessão de ${s.paciente?.nome ?? s.pacienteAnclinic ?? "sem paciente"} às ${s.horaInicio ?? "—"}`}
-                              />
-                            </td>
-                          )}
+                          <td className="col-check">
+                            <input
+                              type="checkbox"
+                              checked={marcadas.has(s.id)}
+                              onChange={(e) => marcar(s.id, e.target.checked)}
+                              aria-label={`Selecionar sessão de ${s.paciente?.nome ?? s.pacienteAnclinic ?? "sem paciente"} às ${s.horaInicio ?? "—"}`}
+                            />
+                          </td>
                           <td className="sb-mono" style={{ whiteSpace: "nowrap" }}>
                             {s.horaInicio ?? "—"}
                             {s.horaFim && `–${s.horaFim}`}
@@ -526,7 +517,7 @@ function AgendaPage({ url }: { url: URLSearchParams }) {
                             ) : (
                               s.motivo && <span className="texto-suave">{s.motivo}</span>
                             )}
-                            {s.pedeToken && data === hojeISO() && podeEditar && s.situacao !== "cancelada" && (
+                            {s.pedeToken && data === hojeISO() && s.situacao !== "cancelada" && (
                               <TokenSessao key={`${s.id}-${s.token ?? ""}`} sessao={s} aoSalvar={agenda.recarregar} />
                             )}
                             {s.guia && (
@@ -552,7 +543,7 @@ function AgendaPage({ url }: { url: URLSearchParams }) {
                                 ))}
                               </ul>
                             )}
-                            {s.guia?.podeEnviar && podeEditar && (
+                            {s.guia?.podeEnviar && (
                               <button
                                 type="button"
                                 className="sb-btn sb-btn--sm"
@@ -578,4 +569,4 @@ function AgendaPage({ url }: { url: URLSearchParams }) {
   );
 }
 
-export default comUrl(AgendaPage);
+export default comUrl(SolicitacoesPage);

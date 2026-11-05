@@ -3,20 +3,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Suspense, type ReactNode } from "react";
-import Icone from "@/components/Icone";
-import { useSessao } from "@/contextos/SessaoContexto";
-import { itemDaRota } from "@/lib/navegacao";
+import { abaDaRota, itemDaRota } from "@/lib/navegacao";
 import Rail from "./Rail";
 import Topbar from "./Topbar";
 
 export default function MainLayout({ children }: { children: ReactNode }) {
-  const { usuario } = useSessao();
   const pathname = usePathname();
-
-  // Quem digitar o endereço de uma tela fora do seu perfil vê um aviso.
-  // (A proteção de verdade está na API, que valida o perfil em cada rota.)
   const item = itemDaRota(pathname);
-  const permitido = !item || item.perfis.includes(usuario.perfil);
+  const abaAtual = abaDaRota(item, pathname);
 
   return (
     <div className="app">
@@ -26,18 +20,17 @@ export default function MainLayout({ children }: { children: ReactNode }) {
       <div className="main">
         <Topbar />
         <main id="conteudo" className="content" tabIndex={-1}>
-          {permitido ? (
-            children
-          ) : (
-            <div className="sb-card estado-central" role="alert">
-              <Icone nome="cadeado" tamanho={24} />
-              <h2 className="card-title">Acesso restrito</h2>
-              <p className="texto-apoio">Seu perfil não tem acesso a esta tela.</p>
-              <Link href="/dashboard" className="sb-btn">
-                Voltar à visão geral
-              </Link>
-            </div>
+          {/* Telas que dividem um item do menu (ex.: Cadastros) ganham abas. */}
+          {item?.abas && abaAtual && (
+            <nav className="abas abas--secao" aria-label={item.rotulo}>
+              {item.abas.map((a) => (
+                <Link key={a.caminho} href={a.caminho} className="aba" aria-current={a === abaAtual ? "page" : undefined}>
+                  {a.rotulo}
+                </Link>
+              ))}
+            </nav>
           )}
+          {children}
         </main>
       </div>
     </div>

@@ -8,7 +8,6 @@ import MensagemErro from "@/components/ui/MensagemErro";
 import Modal from "@/components/ui/Modal";
 import Paginacao from "@/components/ui/Paginacao";
 import { Badge } from "@/components/ui/StatusBadge";
-import { useSessao } from "@/contextos/SessaoContexto";
 import { mensagemDeErro } from "@/lib/cliente/api";
 import { useFetch, usePaginacao } from "@/lib/cliente/hooks";
 import { convenioService, profissionalService } from "@/lib/cliente/servicos";
@@ -29,8 +28,6 @@ const formDoProfissional = (p: Profissional) => ({
 });
 
 function ProfissionaisPage({ url }: { url: URLSearchParams }) {
-  const { usuario } = useSessao();
-  const podeEditar = usuario.perfil === "admin" || usuario.perfil === "recepcionista";
   const [busca, setBusca] = useState("");
   const [buscaAplicada, setBuscaAplicada] = useState("");
   const [filtro, setFiltro] = useState(url.get("filtro") ?? "");
@@ -183,11 +180,9 @@ function ProfissionaisPage({ url }: { url: URLSearchParams }) {
                     <th scope="col" className="sb-end">
                       Sessões
                     </th>
-                    {podeEditar && (
-                      <th scope="col" className="sb-end">
-                        <span className="sr-only">Ações</span>
-                      </th>
-                    )}
+                    <th scope="col" className="sb-end">
+                      <span className="sr-only">Ações</span>
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -211,13 +206,11 @@ function ProfissionaisPage({ url }: { url: URLSearchParams }) {
                         <td className="sb-mono">{p.cbo ?? <Badge tom="warning">Falta</Badge>}</td>
                         <td>{p.credenciamentos.length ? p.credenciamentos.map((c) => c.convenio.nome).join(", ") : "—"}</td>
                         <td className="sb-mono sb-end">{p._count?.agendamentos ?? 0}</td>
-                        {podeEditar && (
-                          <td className="sb-end">
-                            <button type="button" className="sb-btn sb-btn--sm" onClick={() => abrir(p)} aria-label={`Editar ${p.nome}`}>
-                              Editar
-                            </button>
-                          </td>
-                        )}
+                        <td className="sb-end">
+                          <button type="button" className="sb-btn sb-btn--sm" onClick={() => abrir(p)} aria-label={`Editar ${p.nome}`}>
+                            Editar
+                          </button>
+                        </td>
                       </tr>
                     ))
                   )}

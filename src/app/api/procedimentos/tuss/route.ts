@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 
 // Tabela 22 da TUSS (importada da ANS), com a busca por código ou termo.
 export const GET = rota(async (req) => {
-  await exigirSessao(req, ["admin", "recepcionista", "financeiro"]);
+  await exigirSessao(req);
   const busca = req.nextUrl.searchParams.get("busca")?.trim();
   const pag = paginacao(req, 50);
   const where: Prisma.TussProcedimentoWhereInput = busca

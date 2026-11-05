@@ -3,7 +3,7 @@ import { exigirSessao } from "@/lib/auth/sessao";
 import { prisma } from "@/lib/prisma";
 
 export const GET = rota<{ id: string }>(async (req, { params }) => {
-  await exigirSessao(req, ["admin", "recepcionista", "financeiro"]);
+  await exigirSessao(req);
   const { id } = await params;
   const importacao = await prisma.importacao.findUnique({
     where: { id },
