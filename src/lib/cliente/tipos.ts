@@ -340,6 +340,9 @@ export type SessaoAgenda = {
     situacao: string;
     enviada: boolean;
     podeEnviar: boolean;
+    podeConsultar: boolean; // em análise na operadora
+    podeCancelar: boolean; // enviada, ainda ativa na operadora
+    motivoCancelamento: string | null;
     senha: string | null;
     validadeSenha: string | null;
     glosas: string[];

@@ -124,3 +124,36 @@ export function lerRespostaElegibilidade(xml: string): RespostaElegibilidade {
   }
   return falha(xml, "Resposta da operadora sem recibo de elegibilidade.");
 }
+
+// Tabela dm_statusCancelamento.
+export const STATUS_CANCELAMENTO: Record<string, string> = {
+  "1": "Cancelada com sucesso",
+  "2": "Não cancelada",
+  "3": "Guia inexistente na operadora",
+  "4": "Cancelamento em processamento",
+};
+
+export type RespostaCancelamento =
+  | { tipo: "recibo"; status: string; cancelada: boolean; descricao: string }
+  | { tipo: "erro"; glosas: string[] }
+  | { tipo: "falha"; mensagem: string };
+
+/** Lê o reciboCancelaGuiaWS: o status do cancelamento da guia, ou a mensagem de erro. */
+export function lerRespostaCancelamento(xml: string): RespostaCancelamento {
+  const resposta = trecho(xml, "reciboCancelaGuia");
+  if (resposta !== null) {
+    const erro = trecho(resposta, "mensagemErro");
+    if (erro !== null) return { tipo: "erro", glosas: glosasDe(erro) };
+    const status = campo(resposta, "statusCancelamento");
+    if (status) {
+      return {
+        tipo: "recibo",
+        status,
+        // "Guia inexistente" também libera a sessão: não há o que cancelar.
+        cancelada: status === "1" || status === "3",
+        descricao: STATUS_CANCELAMENTO[status] ?? `Status ${status}`,
+      };
+    }
+  }
+  return falha(xml, "Resposta da operadora sem recibo de cancelamento.");
+}

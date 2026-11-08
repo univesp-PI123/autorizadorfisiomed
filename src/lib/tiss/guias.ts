@@ -36,7 +36,13 @@ function indicacaoDoPedido(indicacao: string | null, cid: string | null): string
   return partes.join(" - ") || null;
 }
 
-export async function gerarGuias(agendamentoIds: string[], usuarioId: string) {
+/** Token que vai na guia: só o informado hoje (ele vale só no dia em que o paciente o gerou). */
+function tokenDeHoje(a: { tokenBeneficiario: string | null; tokenInformadoEm: Date | null }): string | null {
+  return a.tokenBeneficiario && a.tokenInformadoEm && hojeISO(a.tokenInformadoEm) === hojeISO() ? a.tokenBeneficiario : null;
+}
+
+/** usuarioId nulo: guia gerada pela rotina automática. */
+export async function gerarGuias(agendamentoIds: string[], usuarioId: string | null) {
   const [sessoes, jaPedidas] = await Promise.all([
     analisarAgendamentos({ id: { in: agendamentoIds } }),
     prisma.guiaTiss.findMany({ where: { agendamentoIds: { hasSome: agendamentoIds } }, select: GUIA_PARA_SESSAO }),
@@ -49,9 +55,7 @@ export async function gerarGuias(agendamentoIds: string[], usuarioId: string) {
       if (s.situacao !== "pronta") return s.pendencias.length ? s.pendencias.join("; ") : (s.motivo ?? s.situacao);
       const d = guiaQueDecide(guiasDaSessao.get(s.agendamento.id) ?? [], deDate(s.agendamento.data));
       if (d?.efeito === "bloqueia") return `Guia ${d.guia.numero} já está ${STATUS_SOLICITACAO[d.guia.statusOperadora!].toLowerCase()} na operadora`;
-      // O token só vale no dia em que o paciente o gerou.
-      const t = s.agendamento.tokenInformadoEm;
-      if (s.agendamento.tokenBeneficiario && t && hojeISO(t) !== hojeISO()) return `Token de ${ddmm(hojeISO(t))} venceu: pegue um novo com o paciente`;
+      if (d?.efeito === "cobre") return `Guia ${d.guia.numero} já autorizada para esta sessão`;
       return null;
     })();
     if (!motivo) return true;
@@ -103,7 +107,7 @@ export async function gerarGuias(agendamentoIds: string[], usuarioId: string) {
       registroAns: a.convenio!.codigoAns,
       prestador: { codigoNaOperadora: a.convenio!.codigoPrestador, nome: clinica?.razaoSocial ?? null },
       carteirinha: a.carteirinha,
-      codValidacao: a.tokenBeneficiario,
+      codValidacao: tokenDeHoje(a),
       solicitante: {
         nome: pedido.medicoNome,
         conselho: pedido.conselho,

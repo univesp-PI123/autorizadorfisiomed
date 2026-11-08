@@ -7,6 +7,7 @@ import { comUrl } from "@/components/ComUrl";
 import Icone from "@/components/Icone";
 import Carregando from "@/components/ui/Carregando";
 import MensagemErro from "@/components/ui/MensagemErro";
+import Modal from "@/components/ui/Modal";
 import { Badge } from "@/components/ui/StatusBadge";
 import { formatarData } from "@/lib/analiseDados";
 import { useFetch } from "@/lib/cliente/hooks";
@@ -35,6 +36,7 @@ const ONDE_RESOLVER: [RegExp, string, boolean][] = [
   [/código do prestador|registro ANS/, "/convenios", true],
   [/pedido médico/i, "na página do paciente", false],
   [/token/, "no campo Token da sessão", false],
+  [/elegível/, "com o paciente ou no portal da Amil", false],
   [/portal da Amil/, "no portal da Amil (ou lance a senha no AnClinic)", false],
 ];
 const ondeResolver = (p: string) => {
@@ -95,6 +97,8 @@ function SolicitacoesPage({ url }: { url: URLSearchParams }) {
   const [gerando, setGerando] = useState(false);
   const [resultadoGuias, setResultadoGuias] = useState<ResultadoGuias | null>(null);
   const [enviando, setEnviando] = useState<string | null>(null);
+  const [cancelando, setCancelando] = useState<{ id: string; numero: number } | null>(null);
+  const [motivo, setMotivo] = useState("");
   const todasUnidades = useFetch(unidadeService.listar);
 
   const buscar = useCallback(() => agendaService.buscar({ data, convenioId: convenioId || undefined }), [data, convenioId]);
@@ -174,6 +178,40 @@ function SolicitacoesPage({ url }: { url: URLSearchParams }) {
       agenda.recarregar();
     } catch (err) {
       toast.error(mensagemDeErro(err, "Não foi possível enviar a guia."));
+    } finally {
+      setEnviando(null);
+    }
+  };
+  // Consulta o status da guia em análise sem esperar a próxima rodada da rotina.
+  const consultarStatus = async (id: string) => {
+    setEnviando(id);
+    try {
+      const r = await guiaTissService.consultarStatus(id);
+      const texto = r.erroEnvio ? `${r.situacao}: ${r.erroEnvio}` : r.situacao;
+      if (r.statusOperadora === "1" || r.statusOperadora === "7") toast.success(texto);
+      else if (r.erroEnvio || r.statusOperadora === "3") toast.error(texto);
+      else toast(texto);
+      agenda.recarregar();
+    } catch (err) {
+      toast.error(mensagemDeErro(err, "Não foi possível consultar o status."));
+    } finally {
+      setEnviando(null);
+    }
+  };
+  // Cancela a guia na operadora; o motivo fica gravado no sistema.
+  const cancelarGuia = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!cancelando) return;
+    setEnviando(cancelando.id);
+    try {
+      const r = await guiaTissService.cancelar(cancelando.id, motivo);
+      if (r.statusOperadora === "6") toast.success(`Guia ${cancelando.numero} cancelada na operadora.`);
+      else toast.error(`${r.situacao}: ${r.erroEnvio ?? "a operadora não cancelou a guia."}`);
+      setCancelando(null);
+      setMotivo("");
+      agenda.recarregar();
+    } catch (err) {
+      toast.error(mensagemDeErro(err, "Não foi possível cancelar a guia."));
     } finally {
       setEnviando(null);
     }
@@ -554,6 +592,30 @@ function SolicitacoesPage({ url }: { url: URLSearchParams }) {
                                 {enviando === s.guia.id ? "Enviando…" : s.guia.erro ? "Tentar de novo" : "Enviar à Amil"}
                               </button>
                             )}
+                            {s.guia && (s.guia.podeConsultar || s.guia.podeCancelar) && (
+                              <span style={{ display: "inline-flex", gap: 6, marginTop: 4 }}>
+                                {s.guia.podeConsultar && (
+                                  <button
+                                    type="button"
+                                    className="sb-btn sb-btn--sm"
+                                    disabled={enviando !== null}
+                                    onClick={() => consultarStatus(s.guia!.id)}
+                                  >
+                                    {enviando === s.guia.id ? "Consultando…" : "Consultar status"}
+                                  </button>
+                                )}
+                                {s.guia.podeCancelar && (
+                                  <button
+                                    type="button"
+                                    className="sb-btn sb-btn--sm"
+                                    disabled={enviando !== null}
+                                    onClick={() => setCancelando({ id: s.guia!.id, numero: s.guia!.numero })}
+                                  >
+                                    Cancelar na Amil
+                                  </button>
+                                )}
+                              </span>
+                            )}
                           </td>
                         </tr>
                       ))
@@ -565,6 +627,39 @@ function SolicitacoesPage({ url }: { url: URLSearchParams }) {
           </>
         )
       )}
+
+      <Modal
+        aberto={!!cancelando}
+        onFechar={() => setCancelando(null)}
+        titulo={`Cancelar a guia ${cancelando?.numero ?? ""} na Amil`}
+        tamanho="sm"
+        rodape={
+          <>
+            <button type="button" className="sb-btn" onClick={() => setCancelando(null)}>
+              Voltar
+            </button>
+            <button type="submit" className="sb-btn sb-btn--primary" form="form-cancelar-guia" disabled={enviando !== null || motivo.trim().length < 3}>
+              {enviando ? "Cancelando…" : "Cancelar guia"}
+            </button>
+          </>
+        }
+      >
+        <form id="form-cancelar-guia" onSubmit={cancelarGuia} className="pilha">
+          <div className="sb-field">
+            <label className="sb-label" htmlFor="motivoCancelamento">
+              Motivo<span className="obrigatorio" aria-hidden="true">*</span>
+            </label>
+            <input
+              id="motivoCancelamento"
+              className="sb-input"
+              value={motivo}
+              onChange={(e) => setMotivo(e.target.value)}
+              maxLength={500}
+              required
+            />
+          </div>
+        </form>
+      </Modal>
     </>
   );
 }

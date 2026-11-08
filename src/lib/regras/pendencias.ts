@@ -57,7 +57,12 @@ export type SessaoParaAnalise = {
   } | null;
   unidade: { cnes: string | null } | null;
   // Token do beneficiário e o dia (YYYY-MM-DD) em que a equipe o informou.
+  // Opcional: o pedido sai na véspera (etapa 1), sem token; quando a equipe
+  // o informa no dia, ele vai na guia.
   token: { valor: string; dia: string } | null;
+  // Última verificação de elegibilidade da carteirinha na operadora (rotina).
+  // Só pesa se foi feita e disse que não é elegível.
+  elegibilidade?: { elegivel: boolean; motivo: string | null } | null;
   // Guia enviada pelo sistema e autorizada pela operadora (status 1 ou 7)
   // para esta data e dentro da validade da senha (regras/guiaSessao.ts).
   guiaAutorizada?: { numero: number; senha: string | null } | null;
@@ -160,10 +165,8 @@ export function analisarSessao(
   else if (!s.unidade.cnes) pendencias.push("Unidade sem CNES");
   if (!s.pacienteId) pendencias.push("Paciente não identificado");
   if (!s.carteirinha) pendencias.push("Sem carteirinha");
-  // A Amil exige o token do paciente na guia; ele vale só no dia em que foi
-  // gerado, que tem de ser o dia da sessão.
-  if (s.convenio.integracao === "tiss_amil" && (!s.token || s.token.dia !== s.data)) {
-    pendencias.push("Sem token do paciente do dia da sessão");
+  if (s.elegibilidade && !s.elegibilidade.elegivel) {
+    pendencias.push(`Carteirinha não elegível na operadora${s.elegibilidade.motivo ? ` (${s.elegibilidade.motivo})` : ""}`);
   }
   if (!s.procedimento) pendencias.push("Sem procedimento");
   else if (!codigoGuia) pendencias.push("Procedimento sem código para a operadora");

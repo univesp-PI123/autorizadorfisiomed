@@ -16,6 +16,7 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
     "db:seed": "tsx prisma/seed.ts",
+    "rotina": "tsx scripts/rotina.ts",
     "postinstall": "prisma generate",
     "db:migrate": "prisma migrate deploy"
   },
