@@ -8,6 +8,7 @@ import MensagemErro from "@/components/ui/MensagemErro";
 import Modal from "@/components/ui/Modal";
 import Paginacao from "@/components/ui/Paginacao";
 import { Badge } from "@/components/ui/StatusBadge";
+import { useSessao } from "@/contextos/SessaoContexto";
 import { mensagemDeErro } from "@/lib/cliente/api";
 import { useFetch, usePaginacao } from "@/lib/cliente/hooks";
 import { convenioService, profissionalService } from "@/lib/cliente/servicos";
@@ -28,6 +29,7 @@ const formDoProfissional = (p: Profissional) => ({
 });
 
 function ProfissionaisPage({ url }: { url: URLSearchParams }) {
+  const { ehAdmin } = useSessao();
   const [busca, setBusca] = useState("");
   const [buscaAplicada, setBuscaAplicada] = useState("");
   const [filtro, setFiltro] = useState(url.get("filtro") ?? "");
@@ -207,9 +209,11 @@ function ProfissionaisPage({ url }: { url: URLSearchParams }) {
                         <td>{p.credenciamentos.length ? p.credenciamentos.map((c) => c.convenio.nome).join(", ") : "—"}</td>
                         <td className="sb-mono sb-end">{p._count?.agendamentos ?? 0}</td>
                         <td className="sb-end">
+                          {ehAdmin && (
                           <button type="button" className="sb-btn sb-btn--sm" onClick={() => abrir(p)} aria-label={`Editar ${p.nome}`}>
                             Editar
                           </button>
+                          )}
                         </td>
                       </tr>
                     ))

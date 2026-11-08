@@ -1,6 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import { ErroHttp, filtroBooleano, json, rota } from "@/lib/api/http";
-import { exigirSessao } from "@/lib/auth/sessao";
+import { exigirAdmin, exigirSessao } from "@/lib/auth/sessao";
 import { prisma } from "@/lib/prisma";
 import { esquemaConvenio, lerCorpo } from "@/lib/validacao";
 
@@ -17,7 +17,7 @@ export const GET = rota(async (req) => {
 });
 
 export const POST = rota(async (req) => {
-  await exigirSessao(req);
+  await exigirAdmin(req);
   const dados = await lerCorpo(req, esquemaConvenio);
   if (await prisma.convenio.findUnique({ where: { nome: dados.nome } })) {
     throw new ErroHttp(409, "Convênio com este nome já existe.");

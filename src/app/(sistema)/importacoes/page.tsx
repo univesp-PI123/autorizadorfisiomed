@@ -8,6 +8,7 @@ import ResumoImportacao from "@/components/ResumoImportacao";
 import Carregando from "@/components/ui/Carregando";
 import MensagemErro from "@/components/ui/MensagemErro";
 import Modal from "@/components/ui/Modal";
+import { useSessao } from "@/contextos/SessaoContexto";
 import { formatarDataHora } from "@/lib/analiseDados";
 import { mensagemDeErro } from "@/lib/cliente/api";
 import { useFetch } from "@/lib/cliente/hooks";
@@ -93,6 +94,7 @@ function FormImportacao({
 
 export default function ImportacoesPage() {
   const [aberta, setAberta] = useState<Importacao | null>(null);
+  const { ehAdmin } = useSessao();
   const historico = useFetch(importacaoService.listar);
   const convenios = useFetch(convenioService.listar);
 
@@ -111,6 +113,7 @@ export default function ImportacoesPage() {
             são marcadas como excluídas.
           </p>
         </FormImportacao>
+        {ehAdmin && (
         <FormImportacao tipo="profissionais" titulo="Profissionais credenciados" aoImportar={aoImportar}>
           <p className="texto-apoio">
             Planilha com Nome, CPF, Conselho, Número no conselho, UF e Especialidades. Com um convênio escolhido, ela vira a
@@ -130,6 +133,7 @@ export default function ImportacoesPage() {
             </select>
           </div>
         </FormImportacao>
+        )}
       </section>
       <EnvioDocumentos aoConcluir={historico.recarregar} />
 

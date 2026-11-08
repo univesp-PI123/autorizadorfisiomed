@@ -6,12 +6,14 @@ import { useState } from "react";
 import Icone from "@/components/Icone";
 import { LogoMenu } from "@/components/Marca";
 import { useAlertas } from "@/contextos/AlertaContexto";
+import { useSessao } from "@/contextos/SessaoContexto";
 import { ITENS_MENU, itemDaRota } from "@/lib/navegacao";
 
 // Barra lateral do Sóbrio: recolhida por padrão (só ícones), botão redondo
 // para expandir e popup com as sub-opções ao passar o mouse ou focar.
 export default function Rail() {
   const { totalAlertas } = useAlertas();
+  const { ehAdmin } = useSessao();
   const pathname = usePathname();
   const busca = useSearchParams().toString();
   const [aberta, setAberta] = useState(false);
@@ -68,7 +70,7 @@ export default function Rail() {
                     <div className="sb-flyout">
                       <div className="sb-flyout__panel" role="menu" aria-label={item.rotulo}>
                         <span className="sb-flyout__title">{item.rotulo}</span>
-                        {item.subitens.map((s) => (
+                        {item.subitens.filter((s) => ehAdmin || !s.soAdmin).map((s) => (
                           <Link
                             key={s.href}
                             className="sb-flyout__link"

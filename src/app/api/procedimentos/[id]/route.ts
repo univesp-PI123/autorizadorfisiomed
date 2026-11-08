@@ -1,12 +1,12 @@
 import { ErroHttp, json, naoEncontrado, rota } from "@/lib/api/http";
-import { exigirSessao } from "@/lib/auth/sessao";
+import { exigirAdmin } from "@/lib/auth/sessao";
 import { prisma } from "@/lib/prisma";
 import { esquemaProcedimento, lerCorpo } from "@/lib/validacao";
 
 // Edita o procedimento do AnClinic e, opcionalmente, o equivalente dele na
 // tabela de uma operadora (de/para).
 export const PUT = rota<{ id: string }>(async (req, { params }) => {
-  await exigirSessao(req);
+  await exigirAdmin(req);
   const { id } = await params;
   const { equivalencia, ...dados } = await lerCorpo(req, esquemaProcedimento);
   if (!(await prisma.procedimento.findUnique({ where: { id } }))) naoEncontrado("Procedimento");

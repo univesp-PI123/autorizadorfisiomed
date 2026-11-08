@@ -1,7 +1,7 @@
 // Formato dos dados como chegam da API (datas "só dia" em YYYY-MM-DD,
 // valores monetários como texto).
 
-export type Perfil = "admin";
+export type Perfil = "admin" | "atendente";
 
 export type StatusAutorizacao =
   | "pendente"

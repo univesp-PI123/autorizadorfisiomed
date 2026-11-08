@@ -80,8 +80,8 @@ async function criarDemo(adminId: string) {
     await prisma.procedimento.upsert({ where: { codigoAnclinic }, update: {}, create: { codigoAnclinic, descricao } });
   }
 
-  // Usuários de teste. O sistema tem um perfil só (admin); Carlos aparece
-  // como terapeuta nos atendimentos de exemplo.
+  // Usuários de teste, com o perfil Atendente (o administrador é o criado
+  // acima). Carlos aparece como terapeuta nos atendimentos de exemplo.
   const terapeutas: string[] = [];
   for (const [nome, email] of [
     ["Ana Recepcionista", "recepcao@demo.local"],
@@ -91,7 +91,7 @@ async function criarDemo(adminId: string) {
     const u = await prisma.usuario.upsert({
       where: { email },
       update: {},
-      create: { nome, email, senhaHash: senhaDemo },
+      create: { nome, email, perfil: "atendente", senhaHash: senhaDemo },
     });
     if (email === "terapeuta@demo.local") terapeutas.push(u.id);
   }

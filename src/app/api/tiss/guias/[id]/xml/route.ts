@@ -1,12 +1,12 @@
 import { naoEncontrado, rota } from "@/lib/api/http";
-import { exigirSessao } from "@/lib/auth/sessao";
+import { exigirAdmin } from "@/lib/auth/sessao";
 import { prisma } from "@/lib/prisma";
 
 type Params = { id: string };
 
 // Baixa o XML da guia, em ISO-8859-1 como vai para a operadora.
 export const GET = rota<Params>(async (req, { params }) => {
-  await exigirSessao(req);
+  await exigirAdmin(req);
   const { id } = await params;
   const guia = await prisma.guiaTiss.findUnique({ where: { id }, select: { numero: true, xml: true } });
   if (!guia) naoEncontrado("Guia");

@@ -5,7 +5,10 @@ import { createContext, useCallback, useContext, type ReactNode } from "react";
 import { authService } from "@/lib/cliente/servicos";
 import type { UsuarioLogado } from "@/lib/cliente/tipos";
 
-type Sessao = { usuario: UsuarioLogado; sair: () => Promise<void> };
+// ehAdmin: o administrador edita cadastros, gerencia usuários e baixa os XMLs
+// da operadora; o atendente só consulta os cadastros. Quem decide é a API
+// (exigirAdmin); a tela só esconde o que o perfil não pode usar.
+type Sessao = { usuario: UsuarioLogado; ehAdmin: boolean; sair: () => Promise<void> };
 
 const SessaoContexto = createContext<Sessao | null>(null);
 
@@ -20,7 +23,7 @@ export function SessaoProvider({ usuario, children }: { usuario: UsuarioLogado; 
       router.refresh();
     }
   }, [router]);
-  return <SessaoContexto.Provider value={{ usuario, sair }}>{children}</SessaoContexto.Provider>;
+  return <SessaoContexto.Provider value={{ usuario, ehAdmin: usuario.perfil === "admin", sair }}>{children}</SessaoContexto.Provider>;
 }
 
 export function useSessao() {

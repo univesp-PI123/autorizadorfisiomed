@@ -9,6 +9,7 @@ import MensagemErro from "@/components/ui/MensagemErro";
 import Modal from "@/components/ui/Modal";
 import Paginacao from "@/components/ui/Paginacao";
 import { Badge } from "@/components/ui/StatusBadge";
+import { useSessao } from "@/contextos/SessaoContexto";
 import { mensagemDeErro } from "@/lib/cliente/api";
 import { useFetch, usePaginacao } from "@/lib/cliente/hooks";
 import { convenioService, importacaoService, procedimentoService } from "@/lib/cliente/servicos";
@@ -95,6 +96,7 @@ function ListaBusca<T>({
 }
 
 export default function ProcedimentosPage() {
+  const { ehAdmin } = useSessao();
   const convenios = useFetch(convenioService.listar);
   const [escolhido, setConvenioId] = useState("");
   const [aba, setAba] = useState<Aba>("equivalencias");
@@ -232,10 +234,12 @@ export default function ProcedimentosPage() {
                 </option>
               ))}
             </select>
+            {ehAdmin && (
             <button type="button" className="sb-btn sb-btn--primary" onClick={() => setImportar(true)}>
               <Icone nome="importar" />
               Importar tabela
             </button>
+            )}
           </div>
         </div>
         <div className="abas" role="tablist" aria-label="Tabelas de procedimentos">
@@ -317,9 +321,11 @@ export default function ProcedimentosPage() {
                             <td className="sb-mono">{guia ?? <Badge tom="warning">Falta</Badge>}</td>
                             <td className="sb-mono sb-end">{p._count?.agendamentos ?? 0}</td>
                             <td className="sb-end">
+                              {ehAdmin && (
                               <button type="button" className="sb-btn sb-btn--sm" onClick={() => abrir(p)} aria-label={`Editar ${p.descricao}`}>
                                 Editar
                               </button>
+                              )}
                             </td>
                           </tr>
                         );

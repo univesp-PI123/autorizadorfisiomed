@@ -9,6 +9,7 @@ import Carregando from "@/components/ui/Carregando";
 import MensagemErro from "@/components/ui/MensagemErro";
 import Modal from "@/components/ui/Modal";
 import { Badge } from "@/components/ui/StatusBadge";
+import { useSessao } from "@/contextos/SessaoContexto";
 import { formatarData } from "@/lib/analiseDados";
 import { useFetch } from "@/lib/cliente/hooks";
 import { mensagemDeErro } from "@/lib/cliente/api";
@@ -84,6 +85,7 @@ function TokenSessao({ sessao, aoSalvar }: { sessao: SessaoAgenda; aoSalvar: () 
 }
 
 function SolicitacoesPage({ url }: { url: URLSearchParams }) {
+  const { ehAdmin } = useSessao();
   const [data, setData] = useState(url.get("data") ?? hojeISO());
   const [convenioId, setConvenioId] = useState(url.get("convenioId") ?? "");
   const [situacao, setSituacao] = useState<SituacaoSessao | "">((url.get("situacao") as SituacaoSessao) ?? "");
@@ -560,10 +562,15 @@ function SolicitacoesPage({ url }: { url: URLSearchParams }) {
                             )}
                             {s.guia && (
                               <span className="texto-suave">
-                                Guia <span className="mono">{s.guia.numero}</span> ·{" "}
-                                <a href={guiaTissService.urlXml(s.guia.id)} download>
-                                  XML
-                                </a>
+                                Guia <span className="mono">{s.guia.numero}</span>
+                                {ehAdmin && (
+                                  <>
+                                    {" "}·{" "}
+                                    <a href={guiaTissService.urlXml(s.guia.id)} download>
+                                      XML
+                                    </a>
+                                  </>
+                                )}
                                 {s.guia.enviada && ` · ${s.guia.situacao}`}
                                 {s.guia.senha && (
                                   <>

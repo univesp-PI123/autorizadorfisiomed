@@ -280,11 +280,24 @@ Por isso o servidor precisa de acesso à internet na hora do build.
 
 ## Perfis de acesso
 
-Há um perfil só, **administrador**: todo usuário vê e faz tudo (pedido do
-grupo em 03/11/2026 — o foco é solicitar autorizações). Os perfis Recepção,
-Terapeuta e Financeiro foram removidos; a migration
-`20261105120000_perfil_unico_admin` transformou esses usuários em
-administradores. A API continua exigindo login em todas as rotas.
+Há dois perfis:
+
+| Tela / ação | Administrador | Atendente |
+|---|:---:|:---:|
+| Solicitações: token, gerar e enviar guias, consultar status, cancelar na Amil | ✓ | ✓ |
+| Autorizações, pacientes, pedidos médicos e documentos | ✓ | ✓ |
+| Importar a agenda do AnClinic e os PDFs | ✓ | ✓ |
+| Relatórios | ✓ | ✓ |
+| Cadastros (convênios, profissionais, procedimentos, clínica e unidades): consultar | ✓ | ✓ |
+| Cadastros: criar e editar; importar profissionais e tabelas de procedimentos | ✓ | |
+| Usuários: criar, mudar o perfil, desativar | ✓ | |
+| Baixar o XML das guias | ✓ | |
+
+Quem decide é a API (`exigirAdmin` em `src/lib/auth/sessao.ts` responde 403
+ao atendente); a tela só esconde o que o perfil não pode usar. O sistema não
+deixa ficar sem administrador ativo. Usuário novo nasce como atendente;
+quem já existia continua administrador (migration
+`20261108130000_perfil_atendente`).
 
 ## Estrutura de pastas
 

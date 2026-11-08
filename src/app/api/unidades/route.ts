@@ -1,5 +1,5 @@
 import { ErroHttp, json, rota } from "@/lib/api/http";
-import { exigirSessao } from "@/lib/auth/sessao";
+import { exigirAdmin, exigirSessao } from "@/lib/auth/sessao";
 import { prisma } from "@/lib/prisma";
 import { esquemaUnidade, lerCorpo } from "@/lib/validacao";
 
@@ -15,7 +15,7 @@ export const GET = rota(async (req) => {
 });
 
 export const POST = rota(async (req) => {
-  await exigirSessao(req);
+  await exigirAdmin(req);
   const dados = await lerCorpo(req, esquemaUnidade);
   if (await prisma.unidade.findUnique({ where: { nomeAnclinic: dados.nome } })) {
     throw new ErroHttp(409, "Já existe uma unidade com este nome.");

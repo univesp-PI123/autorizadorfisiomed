@@ -87,6 +87,13 @@ export async function exigirSessao(req: NextRequest): Promise<UsuarioSessao> {
   return usuario;
 }
 
+/** Como exigirSessao, mas só para o administrador (403 para o atendente). */
+export async function exigirAdmin(req: NextRequest): Promise<UsuarioSessao> {
+  const usuario = await exigirSessao(req);
+  if (usuario.perfil !== "admin") throw new ErroHttp(403, "Apenas o administrador pode fazer isso.");
+  return usuario;
+}
+
 /** Para páginas (server components): devolve o usuário logado ou null. */
 export async function sessaoDaPagina(): Promise<UsuarioSessao | null> {
   const loja = await cookies();

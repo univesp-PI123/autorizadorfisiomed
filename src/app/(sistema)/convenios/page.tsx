@@ -8,6 +8,7 @@ import Carregando from "@/components/ui/Carregando";
 import MensagemErro from "@/components/ui/MensagemErro";
 import Modal from "@/components/ui/Modal";
 import { Badge } from "@/components/ui/StatusBadge";
+import { useSessao } from "@/contextos/SessaoContexto";
 import { mensagemDeErro } from "@/lib/cliente/api";
 import { useFetch } from "@/lib/cliente/hooks";
 import { convenioService } from "@/lib/cliente/servicos";
@@ -62,8 +63,9 @@ const CAMPOS: [keyof FormConvenio, string, string, boolean?, boolean?][] = [
 ];
 
 function ConveniosPage({ url }: { url: URLSearchParams }) {
+  const { ehAdmin } = useSessao();
   const [editando, setEditando] = useState<Convenio | null>(null);
-  const [modalAberto, setModalAberto] = useState(url.get("novo") === "1");
+  const [modalAberto, setModalAberto] = useState(ehAdmin && url.get("novo") === "1");
   const [form, setForm] = useState(FORM_INICIAL);
   const [salvando, setSalvando] = useState(false);
 
@@ -109,10 +111,12 @@ function ConveniosPage({ url }: { url: URLSearchParams }) {
       <section className="sb-card">
         <div className="sb-card__header">
           <h2 className="sb-card__title">Convênios</h2>
+          {ehAdmin && (
           <button type="button" className="sb-btn sb-btn--primary" onClick={() => abrir(null)}>
             <Icone nome="mais" />
             Novo convênio
           </button>
+          )}
         </div>
         {carregando ? (
           <Carregando mensagem="Carregando convênios…" />
@@ -165,9 +169,11 @@ function ConveniosPage({ url }: { url: URLSearchParams }) {
                       <td className="sb-mono sb-end">{c.alertaAntecipacaoDias} d antes</td>
                       <td>{c.ativo ? <Badge tom="success">Ativo</Badge> : <Badge>Inativo</Badge>}</td>
                       <td className="sb-end">
+                        {ehAdmin && (
                         <button type="button" className="sb-btn sb-btn--sm" onClick={() => abrir(c)} aria-label={`Editar ${c.nome}`}>
                           Editar
                         </button>
+                        )}
                       </td>
                     </tr>
                   ))

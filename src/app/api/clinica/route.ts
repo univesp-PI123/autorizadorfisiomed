@@ -1,5 +1,5 @@
 import { json, rota } from "@/lib/api/http";
-import { exigirSessao } from "@/lib/auth/sessao";
+import { exigirAdmin, exigirSessao } from "@/lib/auth/sessao";
 import { prisma } from "@/lib/prisma";
 import { esquemaClinica, lerCorpo } from "@/lib/validacao";
 
@@ -10,7 +10,7 @@ export const GET = rota(async (req) => {
 });
 
 export const PUT = rota(async (req) => {
-  await exigirSessao(req);
+  await exigirAdmin(req);
   const dados = await lerCorpo(req, esquemaClinica);
   const atual = await prisma.clinica.findFirst({ select: { id: true } });
   return json(

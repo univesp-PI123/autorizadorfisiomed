@@ -1,10 +1,10 @@
 import { json, naoEncontrado, rota } from "@/lib/api/http";
-import { exigirSessao } from "@/lib/auth/sessao";
+import { exigirAdmin } from "@/lib/auth/sessao";
 import { prisma } from "@/lib/prisma";
 import { esquemaProfissional, lerCorpo } from "@/lib/validacao";
 
 export const PUT = rota<{ id: string }>(async (req, { params }) => {
-  await exigirSessao(req);
+  await exigirAdmin(req);
   const { id } = await params;
   const { convenioIds, ...dados } = await lerCorpo(req, esquemaProfissional);
   if (!(await prisma.profissional.findUnique({ where: { id } }))) naoEncontrado("Profissional");

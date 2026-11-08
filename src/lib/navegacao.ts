@@ -1,6 +1,6 @@
 import type { NomeIcone } from "@/components/Icone";
 
-export type SubItem = { rotulo: string; href: string };
+export type SubItem = { rotulo: string; href: string; soAdmin?: boolean };
 
 // Telas que dividem um item do menu: aparecem como abas no topo do conteúdo.
 export type Aba = { rotulo: string; caminho: string };
@@ -15,9 +15,9 @@ export type ItemMenu = {
   abas?: Aba[];
 };
 
-// Itens do menu e seus grupos. O sistema tem um perfil só (admin), então
-// todo usuário vê tudo. Nos submenus, as ações ("Nova…", "Importar…") vêm
-// primeiro.
+// Itens do menu e seus grupos. Todo usuário vê todos os itens; as ações que
+// mudam cadastros ou usuários (soAdmin) só aparecem para o administrador.
+// Nos submenus, as ações ("Nova…", "Importar…") vêm primeiro.
 export const ITENS_MENU: ItemMenu[] = [
   {
     caminho: "/dashboard",
@@ -80,7 +80,7 @@ export const ITENS_MENU: ItemMenu[] = [
     grupo: "Cadastros",
     icone: "convenios",
     subitens: [
-      { rotulo: "Novo convênio", href: "/convenios?novo=1" },
+      { rotulo: "Novo convênio", href: "/convenios?novo=1", soAdmin: true },
       { rotulo: "Convênios", href: "/convenios" },
       { rotulo: "Profissionais", href: "/profissionais" },
       { rotulo: "Procedimentos", href: "/procedimentos" },
@@ -100,11 +100,11 @@ export const ITENS_MENU: ItemMenu[] = [
     icone: "configuracoes",
     subitens: [
       { rotulo: "Importar agenda", href: "/importacoes#importar-agenda" },
-      { rotulo: "Importar profissionais", href: "/importacoes#importar-profissionais" },
+      { rotulo: "Importar profissionais", href: "/importacoes#importar-profissionais", soAdmin: true },
       { rotulo: "Enviar documentos", href: "/importacoes#importar-documentos" },
       { rotulo: "Histórico de importações", href: "/importacoes#historico" },
       { rotulo: "Minha conta", href: "/configuracoes#minha-conta" },
-      { rotulo: "Usuários", href: "/configuracoes#usuarios-sistema" },
+      { rotulo: "Usuários", href: "/configuracoes#usuarios-sistema", soAdmin: true },
     ],
     abas: [
       { rotulo: "Importações", caminho: "/importacoes" },
