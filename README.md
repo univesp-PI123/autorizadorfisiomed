@@ -42,10 +42,11 @@ Menu (desde 05/11/2026, a pedido do grupo):
 
 Objetivo: solicitar as autorizações a partir da agenda do AnClinic, pelo
 webservice TISS da Amil (padrão TISS 4.03.00). Na Amil cada sessão é um
-pedido e leva o token que o paciente gera no próprio dia, por isso a guia é
-pedida no dia da sessão (e não na véspera). Importação, conferência, geração
-do XML, elegibilidade e envio estão prontos e foram testados no ambiente de
-homologação da Amil; veja as limitações no fim desta seção.
+pedido (etapa 1, autorização prévia). A rotina automática (passo 6) confere a
+elegibilidade com antecedência, pede a sessão na véspera, consulta o status
+das guias em análise e cancela a guia de sessão desmarcada. Importação,
+conferência, geração do XML, elegibilidade e envio foram testados no ambiente
+de homologação da Amil; veja as limitações no fim desta seção.
 
 Rotina:
 
@@ -72,11 +73,11 @@ Rotina:
    contra os schemas oficiais da ANS (`src/lib/tiss/schemas/v4_03_00`) antes
    de ser gravado, e fica para baixar e conferir (ISO-8859-1, com o hash MD5
    do padrão). A sessão mostra o número da última guia gerada.
-   **Token do paciente (Amil):** no dia da sessão a equipe pega com o
-   paciente o token (app ou SMS da Amil) e digita no campo da sessão, em
-   Solicitações. A guia leva o token no `codValidacao`; sem o token do dia, a
-   sessão fica com a pendência "Sem token do paciente do dia da sessão". O
-   token vale só no dia: guia de outro dia não é enviada.
+   **Token do paciente (Amil), opcional:** se a equipe pega com o paciente o
+   token do dia (app ou SMS da Amil) e o digita no campo da sessão, a guia
+   gerada nesse dia leva o token no `codValidacao`. Sem ele, a guia vai sem o
+   campo (é assim que a rotina pede na véspera). Guia com token só é enviada
+   no dia em que foi gerada.
    **Enviar à Amil** (na sessão) manda a guia ao webservice
    `solicitacaoProcedimento` (SOAP em UTF-8, por enquanto só no endereço de
    homologação) e grava a resposta na guia: status (autorizada, em análise,
@@ -98,7 +99,12 @@ Rotina:
      "Confira no portal da Amil": a guia pode ter sido recebida, então o
      sistema não gera outra. Resolve-se lançando a senha no AnClinic.
    - Guia em análise na operadora (status 2, 4 ou 5) impede guia nova;
-     negada, cancelada ou recusada (mensagem de erro, SOAP Fault) libera.
+     negada, cancelada ou recusada (mensagem de erro, SOAP Fault) libera. A
+     rotina consulta o status dela sozinha; o botão **Consultar status** da
+     sessão faz a consulta na hora.
+   - **Cancelar na Amil** (na sessão, com motivo obrigatório) manda o
+     `cancelaGuia`. Cancelada, a guia deixa de cobrir a sessão. O motivo fica
+     só no sistema: a mensagem TISS não tem esse campo.
 4. **Autorização aprovada:** as sessões que ela cobre ficam ligadas a ela (a
    tela da autorização mostra quantas). A autorização cobre a sessão pelo
    código do procedimento ou, nas lançadas à mão, pelo nome/especialidade
@@ -112,8 +118,28 @@ Rotina:
    geral, as Autorizações ou as Solicitações (`descontarSessoesRealizadas`
    em `src/lib/regras/atendimentos.ts`). Substitui a confirmação manual da
    tela de Atendimentos, que saiu em 05/11/2026.
+6. **Rotina automática** (`npm run rotina`, processo `sga-rotina` no PM2,
+   `src/lib/rotina.ts`): roda a cada 5 minutos e faz, nesta ordem:
+   - **Verificação antecipada:** confere a elegibilidade das carteirinhas da
+     Amil com sessão hoje e nos próximos 3 dias, uma vez por dia. Carteirinha
+     não elegível vira a pendência "Carteirinha não elegível na operadora".
+   - **Pedido na véspera:** gera e envia a guia das sessões *prontas* no dia
+     anterior, às 7h. A senha da Amil vale até o fim da semana, por isso a
+     sessão de segunda é pedida na própria segunda, às 0h05 (nunca no
+     domingo). Sessão importada depois desse horário é pedida na rodada
+     seguinte. A rotina pede cada sessão uma vez só: se já houve guia para a
+     sessão naquela data (negada, recusada…), a equipe decide se pede de novo.
+     Só roda com `ROTINA_ENVIO_AUTOMATICO=1` no `.env`.
+   - **Consulta do status:** guia em análise é consultada depois de 15 min,
+     30 min, 1 h, 2 h e, depois, a cada 4 h, por até cerca de 30 dias
+     (`src/lib/regras/rotina.ts`).
+   - **Cancelamento:** guia ativa de sessão que foi desmarcada ou excluída no
+     AnClinic é cancelada na operadora (uma tentativa automática; se a
+     operadora recusar, o erro fica na sessão).
 
-**Limitações conhecidas** (estado em 02/11/2026):
+   Para testar uma rodada só: `npm run rotina -- --uma-vez`.
+
+**Limitações conhecidas** (estado em 08/11/2026):
 
 - Só o endereço de **homologação** foi usado; produção precisa do endereço e
   das credenciais de produção no `.env` e de um teste com paciente real.
@@ -125,8 +151,10 @@ Rotina:
   (`envioDocumento`, assinado) não foi feito; o pedido segue pelo portal.
 - **Glosa 3145** ("não autorizado por motivo técnico") apareceu na
   homologação sem causa conhecida; o sistema trata o item como negado.
-- Não há consulta do status depois (`solicitacaoStatusAutorizacao`): guia em
-  análise ou a conferir é acompanhada no portal.
+- Consulta do status e cancelamento seguem o padrão TISS e o schema da ANS,
+  mas ainda não foram testados na homologação da Amil.
+- Guia a conferir ("Confira no portal da Amil") continua sendo resolvida no
+  portal.
 
 **Unidade de atendimento:** vem da coluna "Unidade de Atendimento" do
 AnClinic. Para atribuir ou trocar, marque as sessões em **Solicitações** (há o filtro
@@ -403,12 +431,13 @@ Para conferir as tabelas: `sudo -u postgres psql -d sga -c '\dt'`
 
 ```bash
 pm2 start npm --name sga -- start
+pm2 start npm --name sga-rotina -- run rotina   # rotina automática (passo 6 da integração)
 pm2 save
 pm2 startup      # copie e rode o comando "sudo env PATH=..." que ele imprimir
 ```
 
 A aplicação agora roda na porta 3000 e volta sozinha se a máquina reiniciar.
-Comandos úteis: `pm2 status`, `pm2 logs sga`, `pm2 restart sga`.
+Comandos úteis: `pm2 status`, `pm2 logs sga`, `pm2 logs sga-rotina`, `pm2 restart sga sga-rotina`.
 
 ### 7. Publicar na porta 80 com Nginx
 
@@ -497,8 +526,13 @@ git pull
 npm ci
 npx prisma migrate deploy
 npm run build
-pm2 restart sga
+pm2 restart sga sga-rotina
 ```
+
+> **Primeira vez com a rotina automática:** crie o processo uma vez com
+> `pm2 start npm --name sga-rotina -- run rotina && pm2 save` e, quando quiser
+> que ela peça as autorizações sozinha, ponha `ROTINA_ENVIO_AUTOMATICO=1` no
+> `.env` e rode `pm2 restart sga-rotina`.
 
 > **Atualizando para a versão com documentos em lote e atendimentos
 > automáticos:** o `migrate deploy` cria as tabelas de documentos e de
@@ -584,7 +618,7 @@ o schema — no servidor, o `migrate deploy` vai aplicá-la.
 
 - Tela para editar autorização (vigência, protocolo, código TUSS) — a API já
   existe (`PUT /api/autorizacoes/:id`).
-- Amil: passar para produção, códigos do portal das outras terapias,
-  consulta do status (`solicitacaoStatusAutorizacao`), envio do pedido médico
-  assinado (precisa do certificado A1) e relatório do que foi aprovado ou
+- Amil: passar para produção, códigos do portal das outras terapias, envio
+  do pedido médico assinado (precisa do certificado A1), consulta da
+  validação de presença por QR code e relatório do que foi aprovado ou
   negado.

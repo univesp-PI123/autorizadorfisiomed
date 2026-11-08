@@ -105,6 +105,8 @@ export const elegibilidadeService = {
 export const guiaTissService = {
   gerar: (agendamentoIds: string[]) => api.post<ResultadoGuias>("/tiss/guias", { agendamentoIds }),
   enviar: (id: string) => api.post<GuiaEnviada>(`/tiss/guias/${id}/enviar`),
+  consultarStatus: (id: string) => api.post<GuiaEnviada>(`/tiss/guias/${id}/status`),
+  cancelar: (id: string, motivo: string) => api.post<GuiaEnviada>(`/tiss/guias/${id}/cancelar`, { motivo }),
   urlXml: (id: string) => `/api/tiss/guias/${id}/xml`,
 };
 

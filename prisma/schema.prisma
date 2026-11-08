@@ -171,6 +171,11 @@ model PacienteConvenio {
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
+  // Última verificação de elegibilidade na operadora (rotina ou botão).
+  elegivel            Boolean?
+  elegibilidadeEm     DateTime?
+  elegibilidadeMotivo String?
+
   paciente     Paciente      @relation(fields: [pacienteId], references: [id])
   convenio     Convenio      @relation(fields: [convenioId], references: [id])
   autorizacoes Autorizacao[]
@@ -545,6 +550,15 @@ model GuiaTiss {
   erroEnvio           String? // falha de comunicação ou tissFault
   conferir            String? // resposta sem o que foi liberado, ou envio sem resposta: conferir no portal
   respostaXml         String?
+
+  // Rotina: consulta do status enquanto a guia está em análise na operadora.
+  consultasStatus   Int       @default(0)
+  proximaConsultaEm DateTime?
+
+  // Cancelamento da guia na operadora (cancelaGuia).
+  canceladaEm        DateTime?
+  motivoCancelamento String?
+  erroCancelamento   String?
 
   convenio Convenio      @relation(fields: [convenioId], references: [id])
   paciente Paciente      @relation(fields: [pacienteId], references: [id])

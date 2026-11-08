@@ -118,12 +118,16 @@ describe("analisarSessao", () => {
       pendencias: ["Guia 19: a operadora não respondeu ao envio. Confira no portal da Amil"],
     });
   });
-  it("Amil: sem token, ou com token de outro dia, fica pendente", () => {
-    const pend = "Sem token do paciente do dia da sessão";
-    expect(analisarSessao(sessao({ token: null }), ctx())).toEqual({ situacao: "pendente", pendencias: [pend] });
-    expect(analisarSessao(sessao({ token: { valor: "482913", dia: "2026-09-27" } }), ctx()).pendencias).toEqual([pend]);
-    const outro = { id: AMIL, integracao: "tiss_outra", codigoPrestador: "1", codigoAns: "000001" };
-    expect(analisarSessao(sessao({ token: null, convenio: outro }), ctx()).situacao).toBe("pronta");
+  it("Amil: o token é opcional (o pedido sai na véspera, sem ele)", () => {
+    expect(analisarSessao(sessao({ token: null }), ctx()).situacao).toBe("pronta");
+    expect(analisarSessao(sessao({ token: { valor: "482913", dia: "2026-09-27" } }), ctx()).situacao).toBe("pronta");
+  });
+  it("carteirinha não elegível na operadora fica pendente, com o motivo", () => {
+    expect(analisarSessao(sessao({ elegibilidade: { elegivel: false, motivo: "1013 - Cartão vencido" } }), ctx())).toEqual({
+      situacao: "pendente",
+      pendencias: ["Carteirinha não elegível na operadora (1013 - Cartão vencido)"],
+    });
+    expect(analisarSessao(sessao({ elegibilidade: { elegivel: true, motivo: null } }), ctx()).situacao).toBe("pronta");
   });
 });
 

@@ -5,6 +5,7 @@ import { deDate, ehDataISO, hojeISO, paraDate } from "@/lib/datas";
 import { prisma } from "@/lib/prisma";
 import { atualizarAutorizacoes } from "@/lib/regras/atendimentos";
 import type { SituacaoSessao } from "@/lib/regras/pendencias";
+import { STATUS_AUTORIZADA, STATUS_EM_ANDAMENTO } from "@/lib/tiss/dominios";
 import { situacaoDaGuia } from "@/lib/tiss/envio";
 
 const SITUACOES: SituacaoSessao[] = ["pendente", "pronta", "coberta", "fora", "cancelada"];
@@ -28,6 +29,7 @@ export const GET = rota(async (req) => {
     select: {
       id: true, numero: true, agendamentoIds: true, enviadaEm: true, statusOperadora: true, senhaOperadora: true,
       validadeSenha: true, glosas: true, erroEnvio: true, conferir: true, createdAt: true, convenio: { select: { integracao: true } },
+      canceladaEm: true, motivoCancelamento: true, erroCancelamento: true,
     },
     orderBy: { numero: "desc" },
   });
@@ -42,10 +44,15 @@ export const GET = rota(async (req) => {
       // Só no dia em que foi gerada: o token do paciente vale só nesse dia.
       // Cada guia vai uma vez; volta a poder ir só se não chegou à operadora.
       podeEnviar: g.convenio.integracao === "tiss_amil" && !g.enviadaEm && hojeISO(g.createdAt) === hojeISO(),
+      podeConsultar:
+        !!g.enviadaEm && !g.canceladaEm && !!g.statusOperadora &&
+        STATUS_EM_ANDAMENTO.has(g.statusOperadora) && !STATUS_AUTORIZADA.has(g.statusOperadora),
+      podeCancelar: !!g.enviadaEm && !g.canceladaEm && !!g.statusOperadora && STATUS_EM_ANDAMENTO.has(g.statusOperadora),
+      motivoCancelamento: g.motivoCancelamento,
       senha: g.senhaOperadora,
       validadeSenha: g.validadeSenha && deDate(g.validadeSenha),
       glosas: g.glosas,
-      erro: g.erroEnvio,
+      erro: g.erroCancelamento ?? g.erroEnvio,
     };
 
   const analisadas = sessoes.map(

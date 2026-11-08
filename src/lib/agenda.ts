@@ -62,7 +62,7 @@ export async function analisarAgendamentos(where: Prisma.AgendamentoWhereInput) 
   });
 
   const pacienteIds = [...new Set(agendamentos.map((a) => a.pacienteId).filter((id): id is string => !!id))];
-  const [clinica, pedidos, autorizacoes, guias] = await Promise.all([
+  const [clinica, pedidos, autorizacoes, guias, vinculos] = await Promise.all([
     prisma.clinica.findFirst({ select: { id: true } }),
     prisma.pedidoMedico.findMany({
       where: { pacienteId: { in: pacienteIds }, ativo: true },
@@ -83,8 +83,15 @@ export async function analisarAgendamentos(where: Prisma.AgendamentoWhereInput) 
       select: GUIA_PARA_SESSAO,
       orderBy: { numero: "desc" },
     }),
+    prisma.pacienteConvenio.findMany({
+      where: { pacienteId: { in: pacienteIds }, elegibilidadeEm: { not: null } },
+      select: { pacienteId: true, convenioId: true, elegivel: true, elegibilidadeMotivo: true },
+    }),
   ]);
   const guiasDaSessao = guiasParaSessao(guias);
+  const elegibilidade = new Map<string, { elegivel: boolean; motivo: string | null } | null>(
+    vinculos.map((v) => [`${v.pacienteId}:${v.convenioId}`, v.elegivel === null ? null : { elegivel: v.elegivel, motivo: v.elegibilidadeMotivo }]),
+  );
 
   const contextos = new Map<string, ContextoAnalise>();
   const contexto = (pacienteId: string | null): ContextoAnalise => {
@@ -146,6 +153,7 @@ export async function analisarAgendamentos(where: Prisma.AgendamentoWhereInput) 
         },
         unidade: a.unidade,
         token: a.tokenBeneficiario && a.tokenInformadoEm ? { valor: a.tokenBeneficiario, dia: hojeISO(a.tokenInformadoEm) } : null,
+        elegibilidade: elegibilidade.get(`${a.pacienteId}:${a.convenioId}`) ?? null,
         ...efeitoDasGuias(guiasDaSessao.get(a.id) ?? [], deDate(a.data)),
       },
       contexto(a.pacienteId),
