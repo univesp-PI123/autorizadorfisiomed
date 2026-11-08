@@ -8,6 +8,7 @@ import Carregando from "@/components/ui/Carregando";
 import MensagemErro from "@/components/ui/MensagemErro";
 import Modal from "@/components/ui/Modal";
 import { Badge } from "@/components/ui/StatusBadge";
+import { useSessao } from "@/contextos/SessaoContexto";
 import { mensagemDeErro } from "@/lib/cliente/api";
 import { useFetch } from "@/lib/cliente/hooks";
 import { clinicaService, unidadeService } from "@/lib/cliente/servicos";
@@ -40,6 +41,7 @@ function FormClinica({ clinica, aoSalvar }: { clinica: Clinica | null; aoSalvar:
     cnpj: clinica ? formatarCnpj(clinica.cnpj) : "",
   });
   const [salvando, setSalvando] = useState(false);
+  const { ehAdmin } = useSessao();
   const aoMudar = (e: ChangeEvent<HTMLInputElement>) => setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
 
   const aoEnviar = async (e: FormEvent) => {
@@ -71,32 +73,35 @@ function FormClinica({ clinica, aoSalvar }: { clinica: Clinica | null; aoSalvar:
             <label className="sb-label" htmlFor="cli-razao">
               Razão social<span className="obrigatorio" aria-hidden="true">*</span>
             </label>
-            <input id="cli-razao" name="razaoSocial" className="sb-input" value={form.razaoSocial} onChange={aoMudar} required />
+            <input id="cli-razao" name="razaoSocial" className="sb-input" value={form.razaoSocial} onChange={aoMudar} readOnly={!ehAdmin} required />
           </div>
           <div className="sb-field">
             <label className="sb-label" htmlFor="cli-fantasia">
               Nome fantasia
             </label>
-            <input id="cli-fantasia" name="nomeFantasia" className="sb-input" value={form.nomeFantasia} onChange={aoMudar} />
+            <input id="cli-fantasia" name="nomeFantasia" className="sb-input" value={form.nomeFantasia} onChange={aoMudar} readOnly={!ehAdmin} />
           </div>
           <div className="sb-field">
             <label className="sb-label" htmlFor="cli-cnpj">
               CNPJ<span className="obrigatorio" aria-hidden="true">*</span>
             </label>
-            <input id="cli-cnpj" name="cnpj" inputMode="numeric" className="sb-input mono" value={form.cnpj} onChange={aoMudar} required />
+            <input id="cli-cnpj" name="cnpj" inputMode="numeric" className="sb-input mono" value={form.cnpj} onChange={aoMudar} readOnly={!ehAdmin} required />
           </div>
         </div>
-        <div>
-          <button type="submit" className="sb-btn sb-btn--primary" disabled={salvando}>
-            {salvando ? "Salvando…" : "Salvar"}
-          </button>
-        </div>
+        {ehAdmin && (
+          <div>
+            <button type="submit" className="sb-btn sb-btn--primary" disabled={salvando}>
+              {salvando ? "Salvando…" : "Salvar"}
+            </button>
+          </div>
+        )}
       </div>
     </form>
   );
 }
 
 export default function UnidadesPage() {
+  const { ehAdmin } = useSessao();
   const clinica = useFetch(clinicaService.buscar);
   const unidades = useFetch(unidadeService.listar);
   const [editando, setEditando] = useState<Unidade | null>(null);
@@ -154,10 +159,12 @@ export default function UnidadesPage() {
             <Link href="/solicitacoes?unidade=sem" className="sb-btn">
               Sessões sem unidade
             </Link>
+            {ehAdmin && (
             <button type="button" className="sb-btn sb-btn--primary" onClick={abrirNova}>
               <Icone nome="mais" />
               Nova unidade
             </button>
+            )}
           </div>
         </div>
         <div className="sb-card__body">
@@ -212,9 +219,11 @@ export default function UnidadesPage() {
                       </td>
                       <td className="sb-mono sb-end">{u._count?.agendamentos ?? 0}</td>
                       <td className="sb-end">
+                        {ehAdmin && (
                         <button type="button" className="sb-btn sb-btn--sm" onClick={() => abrir(u)} aria-label={`Editar ${u.nome}`}>
                           Editar
                         </button>
+                        )}
                       </td>
                     </tr>
                   ))

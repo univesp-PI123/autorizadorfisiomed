@@ -47,10 +47,13 @@ export const esquemaLogin = z.object({
   senha: z.string().min(1, "Senha é obrigatória.").max(128),
 });
 
+const perfil = z.enum(["admin", "atendente"], { message: "Perfil inválido." });
+
 export const esquemaUsuarioNovo = z.object({
   nome: textoObrigatorio(150, "Nome é obrigatório."),
   email,
   senha: senhaNova,
+  perfil: perfil.default("atendente"),
 });
 
 export const esquemaUsuarioEdicao = z
@@ -58,6 +61,7 @@ export const esquemaUsuarioEdicao = z
     nome: textoObrigatorio(150, "Nome é obrigatório."),
     email,
     ativo: z.boolean(),
+    perfil,
   })
   .partial();
 

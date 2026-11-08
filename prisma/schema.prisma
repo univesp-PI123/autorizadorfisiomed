@@ -17,10 +17,12 @@ datasource db {
 
 // --- Enums -----------------------------------------------------------
 
-// Um perfil só (pedido do grupo em 03/11/2026): o sistema serve para
-// solicitar autorizações, e todo usuário tem acesso a tudo.
+// Dois perfis. O atendente faz o trabalho do dia e consulta os cadastros; o
+// administrador também edita os cadastros, gerencia os usuários e baixa os
+// XMLs trocados com a operadora (src/lib/auth/sessao.ts: exigirAdmin).
 enum PerfilUsuario {
   admin
+  atendente
 }
 
 // Máquina de estados da autorização. As transições válidas ficam em

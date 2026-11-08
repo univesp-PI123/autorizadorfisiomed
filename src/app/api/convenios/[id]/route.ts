@@ -1,5 +1,5 @@
 import { ErroHttp, json, naoEncontrado, rota } from "@/lib/api/http";
-import { exigirSessao } from "@/lib/auth/sessao";
+import { exigirAdmin, exigirSessao } from "@/lib/auth/sessao";
 import { prisma } from "@/lib/prisma";
 import { esquemaConvenio, lerCorpo } from "@/lib/validacao";
 
@@ -14,7 +14,7 @@ export const GET = rota<Params>(async (req, { params }) => {
 });
 
 export const PUT = rota<Params>(async (req, { params }) => {
-  await exigirSessao(req);
+  await exigirAdmin(req);
   const { id } = await params;
   const dados = await lerCorpo(req, esquemaConvenio);
   const outro = await prisma.convenio.findUnique({ where: { nome: dados.nome } });

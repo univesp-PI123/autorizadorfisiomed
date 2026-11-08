@@ -39,6 +39,8 @@ export const POST = rota(async (req) => {
   if (!(arquivo instanceof File) || arquivo.size === 0) throw new ErroHttp(422, "Selecione a planilha .xlsx.");
   if (arquivo.size > TAMANHO_MAX) throw new ErroHttp(413, "Planilha grande demais (máximo 15 MB).");
   if (typeof tipo !== "string" || !(TIPOS as readonly string[]).includes(tipo)) throw new ErroHttp(422, "Tipo de importação inválido.");
+  // A agenda é trabalho do dia; as outras planilhas mudam cadastros.
+  if (tipo !== "agenda" && usuario.perfil !== "admin") throw new ErroHttp(403, "Apenas o administrador importa cadastros.");
   const aceitaCsv = tipo === "tabela_operadora" || tipo === "tuss";
   if (!(aceitaCsv ? /\.(xlsx|csv)$/i : /\.xlsx$/i).test(arquivo.name)) {
     throw new ErroHttp(415, aceitaCsv ? "Envie a planilha em .xlsx ou .csv." : "Envie a planilha no formato .xlsx.");

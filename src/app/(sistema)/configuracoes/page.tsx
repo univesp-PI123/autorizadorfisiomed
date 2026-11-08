@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useCallback, useState, type FormEvent } from "react";
 import toast from "react-hot-toast";
 import Icone from "@/components/Icone";
 import Carregando from "@/components/ui/Carregando";
@@ -12,19 +12,22 @@ import { formatarDataHora } from "@/lib/analiseDados";
 import { mensagemDeErro } from "@/lib/cliente/api";
 import { useFetch } from "@/lib/cliente/hooks";
 import { usuarioService } from "@/lib/cliente/servicos";
-import type { Usuario } from "@/lib/cliente/tipos";
+import type { Perfil, Usuario } from "@/lib/cliente/tipos";
 
-const FORM_USUARIO = { nome: "", email: "", senha: "" };
+const FORM_USUARIO = { nome: "", email: "", senha: "", perfil: "atendente" as Perfil };
+const ROTULO_PERFIL: Record<Perfil, string> = { admin: "Administrador", atendente: "Atendente" };
 const SENHA_VAZIA = { senhaAtual: "", novaSenha: "", confirmar: "" };
 
 export default function ConfiguracoesPage() {
-  const { usuario } = useSessao();
+  const { usuario, ehAdmin } = useSessao();
   const [modalUsuario, setModalUsuario] = useState(false);
   const [formUsuario, setFormUsuario] = useState(FORM_USUARIO);
   const [senhaForm, setSenhaForm] = useState(SENHA_VAZIA);
   const [salvando, setSalvando] = useState(false);
 
-  const usuarios = useFetch(usuarioService.listar);
+  // Só o administrador vê e gerencia os usuários (a API recusa o atendente).
+  const listarUsuarios = useCallback(() => (ehAdmin ? usuarioService.listar() : Promise.resolve([] as Usuario[])), [ehAdmin]);
+  const usuarios = useFetch(listarUsuarios);
 
   const executar = async (acao: () => Promise<unknown>, sucesso: string, aoConcluir: () => void) => {
     setSalvando(true);
@@ -55,6 +58,12 @@ export default function ConfiguracoesPage() {
       u.ativo ? "Usuário desativado." : "Usuário reativado.",
       usuarios.recarregar,
     );
+  };
+
+  const alternarPerfil = (u: Usuario) => {
+    const novo: Perfil = u.perfil === "admin" ? "atendente" : "admin";
+    if (!window.confirm(`Mudar ${u.nome} para ${ROTULO_PERFIL[novo]}?`)) return;
+    executar(() => usuarioService.atualizar(u.id, { perfil: novo }), "Perfil alterado.", usuarios.recarregar);
   };
 
   const aoAlterarSenha = (e: FormEvent) => {
@@ -128,6 +137,7 @@ export default function ConfiguracoesPage() {
         </form>
       </section>
 
+      {ehAdmin && (
       <section className="sb-card" id="usuarios-sistema" aria-labelledby="titulo-usuarios">
         <div className="sb-card__header">
           <h2 className="sb-card__title" id="titulo-usuarios">
@@ -151,6 +161,7 @@ export default function ConfiguracoesPage() {
                 <tr>
                   <th scope="col">Nome</th>
                   <th scope="col">E-mail</th>
+                  <th scope="col">Perfil</th>
                   <th scope="col">Situação</th>
                   <th scope="col" className="sb-end">
                     Último acesso
@@ -165,13 +176,19 @@ export default function ConfiguracoesPage() {
                   <tr key={u.id}>
                     <td className="sb-strong">{u.nome}</td>
                     <td>{u.email}</td>
+                    <td>{ROTULO_PERFIL[u.perfil]}</td>
                     <td>{u.ativo ? <Badge tom="success">Ativo</Badge> : <Badge>Inativo</Badge>}</td>
                     <td className="sb-mono sb-end">{formatarDataHora(u.ultimoAcesso)}</td>
                     <td className="sb-end">
                       {u.id !== usuario.id && (
-                        <button type="button" className="sb-btn sb-btn--sm" onClick={() => alternarAtivo(u)} disabled={salvando}>
-                          {u.ativo ? "Desativar" : "Reativar"}
-                        </button>
+                        <span style={{ display: "inline-flex", gap: 6 }}>
+                          <button type="button" className="sb-btn sb-btn--sm" onClick={() => alternarPerfil(u)} disabled={salvando}>
+                            {u.perfil === "admin" ? "Tornar atendente" : "Tornar administrador"}
+                          </button>
+                          <button type="button" className="sb-btn sb-btn--sm" onClick={() => alternarAtivo(u)} disabled={salvando}>
+                            {u.ativo ? "Desativar" : "Reativar"}
+                          </button>
+                        </span>
                       )}
                     </td>
                   </tr>
@@ -181,6 +198,7 @@ export default function ConfiguracoesPage() {
           </div>
         )}
       </section>
+      )}
 
       <Modal
         aberto={modalUsuario}
@@ -212,6 +230,25 @@ export default function ConfiguracoesPage() {
               E-mail<span className="obrigatorio" aria-hidden="true">*</span>
             </label>
             <input id="u-email" type="email" autoComplete="off" className="sb-input" value={formUsuario.email} onChange={(e) => setFormUsuario((f) => ({ ...f, email: e.target.value }))} required />
+          </div>
+          <div className="sb-field">
+            <label className="sb-label" htmlFor="u-perfil">
+              Perfil
+            </label>
+            <select
+              id="u-perfil"
+              className="sb-input"
+              value={formUsuario.perfil}
+              onChange={(e) => setFormUsuario((f) => ({ ...f, perfil: e.target.value as Perfil }))}
+              aria-describedby="u-perfil-ajuda"
+            >
+              <option value="atendente">Atendente</option>
+              <option value="admin">Administrador</option>
+            </select>
+            <span id="u-perfil-ajuda" className="sb-help">
+              O atendente faz o trabalho do dia e consulta os cadastros. O administrador também edita os cadastros, gerencia
+              os usuários e baixa os XMLs da operadora.
+            </span>
           </div>
           <div className="sb-field">
             <label className="sb-label" htmlFor="u-senha">
